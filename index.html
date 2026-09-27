@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Space Vanguard - WebGL 3D Uzay Savaşı</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Play:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 3D WebGL Canvas Layer -->
+  <div id="canvas-container"></div>
+
+  <!-- UI Overlay Layer -->
+  <div id="ui-layer">
+    <!-- Top-Down Drop Tier-Up Banner -->
+    <div id="top-tier-banner" class="interactive">
+      <div class="tier-banner-header">
+        <span class="tier-banner-star">★</span>
+        <span>ULUSUNUN HANGİ PİLOTU OLACAKSIN ?</span>
+        <span class="tier-banner-star">★</span>
+      </div>
+      <div id="top-tier-choices" class="tier-choices-row">
+        <!-- Populated dynamically by JS -->
+      </div>
+    </div>
+
+    <!-- In-Game HUD Elements (Hidden on Main Menu & Loading) -->
+    <div id="in-game-hud" style="display: none;">
+      <!-- Top Left: Vitals (Shield, Energy, Cargo) & Base Dock Status -->
+      <div id="top-left-hud">
+        <div id="top-vitals">
+          <div class="vital-row">
+            <span class="vital-icon shield-icon" title="Kalkan">🛡️</span>
+            <div class="bar-wrapper">
+              <div class="bar-fill shield-fill" style="width: 100%;"></div>
+              <div class="bar-label" id="shield-text">100 / 100</div>
+            </div>
+          </div>
+          <div class="vital-row">
+            <span class="vital-icon energy-icon" title="Lazer / Enerji">⚡</span>
+            <div class="bar-wrapper">
+              <div class="bar-fill energy-fill" style="width: 100%;"></div>
+              <div class="bar-label" id="energy-text">100 / 100</div>
+            </div>
+          </div>
+          <div class="vital-row">
+            <span class="vital-icon cargo-icon" title="Kargo / Cevher">💎</span>
+            <div class="bar-wrapper">
+              <div class="bar-fill cargo-fill" style="width: 0%;"></div>
+              <div class="bar-label" id="cargo-text">0 / 30</div>
+            </div>
+          </div>
+        </div>
+        <div id="base-dock-status" style="display: none;"></div>
+      </div>
+
+      <!-- Top Right: Radar / Minimap & Leaderboard -->
+      <div id="top-right-hud">
+        <div id="radar-container">
+          <canvas id="radar-canvas" width="240" height="240"></canvas>
+          <div class="radar-sweep"></div>
+        </div>
+
+        <div id="leaderboard">
+          <div class="leaderboard-title">LİDERLİK TABLOSU</div>
+          <div id="leaderboard-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Center: Upgrades Dock (Pure Icon Cards Grid, Auto-Slide) -->
+      <div id="upgrade-dock" class="interactive">
+        <button id="upgrade-close-btn" class="upgrade-close-btn" title="Kapat">✕</button>
+        <div id="upgrade-cards-grid" class="upgrade-grid">
+          <!-- Populated dynamically by JS (Icons & Pips only) -->
+        </div>
+      </div>
+
+      <!-- Bottom Left: Chat Box (Press T to talk) -->
+      <div id="game-chat-box" class="interactive">
+        <div class="chat-header">
+          <span class="chat-title">📡 TAKTİK İLETİŞİM</span>
+          <span class="chat-hint">[T] Sohbet</span>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <form id="chat-form" class="chat-input-bar" onsubmit="return false;">
+          <input type="text" id="chat-input" class="chat-input" placeholder="[T] Basarak yazın..." maxlength="65" autocomplete="off">
+          <button type="submit" id="chat-send-btn" class="chat-send-btn" title="Gönder">➤</button>
+        </form>
+      </div>
+
+      <!-- Bottom Right: Audio Controls (Music & Sound Icons Only) -->
+      <div id="audio-controls" class="interactive">
+        <button id="music-toggle-btn" class="audio-btn" title="Müziği Aç / Kapat" aria-label="Müziği Aç / Kapat">
+          <span id="music-icon" class="audio-icon">🎵</span>
+        </button>
+        <button id="sound-toggle-btn" class="audio-btn" title="Ses Efektlerini Aç / Kapat" aria-label="Ses Efektlerini Aç / Kapat">
+          <span id="sound-icon" class="audio-icon">🔊</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Start / Main Menu Screen with Nation Selection -->
+    <div id="start-screen" class="overlay-screen interactive">
+      <div class="game-logo">SPACE VANGUARD</div>
+
+      <div class="start-box">
+        <input type="text" id="player-name-input" class="name-input" placeholder="KOMUTAN ADINIZ" maxlength="15" value="VANGUARD-1">
+
+        <!-- 3 Nations Selection (Mars, Earth, Saturn - Compact) -->
+        <div class="nation-select-title">HİZMET EDECEĞİNİZ ULUSU SEÇİN:</div>
+        <div class="nation-cards" id="nation-cards-container">
+          <div class="nation-card red" data-nation="red" title="Kryos Ulusu">
+            <div class="nation-flag-icon">
+              <svg viewBox="0 0 40 40" width="42" height="42" class="planet-svg">
+                <defs>
+                  <radialGradient id="mars-grad" cx="35%" cy="35%" r="65%">
+                    <stop offset="0%" stop-color="#ff7b6b"/>
+                    <stop offset="60%" stop-color="#d62828"/>
+                    <stop offset="100%" stop-color="#67000d"/>
+                  </radialGradient>
+                </defs>
+                <circle cx="20" cy="20" r="16" fill="url(#mars-grad)"/>
+                <ellipse cx="20" cy="16" rx="14" ry="4" fill="#a51323" opacity="0.5"/>
+                <ellipse cx="20" cy="24" rx="13" ry="3.5" fill="#58000b" opacity="0.5"/>
+                <circle cx="20" cy="20" r="16" stroke="rgba(255, 120, 100, 0.7)" stroke-width="1.5" fill="none"/>
+              </svg>
+            </div>
+            <div class="nation-card-name">KRYOS ULUSU</div>
+          </div>
+          <div class="nation-card blue selected" data-nation="blue" title="Veylarian Ulusu">
+            <div class="nation-flag-icon">
+              <svg viewBox="0 0 40 40" width="42" height="42" class="planet-svg">
+                <defs>
+                  <radialGradient id="earth-grad" cx="35%" cy="35%" r="65%">
+                    <stop offset="0%" stop-color="#4cc9f0"/>
+                    <stop offset="55%" stop-color="#0077b6"/>
+                    <stop offset="100%" stop-color="#03045e"/>
+                  </radialGradient>
+                </defs>
+                <circle cx="20" cy="20" r="16" fill="url(#earth-grad)"/>
+                <path d="M 12 12 Q 18 10 22 14 Q 20 20 15 18 Z" fill="#2ec4b6" opacity="0.8"/>
+                <path d="M 18 22 Q 25 21 28 26 Q 22 30 18 27 Z" fill="#2ec4b6" opacity="0.8"/>
+                <path d="M 9 19 Q 15 16 17 22 Q 12 25 9 19 Z" fill="#2ec4b6" opacity="0.7"/>
+                <ellipse cx="20" cy="18" rx="14" ry="2.5" fill="#ffffff" opacity="0.4"/>
+                <circle cx="20" cy="20" r="16" stroke="rgba(100, 220, 255, 0.8)" stroke-width="1.5" fill="none"/>
+              </svg>
+            </div>
+            <div class="nation-card-name">VEYLARIAN ULUSU</div>
+          </div>
+          <div class="nation-card gold" data-nation="gold" title="Aethelon Ulusu">
+            <div class="nation-flag-icon">
+              <svg viewBox="0 0 48 40" width="50" height="42" class="planet-svg">
+                <defs>
+                  <radialGradient id="saturn-grad" cx="40%" cy="35%" r="65%">
+                    <stop offset="0%" stop-color="#ffe699"/>
+                    <stop offset="60%" stop-color="#e5a93c"/>
+                    <stop offset="100%" stop-color="#7a4e0a"/>
+                  </radialGradient>
+                  <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#ffe082" stop-opacity="0.85"/>
+                    <stop offset="50%" stop-color="#ffb74d" stop-opacity="0.95"/>
+                    <stop offset="100%" stop-color="#ff9800" stop-opacity="0.7"/>
+                  </linearGradient>
+                </defs>
+                <ellipse cx="24" cy="20" rx="22" ry="7" fill="none" stroke="url(#ring-grad)" stroke-width="3.2" transform="rotate(-18 24 20)" stroke-dasharray="75 75" stroke-dashoffset="0"/>
+                <circle cx="24" cy="20" r="13" fill="url(#saturn-grad)"/>
+                <ellipse cx="24" cy="18" rx="11" ry="2.2" fill="#c48a28" opacity="0.45"/>
+                <ellipse cx="24" cy="22" rx="12" ry="2.5" fill="#8c580d" opacity="0.45"/>
+                <ellipse cx="24" cy="20" rx="22" ry="7" fill="none" stroke="url(#ring-grad)" stroke-width="3.2" transform="rotate(-18 24 20)" stroke-dasharray="75 75" stroke-dashoffset="75"/>
+                <circle cx="24" cy="20" r="13" stroke="rgba(255, 230, 150, 0.7)" stroke-width="1.2" fill="none"/>
+              </svg>
+            </div>
+            <div class="nation-card-name">AETHELON ULUSU</div>
+          </div>
+        </div>
+
+        <!-- Dedicated Lore Preview Box on Hover & Selection -->
+        <div id="nation-lore-box" class="nation-lore-box">
+          <div id="nation-lore-title" class="nation-lore-title">🌍 VEYLARIAN ULUSU</div>
+          <div id="nation-lore-desc" class="nation-lore-desc">Kadim, disiplinli ve teknolojik olarak üstün bir ırk/ulus hissi verir. Ağır zırhlı kruvazörler, merkezi bir imparatorluk yapısı ve enerji silahlarında uzmanlaşmış bir doktrin için idealdir.</div>
+        </div>
+
+        <button id="play-btn" class="play-btn">OYUNA KATIL</button>
+      </div>
+    </div>
+
+    <!-- Loading Screen with Organized Controls Presentation -->
+    <div id="loading-screen" class="overlay-screen interactive" style="display: none;">
+      <div class="loading-container">
+        <div class="loading-logo">SPACE VANGUARD</div>
+        <div class="loading-status-text" id="loading-status">GRAVİTASYON MOTORLARI BAŞLATILIYOR...</div>
+        <div class="loading-bar-wrapper">
+          <div class="loading-bar-fill" id="loading-bar-fill"></div>
+        </div>
+        <div class="loading-pct" id="loading-pct">0%</div>
+
+        <!-- Organized Controls Presentation -->
+        <div class="loading-controls-box">
+          <div class="loading-controls-title">🎮 UÇUŞ & SAVAŞ KONTROLLERİ</div>
+          <div class="controls-columns-row">
+            <div class="control-column">
+              <div class="control-col-header">
+                <span class="col-icon">🎯</span>
+                <span class="col-title">YÖNLENDİRME & İTİŞ</span>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">Fare Hareketi</div>
+                <div class="key-desc">Gemi Burun Yönü (360°)</div>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">Sağ Tık / W / ↑</div>
+                <div class="key-desc">İleri İtici Motorlar</div>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">S / ↓</div>
+                <div class="key-desc">Ters İtiş / Acil Fren</div>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">Shift / Ctrl</div>
+                <div class="key-desc">RCS Dengeleyici</div>
+              </div>
+            </div>
+
+            <div class="control-column">
+              <div class="control-col-header">
+                <span class="col-icon">⚡</span>
+                <span class="col-title">SİLAHLAR & MEKANİKLER</span>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">Sol Tık / Boşluk</div>
+                <div class="key-desc">Lazer Toplarını Ateşle</div>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">Savunma (Tank)</div>
+                <div class="key-desc">Tekli Ağır Kuşatma Topu</div>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">Manevra (Hız)</div>
+                <div class="key-desc">3'lü Seri Atış (Isınma Frenli)</div>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">Dengeli / Şifacı</div>
+                <div class="key-desc">2'li İkiz Işınlar & Can Yenileme</div>
+              </div>
+            </div>
+
+            <div class="control-column">
+              <div class="control-col-header">
+                <span class="col-icon">🚀</span>
+                <span class="col-title">GELİŞİM & İLETİŞİM</span>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">1 - 8 Tuşları</div>
+                <div class="key-desc">Özellikleri Anında Yükselt</div>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">B Tuşu</div>
+                <div class="key-desc">Ana Üsse Kristal Bağışı Yap</div>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">T Tuşu</div>
+                <div class="key-desc">Taktik Telsiz / Sohbet Aç</div>
+              </div>
+              <div class="control-row">
+                <div class="key-badge">Kargo Dolunca</div>
+                <div class="key-desc">Üst Seviye Gemiye Evrimleş!</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="overlay-screen interactive" style="display: none;">
+      <div class="game-logo" style="color: #ff3355;">GEMİ İMHA EDİLDİ</div>
+      
+      <div class="start-box">
+        <div class="game-over-stats">
+          <div>Skor: <span id="final-score">0</span></div>
+          <div>Toplanan Kristal: <span id="final-crystals">0</span></div>
+          <div>Ulaşılan Gemi: <span id="final-tier">Fly</span></div>
+        </div>
+
+        <!-- 5-Second Base Respawn Countdown -->
+        <div id="respawn-timer-container" style="display: none;">
+          <div class="respawn-timer-label">KENDİ ÜSSÜNÜZDEN YENİDEN DOĞUŞ:</div>
+          <div class="respawn-timer-display">
+            <span id="respawn-countdown-num">5</span> <span style="font-size: 1.2rem; color: #9eccdf;">SANİYE</span>
+          </div>
+          <div class="respawn-progress-bar">
+            <div id="respawn-progress-fill"></div>
+          </div>
+          <div class="respawn-timer-sub">5 saniye içinde kendi üssünüzden doğacaksınız (Kargo sıfırlanır)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Announcement Banner -->
+    <div id="announcement-banner" style="display: none;"></div>
+
+    <!-- Victory / Galactic Conquest Screen -->
+    <div id="victory-screen" class="overlay-screen interactive" style="display: none;">
+      <div id="victory-title" class="game-logo" style="color: #ffd700;">ZAFER!</div>
+      <div id="victory-subtitle" class="game-tagline">Tüm düşman üsleri imha edildi! Galaksinin tek hakimi sizsiniz!</div>
+      
+      <div class="start-box">
+        <div id="victory-nation-banner" style="font-size: 1.3rem; font-weight: bold; margin-bottom: 12px; letter-spacing: 1px;"></div>
+        <div class="game-over-stats">
+          <div>Toplam Skor: <span id="victory-score">0</span></div>
+          <div>Toplanan Kristal: <span id="victory-crystals">0</span></div>
+          <div>Ulaşılan Gemi: <span id="victory-tier">Fly</span></div>
+        </div>
+        <button id="victory-restart-btn" class="play-btn">YENİDEN OYNA</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/shipTree.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "starblast-game",
+  "version": "1.0.0",
+  "description": "Starblast.io inspired 3D WebGL Space Arcade Game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "starblast",
+    "space-shooter",
+    "threejs",
+    "webgl",
+    "game"
+  ],
+  "author": "",
+  "license": "MIT"
+}
