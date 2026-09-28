@@ -109,7 +109,7 @@ const TIER_YIELDS = [
 const asteroids = new Map();
 let nextAsteroidId = 1;
 
-function generateAsteroid(tier = null, nearBase = null) {
+function generateAsteroid(tier = null, nearBase = null, nearNation = null) {
   const sizeTier = tier || Math.floor(Math.random() * 7) + 1;
   const radius = 13 + (sizeTier - 1) * 8.5;
   const maxHealth = ASTEROID_HEALTHS[sizeTier] || (sizeTier * 220);
@@ -120,7 +120,7 @@ function generateAsteroid(tier = null, nearBase = null) {
   let x, y;
   if (nearBase) {
     const angle = Math.random() * Math.PI * 2;
-    const r = 320 + Math.random() * 550;
+    const r = 200 + Math.random() * 520;
     x = nearBase.x + Math.cos(angle) * r;
     y = nearBase.y + Math.sin(angle) * r;
   } else {
@@ -141,20 +141,23 @@ function generateAsteroid(tier = null, nearBase = null) {
     maxHealth,
     crystalCount,
     crystalTotalValue,
+    nearNation: nearNation || null,
     isDead: false
   };
   asteroids.set(id, ast);
   return ast;
 }
 
-// Populate initial galaxy with 130 persistent asteroids + base surroundings
-for (let i = 0; i < 130; i++) {
+// Populate galaxy: 120 persistent deep-space asteroids + 18 beginner asteroids per home base
+for (let i = 0; i < 120; i++) {
   generateAsteroid((i % 7) + 1);
 }
+// Each base gets 18 small/medium asteroids (Tier 1 & 2 heavily weighted for easy early-game mining)
+const baseTiers = [1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3];
 for (const n of ['blue', 'red', 'gold']) {
   const b = BASE_LOCATIONS[n];
-  for (let i = 0; i < 6; i++) {
-    generateAsteroid((i % 5) + 1, b);
+  for (const tier of baseTiers) {
+    generateAsteroid(tier, b, n);
   }
 }
 
@@ -271,10 +274,14 @@ io.on('connection', (socket) => {
 
     players.set(socket.id, newPlayer);
 
-    // Confirm join to client
+    // Confirm join to client with complete active galaxy state
     socket.emit('join_success', {
       player: newPlayer,
-      spawn
+      spawn,
+      asteroids: Array.from(asteroids.values()).filter(a => !a.isDead),
+      stations,
+      crystals: Array.from(activeCrystals.values()),
+      players: Array.from(players.values()).filter(p => !p.isDead && p.id !== socket.id)
     });
 
     // Notify all other clients of the new player
@@ -335,10 +342,26 @@ io.on('connection', (socket) => {
     const p = players.get(socket.id);
     if (!p) return;
 
-    const ast = asteroids.get(data.asteroidId);
+    let ast = (data && data.asteroidId) ? asteroids.get(data.asteroidId) : null;
+
+    // Proximity fallback if asteroidId wasn't found (prevents dropped hits from race conditions or local IDs)
+    if (!ast && data) {
+      const hitX = (data.x !== undefined) ? Number(data.x) : p.x;
+      const hitY = (data.y !== undefined) ? Number(data.y) : p.y;
+      let minD = 220;
+      for (const [id, a] of asteroids) {
+        if (a.isDead) continue;
+        const d = Math.hypot(a.x - hitX, a.y - hitY);
+        if (d < a.radius + minD) {
+          minD = d - a.radius;
+          ast = a;
+        }
+      }
+    }
+
     if (!ast || ast.isDead) return;
 
-    const dmg = Number(data.damage) || 10;
+    const dmg = Number(data.damage) || 12;
     ast.health -= dmg;
 
     if (ast.health <= 0) {
@@ -371,11 +394,12 @@ io.on('connection', (socket) => {
         killerId: socket.id
       });
 
-      // Schedule asteroid respawn in 14s
+      // Schedule asteroid respawn in 10s (preserves nearBase location if asteroid was near home base)
       setTimeout(() => {
-        const newAst = generateAsteroid(ast.tier);
+        const baseLoc = ast.nearNation ? BASE_LOCATIONS[ast.nearNation] : null;
+        const newAst = generateAsteroid(ast.tier, baseLoc, ast.nearNation);
         io.emit('asteroid_spawned', newAst);
-      }, 14000);
+      }, 10000);
 
     } else {
       io.emit('asteroid_damaged', {
@@ -524,15 +548,28 @@ io.on('connection', (socket) => {
     const p = players.get(socket.id);
     if (!p || p.isDead) return;
 
-    const gem = activeCrystals.get(data.crystalId);
+    let gem = (data && data.crystalId) ? activeCrystals.get(data.crystalId) : null;
+    let targetGemId = data ? data.crystalId : null;
+
+    if (!gem && data) {
+      const hitX = (data.x !== undefined) ? Number(data.x) : p.x;
+      const hitY = (data.y !== undefined) ? Number(data.y) : p.y;
+      for (const [id, g] of activeCrystals) {
+        if (Math.hypot(g.x - hitX, g.y - hitY) < 90) {
+          gem = g;
+          targetGemId = id;
+          break;
+        }
+      }
+    }
     if (!gem) return;
 
-    activeCrystals.delete(data.crystalId);
+    activeCrystals.delete(targetGemId);
     p.crystals = (p.crystals || 0) + gem.value;
     p.score = (p.score || 0) + gem.value * 15;
 
     io.emit('crystal_collected', {
-      crystalId: data.crystalId,
+      crystalId: targetGemId,
       collectorId: socket.id,
       playerCrystals: p.crystals,
       playerScore: p.score
