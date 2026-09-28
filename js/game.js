@@ -67,6 +67,7 @@ class StarblastGame {
     this.lasers = [];
     this.particles = [];
     this.bots = [];
+    this.remotePlayers = new Map();
     this.stations = {};
 
     // 3 Nation Base Locations (120-degree balanced layout across 10000x10000 galaxy)
@@ -86,10 +87,13 @@ class StarblastGame {
     this.createWorldBoundary();
     this.ui = new UIManager(this);
 
+    // Network Engine (Socket.IO Multiplayer)
+    this.network = new NetworkManager(this);
+
     this.setupInputs();
     this.lastTime = performance.now();
 
-    // Start live 3D universe bot battle on main menu!
+    // Start live 3D cosmic universe view on main menu (no bots)
     this.initMenuBattle();
 
     window.addEventListener('resize', () => this.onWindowResize());
@@ -115,7 +119,7 @@ class StarblastGame {
       const tier = (i % 7) + 1;
       this.spawnRandomAsteroid(tier);
     }
-    // Extra central asteroids for epic dogfighting backdrop
+    // Extra central asteroids for cosmic backdrop
     for (let i = 0; i < 20; i++) {
       const dist = 70 + Math.random() * 450;
       const angle = Math.random() * Math.PI * 2;
@@ -125,38 +129,7 @@ class StarblastGame {
       this.asteroids.push(ast);
       this.scene.add(ast.mesh);
     }
-
-    // 3. Spawn bots across the 3 nations:
-    // 5 bots from each nation (15 skirmishers) clash right in front of the camera with varied classes!
-    const skirmishClasses = ['tank-rhino', 'speed-dart', 'bruiser-crusader', 'healer-cleric'];
-    for (const nation of ['red', 'blue', 'gold']) {
-      const names = NATION_BOT_NAMES[nation] || ['Savaşçı'];
-      for (let i = 0; i < 10; i++) {
-        let spawnX, spawnY;
-        let isSkirmish = false;
-        let shipClass = 'fly';
-
-        if (i < 5) {
-          isSkirmish = true;
-          shipClass = skirmishClasses[i % skirmishClasses.length];
-          const angle = (i * (Math.PI * 2 / 5)) + (nation === 'red' ? 0 : nation === 'blue' ? 2.1 : 4.2);
-          const r = 200 + Math.random() * 260;
-          spawnX = Math.cos(angle) * r;
-          spawnY = Math.sin(angle) * r;
-        } else {
-          const baseSpawn = this.getNationSpawn(nation);
-          spawnX = baseSpawn.x;
-          spawnY = baseSpawn.y;
-        }
-
-        const name = names[i] || `${nation.toUpperCase()}-${i + 1}`;
-        const bot = new BotShip(`bot-menu-${Date.now()}-${i}-${nation}`, name, shipClass, spawnX, spawnY, nation, this.scene);
-        bot.isMenuSkirmish = isSkirmish;
-        if (bot.healthBarContainer) bot.healthBarContainer.style.display = 'none';
-        this.bots.push(bot);
-        this.scene.add(bot.mesh);
-      }
-    }
+    // Bot simulation removed - pure multiplayer arena
   }
 
   createStarfield() {
@@ -726,7 +699,8 @@ class StarblastGame {
 
     // Spawn player at own nation base
     const spawn = this.getNationSpawn(chosenNation);
-    this.player = new Ship('player', playerName, 'fly', spawn.x, spawn.y, true, chosenNation, this.scene);
+    const myId = (this.network && this.network.myId) ? this.network.myId : 'player';
+    this.player = new Ship(myId, playerName, 'fly', spawn.x, spawn.y, true, chosenNation, this.scene);
     this.player.spawnShieldTimer = 3.5;
     this.playerDeadHandled = false;
     this.scene.add(this.player.mesh);
@@ -737,17 +711,11 @@ class StarblastGame {
     this.camera.quaternion.set(0, 0, 0, 1);
     this.camera.up.set(0, 1, 0);
 
-    this.spawnInitialWorld();
-
-    // Spawn 16 nearby asteroids around the home base for immediate space scenery and mining
-    for (let i = 0; i < 16; i++) {
-      const angle = (i / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
-      const r = 320 + Math.random() * 550;
-      const ax = spawn.x + Math.cos(angle) * r;
-      const ay = spawn.y + Math.sin(angle) * r;
-      const ast = new Asteroid(ax, ay, (i % 5) + 1);
-      this.asteroids.push(ast);
-      this.scene.add(ast.mesh);
+    // Notify server of join
+    if (this.network && this.network.isConnected) {
+      this.network.joinGame(playerName, chosenNation);
+    } else {
+      this.spawnInitialWorld();
     }
 
     const startScreen = document.getElementById('start-screen');
@@ -763,7 +731,7 @@ class StarblastGame {
 
     if (this.ui) {
       const nCfg = NATIONS[chosenNation] || NATIONS['blue'];
-      this.ui.addChatMessage('KOMUTA MERKEZİ', `${nCfg.name} filosuna hoş geldiniz, Komutan ${playerName}! Space Vanguard protokolü aktif. [T] tuşuna basarak sohbete katılabilirsiniz.`, chosenNation, true);
+      this.ui.addChatMessage('KOMUTA MERKEZİ', `${nCfg.name} filosuna hoş geldiniz, Komutan ${playerName}! Space Vanguard çevrimiçi protokolü aktif. [T] tuşuna basarak sohbete katılabilirsiniz.`, chosenNation, true);
     }
   }
 
@@ -778,9 +746,10 @@ class StarblastGame {
     const name = this.player ? this.player.name : 'KOMUTAN';
     const spawn = this.getNationSpawn(nation);
     const shipKey = this.lastPlayerShipKey || (this.player ? this.player.shipKey : 'fly');
+    const myId = (this.network && this.network.myId) ? this.network.myId : 'player';
 
     // Respawn with the SAME tier ship, but cargo crystals (ganimet) reset to 0!
-    this.player = new Ship('player', name, shipKey, spawn.x, spawn.y, true, nation, this.scene);
+    this.player = new Ship(myId, name, shipKey, spawn.x, spawn.y, true, nation, this.scene);
     this.player.isDead = false;
     if (this.lastPlayerUpgrades) {
       this.player.upgrades = { ...this.lastPlayerUpgrades };
@@ -809,6 +778,10 @@ class StarblastGame {
 
     this.ui.updateHUD(this.player, this.stations);
     this.isPlaying = true;
+
+    if (this.network && this.network.isConnected) {
+      this.network.emitRespawn();
+    }
   }
 
   clearWorld() {
@@ -819,6 +792,7 @@ class StarblastGame {
     for (const l of this.lasers) l.destroy(this.scene);
     for (const p of this.particles) p.destroy(this.scene);
     for (const b of this.bots) b.destroy(this.scene);
+    for (const [id, rp] of this.remotePlayers) rp.destroy(this.scene);
     for (const key in this.stations) {
       const st = this.stations[key];
       if (st && st.mesh) this.scene.remove(st.mesh);
@@ -845,35 +819,23 @@ class StarblastGame {
     this.lasers = [];
     this.particles = [];
     this.bots = [];
+    this.remotePlayers.clear();
     this.stations = {};
   }
 
   spawnInitialWorld() {
-    // Spawn 130 stationary asteroids distributed across all 7 size tiers
-    for (let i = 0; i < 130; i++) {
-      const tier = (i % 7) + 1;
-      this.spawnRandomAsteroid(tier);
-    }
-
-    // Spawn 10 ships per team (30 total ships across the galaxy):
-    // Player's chosen team: 1 player + 9 bots = 10
-    // Other 2 teams: 10 bots each = 10 each
-    // All ships start at Tier 1 Fly with Level 1 stats
-    for (const nation of ['red', 'blue', 'gold']) {
-      const isPlayerTeam = (nation === this.playerNation);
-      const botsToSpawn = isPlayerTeam ? 9 : 10;
-      const names = NATION_BOT_NAMES[nation] || ['Savaşçı'];
-
-      for (let i = 0; i < botsToSpawn; i++) {
-        const name = names[i] || `${nation.toUpperCase()}-${i + 1}`;
-        this.spawnBot(name, 'fly', nation);
+    // Only spawn offline asteroids if not populated by server
+    if (this.asteroids.length === 0) {
+      for (let i = 0; i < 130; i++) {
+        const tier = (i % 7) + 1;
+        this.spawnRandomAsteroid(tier);
       }
     }
+    // Bots removed: only real online players participate!
   }
 
   spawnRandomAsteroid(tier = null) {
     const sizeTier = tier || Math.floor(Math.random() * 7) + 1;
-    // Keep asteroids distributed widely across the 10000 unit arena
     const dist = 350 + Math.random() * (this.worldSize / 2 - 500);
     const angle = Math.random() * Math.PI * 2;
     const x = Math.cos(angle) * dist;
@@ -885,10 +847,7 @@ class StarblastGame {
   }
 
   spawnBot(name, shipKey = 'fly', nation = 'red') {
-    const spawn = this.getNationSpawn(nation);
-    const bot = new BotShip(`bot-${Date.now()}-${Math.random()}`, name, shipKey, spawn.x, spawn.y, nation, this.scene);
-    this.bots.push(bot);
-    this.scene.add(bot.mesh);
+    // Legacy stub - Bot simulation stripped for human multiplayer
   }
 
   upgradeStat(statId) {
@@ -902,9 +861,11 @@ class StarblastGame {
       this.player.recomputeStats();
       this.lastPlayerUpgrades = { ...this.player.upgrades };
       window.soundSystem.playUpgrade();
-      // Requirement: "50 maden varsa alt yükseltme paneli sürekli açık kalsın... puan verebilsin"
       if (this.ui) {
         this.ui.updateHUD(this.player, this.stations);
+      }
+      if (this.network && this.network.isConnected) {
+        this.network.sendPlayerState(this.player);
       }
     }
   }
@@ -917,6 +878,9 @@ class StarblastGame {
     window.soundSystem.playTierUp();
     this.createExplosionParticles(this.player.x, this.player.y, NATIONS[this.player.nation].color, 40);
     this.ui.updateHUD(this.player);
+    if (this.network && this.network.isConnected) {
+      this.network.emitEvolve(shipKey);
+    }
   }
 
   donateToHomeBase() {
@@ -931,13 +895,17 @@ class StarblastGame {
       this.player.score += amount * 25;
       this.player.shield = this.player.stats.shieldCap;
 
-      const result = homeBase.donate(amount);
+      if (this.network && this.network.isConnected) {
+        this.network.emitDonateBase(amount);
+      } else {
+        const result = homeBase.donate(amount);
+        if (result.leveledUp) {
+          window.soundSystem.playTierUp();
+        }
+      }
+
       window.soundSystem.playUpgrade();
       this.createExplosionParticles(homeBase.x, homeBase.y, NATIONS[this.player.nation].color, 25);
-
-      if (result.leveledUp) {
-        window.soundSystem.playTierUp();
-      }
       this.ui.updateHUD(this.player);
     }
   }
@@ -1076,83 +1044,32 @@ class StarblastGame {
           this.scene.add(laser.mesh);
         });
         window.soundSystem.playLaser(newLasers[0].isHeavy);
+
+        if (this.network && this.network.isConnected) {
+          this.network.emitFireLasers(newLasers.map(l => ({
+            x: Math.round(l.x),
+            y: Math.round(l.y),
+            vx: Math.round(l.vx),
+            vy: Math.round(l.vy),
+            damage: l.damage,
+            isHeavy: !!l.isHeavy,
+            isHealBeam: !!l.isHealBeam,
+            color: l.mesh ? (l.nation === 'red' ? 0xff3b5c : (l.nation === 'blue' ? 0x00f0ff : 0xffcc00)) : 0x00f0ff,
+            maxRange: l.maxRange
+          })));
+        }
       }
+    }
+
+    // Send player state to server at ~28Hz
+    if (this.network && this.network.isConnected) {
+      this.network.sendPlayerState(this.player);
     }
   }
 
   handlePlayerChat(text) {
-    const lower = text.toLowerCase();
-
-    // Find living friendly bots to reply
-    const friendlyBots = this.bots.filter(b => !b.isDead && b.nation === this.playerNation);
-    if (friendlyBots.length === 0) return;
-    const bot = friendlyBots[Math.floor(Math.random() * friendlyBots.length)];
-
-    let reply = '';
-    if (lower.includes('selam') || lower.includes('sa') || lower.includes('merhaba') || lower.includes('slm')) {
-      const greetings = [
-        'Aleyküm selam komutanım, savaşa hazırız!',
-        'Selamlar liderim! Galaksi bizim olacak.',
-        'Selam dostum, arkanı kolluyorum!',
-        'Aleyküm selam! Asteroidleri parçalayıp üssü geliştirelim.'
-      ];
-      reply = greetings[Math.floor(Math.random() * greetings.length)];
-    } else if (lower.includes('üs') || lower.includes('savun') || lower.includes('koru') || lower.includes('merkez')) {
-      const defReplies = [
-        'Emredersiniz komutanım, üs savunma pozisyonuna geçiyorum!',
-        'Ana üs kalkanlarını güçlendirmek için kristal topluyorum!',
-        'Üsse yaklaşan düşmanları püskürtüyoruz!'
-      ];
-      reply = defReplies[Math.floor(Math.random() * defReplies.length)];
-    } else if (lower.includes('saldır') || lower.includes('hücum') || lower.includes('vur') || lower.includes('atak')) {
-      const atkReplies = [
-        'Tam güç saldırı! Hedefe kilitleniyorum!',
-        'Düşman üssüne doğru hücum formasyonundayız!',
-        'Lazerler maksimum kapasitede, ateş serbest!'
-      ];
-      reply = atkReplies[Math.floor(Math.random() * atkReplies.length)];
-    } else if (lower.includes('yardım') || lower.includes('help') || lower.includes('destek')) {
-      reply = 'Dayanın komutanım, koordinatlarınıza intikal ediyorum!';
-    } else {
-      const genReplies = [
-        'Anlaşıldı komutanım, operasyon devam ediyor.',
-        'Filonuz hazır ve emrinizde!',
-        'Lazer kapasitemi artırdım, devam edelim!',
-        'Harika taktik komutanım, zafere az kaldı!'
-      ];
-      reply = genReplies[Math.floor(Math.random() * genReplies.length)];
-    }
-
-    // Realistic typing delay (1.0 - 2.2s)
-    setTimeout(() => {
-      if (this.isPlaying && this.ui) {
-        this.ui.addChatMessage(bot.name, reply, bot.nation);
-      }
-    }, 1000 + Math.random() * 1200);
-  }
-
-  updateBotChat(dt) {
-    this.botChatTimer = (this.botChatTimer || 0) + dt;
-    if (this.botChatTimer < 18.0) return;
-    this.botChatTimer = Math.random() * 5.0; // Randomize next chatter
-
-    const livingBots = this.bots.filter(b => !b.isDead);
-    if (livingBots.length === 0) return;
-    const bot = livingBots[Math.floor(Math.random() * livingBots.length)];
-
-    const chatter = [
-      'Büyük asteroidi patlattım, kristaller dökülüyor!',
-      'Lazer kapasitesini yükselttim, düşmana acımak yok.',
-      'Kargo doldu, üsse bağış yapmaya gidiyorum.',
-      'Düşman devriyesi tespit edildi, dikkatli olun!',
-      'Gövde sağlam, kalkanlar maksimum seviyede.',
-      'Üssümüz seviye atlamak üzere, kristalleri toplayın!',
-      'Manevra motorları harika çalışıyor.'
-    ];
-
-    const text = chatter[Math.floor(Math.random() * chatter.length)];
-    if (this.ui) {
-      this.ui.addChatMessage(bot.name, text, bot.nation);
+    if (this.network && this.network.isConnected) {
+      this.network.sendChat(text);
     }
   }
 
@@ -1161,13 +1078,15 @@ class StarblastGame {
     this.updateShootingStars(dt);
     this.updateFieryMeteors(dt);
 
-    // Bot tactical chatter
-    this.updateBotChat(dt);
-
     const allShips = [];
     if (this.player && !this.player.isDead) allShips.push(this.player);
-    for (const b of this.bots) {
-      if (!b.isDead) allShips.push(b);
+    for (const rp of this.remotePlayers.values()) {
+      if (!rp.isDead) allShips.push(rp);
+    }
+
+    // Update Remote Players Smooth Interpolation
+    for (const rp of this.remotePlayers.values()) {
+      rp.updateInterpolation(dt);
     }
 
     // 1. Update 3 Nation Home Bases
@@ -1221,86 +1140,7 @@ class StarblastGame {
       a.update(dt, this.worldSize);
     }
 
-    // 3. Update Bots AI & Weapons
-    for (let i = this.bots.length - 1; i >= 0; i--) {
-      const bot = this.bots[i];
-      if (bot.isDead) {
-        bot.destroy(this.scene);
-        this.bots.splice(i, 1);
-        const deadNation = bot.nation;
-
-        if (this.isMenuBattle) {
-          setTimeout(() => {
-            if (this.isMenuBattle) {
-              const skirmishClasses = ['tank-rhino', 'speed-dart', 'bruiser-crusader', 'healer-cleric'];
-              const sClass = skirmishClasses[Math.floor(Math.random() * skirmishClasses.length)];
-              const names = NATION_BOT_NAMES[deadNation] || ['Savaşçı'];
-              const name = names[Math.floor(Math.random() * names.length)];
-              const sx = (Math.random() - 0.5) * 900;
-              const sy = (Math.random() - 0.5) * 700;
-              const newBot = new BotShip(`menu-${deadNation}-${Date.now()}`, name, sClass, sx, sy, deadNation, this.scene);
-              newBot.isMenuSkirmish = true;
-              if (newBot.healthBarContainer) newBot.healthBarContainer.style.display = 'none';
-              this.bots.push(newBot);
-              this.scene.add(newBot.mesh);
-            }
-          }, 1200);
-          continue;
-        }
-
-        setTimeout(() => {
-          if (this.isPlaying) {
-            const homeBase = this.stations[deadNation];
-            // Only respawn if this nation's base is still standing!
-            if (homeBase && !homeBase.isDead) {
-              const currentLiving = this.bots.filter(b => !b.isDead && b.nation === deadNation).length;
-              const targetCap = (deadNation === this.playerNation) ? 9 : 10;
-              if (currentLiving < targetCap) {
-                const names = NATION_BOT_NAMES[deadNation] || ['Savaşçı'];
-                const name = names[Math.floor(Math.random() * names.length)];
-                this.spawnBot(name, 'fly', deadNation);
-              }
-            }
-          }
-        }, 4500);
-        continue;
-      }
-
-      bot.updateAI(dt, this.asteroids, allShips, this.gems, this.stations);
-
-      if (bot.isShooting) {
-        const botLasers = bot.tryFire();
-        if (botLasers && botLasers.length > 0) {
-          botLasers.forEach(l => {
-            this.lasers.push(l);
-            this.scene.add(l.mesh);
-          });
-          // Play firing sound ONLY if bot is nearby the player
-          const vol = this.getPositionalVolume(bot.x, bot.y, 650);
-          if (vol > 0.04) {
-            window.soundSystem.playLaser(botLasers[0].isHeavy, vol * 0.6);
-          }
-        }
-      }
-    }
-
-    // Continuous replenishment: ensure each nation keeps 10 ships alive
-    this.botMonitorTimer = (this.botMonitorTimer || 0) + dt;
-    if (this.botMonitorTimer >= 2.0) {
-      this.botMonitorTimer = 0;
-      for (const nation of ['red', 'blue', 'gold']) {
-        const homeBase = this.stations[nation];
-        if (homeBase && !homeBase.isDead) {
-          const living = this.bots.filter(b => !b.isDead && b.nation === nation).length;
-          const targetCap = (nation === this.playerNation) ? 9 : 10;
-          if (living < targetCap) {
-            const names = NATION_BOT_NAMES[nation] || ['Savaşçı'];
-            const name = names[Math.floor(Math.random() * names.length)];
-            this.spawnBot(name, 'fly', nation);
-          }
-        }
-      }
-    }
+    // 3. Bot simulation removed - pure multiplayer arena with human pilots
 
     // 4. Update Player
     if (this.player) {
@@ -1343,12 +1183,16 @@ class StarblastGame {
         if (dist < ast.radius + laser.radius) {
           hit = true;
           this.createLaserHitParticles(laser.x, laser.y, 0xffbb44);
-          const hitVol = (laser.ownerId === 'player') ? 1.0 : this.getPositionalVolume(laser.x, laser.y, 650);
+          const hitVol = (laser.ownerId === 'player' || (this.network && laser.ownerId === this.network.myId)) ? 1.0 : this.getPositionalVolume(laser.x, laser.y, 650);
           if (hitVol > 0.04) window.soundSystem.playHit(hitVol);
 
-          const destroyed = ast.takeDamage(laser.damage, laser.ownerId);
-          if (destroyed) {
-            this.handleAsteroidDestroyed(ast, laser.ownerId);
+          if (this.network && this.network.isConnected) {
+            this.network.emitHitAsteroid(ast.id, laser.damage);
+          } else {
+            const destroyed = ast.takeDamage(laser.damage, laser.ownerId);
+            if (destroyed) {
+              this.handleAsteroidDestroyed(ast, laser.ownerId);
+            }
           }
 
           // Healer life regeneration on hit: "şifacı vurduğu zaman can yeniler"
@@ -1389,9 +1233,13 @@ class StarblastGame {
                 this.createHealingParticle(shooter.x, shooter.y);
               }
 
-              if (laser.ownerId === 'player' && this.player) {
+              if ((laser.ownerId === 'player' || (this.network && laser.ownerId === this.network.myId)) && this.player) {
                 this.player.score += Math.round(healAmt * 2);
                 this.ui.updateHUD(this.player);
+              }
+
+              if (this.network && this.network.isConnected) {
+                this.network.emitHitPlayer(ship.id, laser.damage, true);
               }
               break;
             }
@@ -1408,10 +1256,13 @@ class StarblastGame {
             ship.vx += (laser.vx / ship.mass) * 0.12;
             ship.vy += (laser.vy / ship.mass) * 0.12;
 
-            // Combat damage factor for prolonged, strategic dogfights ("hasar oranlarını düşürmeliyiz gemiler birbiri ile fight yapabilsin")
-            const shipKilled = ship.takeDamage(laser.damage * 0.70);
-            if (shipKilled) {
-              this.handleShipDestroyed(ship, laser.ownerId);
+            if (this.network && this.network.isConnected) {
+              this.network.emitHitPlayer(ship.id, laser.damage * 0.70, false);
+            } else {
+              const shipKilled = ship.takeDamage(laser.damage * 0.70);
+              if (shipKilled) {
+                this.handleShipDestroyed(ship, laser.ownerId);
+              }
             }
 
             // Healer hitting enemy also regenerates health: "şifacı vurduğu zaman can yeniler"
@@ -1449,6 +1300,10 @@ class StarblastGame {
                 shooter.shield = Math.min(shooter.stats.shieldCap, shooter.shield + laser.damage * 0.35);
                 this.createHealingParticle(shooter.x, shooter.y);
               }
+
+              if (this.network && this.network.isConnected) {
+                this.network.emitHitBase(station.nation, laser.damage, true);
+              }
               break;
             }
 
@@ -1460,9 +1315,13 @@ class StarblastGame {
             const hitVol = (laser.ownerId === 'player') ? 1.0 : this.getPositionalVolume(station.x, station.y, 800);
             if (hitVol > 0.04) window.soundSystem.playHit(hitVol);
 
-            const destroyed = station.takeDamage(laser.damage);
-            if (destroyed) {
-              this.handleStationDestroyed(station, laser.ownerId);
+            if (this.network && this.network.isConnected) {
+              this.network.emitHitBase(station.nation, laser.damage, false);
+            } else {
+              const destroyed = station.takeDamage(laser.damage);
+              if (destroyed) {
+                this.handleStationDestroyed(station, laser.ownerId);
+              }
             }
 
             if (laser.isHealBeam) {
@@ -1498,19 +1357,23 @@ class StarblastGame {
         const dist = Math.hypot(gem.x - ship.x, gem.y - ship.y);
         const distFromHull = dist - ship.radius - gem.radius;
         if (distFromHull <= 15) {
-          ship.crystals += gem.value;
-          ship.score += gem.value * 10;
-          if (ship.isPlayer) {
-            window.soundSystem.playGemPickup();
-            const currentCfg = SHIP_TREE[ship.shipKey];
-            if (ship.crystals >= currentCfg.cargoCapacity && currentCfg.evolvesTo && currentCfg.evolvesTo.length > 0) {
-              this.ui.showTierUpDropBanner(ship);
+          if (ship.isPlayer && this.network && this.network.isConnected) {
+            this.network.emitCollectCrystal(gem.id);
+          } else {
+            ship.crystals += gem.value;
+            ship.score += gem.value * 10;
+            if (ship.isPlayer) {
+              window.soundSystem.playGemPickup();
+              const currentCfg = SHIP_TREE[ship.shipKey];
+              if (ship.crystals >= currentCfg.cargoCapacity && currentCfg.evolvesTo && currentCfg.evolvesTo.length > 0) {
+                this.ui.showTierUpDropBanner(ship);
+              }
             }
-          }
 
-          this.createGemPickupFlash(gem.x, gem.y, gem.value);
-          gem.destroy(this.scene);
-          this.gems.splice(i, 1);
+            this.createGemPickupFlash(gem.x, gem.y, gem.value);
+            gem.destroy(this.scene);
+            this.gems.splice(i, 1);
+          }
           break;
         }
       }
@@ -1839,14 +1702,14 @@ class StarblastGame {
 
       // Update UI components
       this.ui.updateHUD(this.player, this.stations);
-      this.ui.updateRadar(this.player, this.asteroids, this.bots, this.gems, this.stations, this.worldSize);
-      this.ui.updateLeaderboard(this.player, this.bots);
+      this.ui.updateRadar(this.player, this.asteroids, this.remotePlayers, this.gems, this.stations, this.worldSize);
+      this.ui.updateLeaderboard(this.player, this.remotePlayers);
     } else if (this.isMenuBattle) {
-      // Live background universe bot battle!
+      // Live background cosmic galaxy view
       this.updatePhysicsAndCollisions(dt);
 
-      // Cinematic gentle camera orbit around the central sector battle
-      this.menuCamAngle = (this.menuCamAngle || 0) + dt * 0.06;
+      // Cinematic gentle camera orbit around the cosmic galaxy
+      this.menuCamAngle = (this.menuCamAngle || 0) + dt * 0.04;
       this.camera.position.x = Math.sin(this.menuCamAngle) * 380;
       this.camera.position.y = Math.cos(this.menuCamAngle) * 380;
       this.camera.position.z = 750 + Math.sin(this.menuCamAngle * 1.5) * 50;
@@ -1866,6 +1729,350 @@ class StarblastGame {
     }
 
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // ==========================================
+  // MULTIPLAYER NETWORK SYNCHRONIZATION
+  // ==========================================
+  syncServerAsteroids(serverAsteroids) {
+    if (!serverAsteroids || serverAsteroids.length === 0) return;
+    for (const a of this.asteroids) {
+      if (a.mesh) this.scene.remove(a.mesh);
+    }
+    this.asteroids = [];
+
+    serverAsteroids.forEach(astData => {
+      const ast = new Asteroid(astData.x, astData.y, astData.tier);
+      ast.id = astData.id;
+      ast.health = astData.health;
+      ast.maxHealth = astData.maxHealth;
+      ast.radius = astData.radius;
+      ast.crystalCount = astData.crystalCount;
+      ast.crystalTotalValue = astData.crystalTotalValue;
+      ast.isDead = !!astData.isDead;
+      if (!ast.isDead) {
+        this.asteroids.push(ast);
+        this.scene.add(ast.mesh);
+      }
+    });
+  }
+
+  syncServerStations(serverStations) {
+    if (!serverStations) return;
+    for (const key of ['red', 'blue', 'gold']) {
+      const stData = serverStations[key];
+      if (stData && this.stations[key]) {
+        this.stations[key].hp = stData.hp;
+        this.stations[key].maxHp = stData.maxHp;
+        this.stations[key].level = stData.level;
+        this.stations[key].crystalsDonated = stData.crystalsDonated;
+        this.stations[key].crystalsRequired = stData.crystalsRequired;
+        this.stations[key].isDead = !!stData.isDead;
+      }
+    }
+  }
+
+  syncServerCrystals(serverCrystals) {
+    if (!serverCrystals) return;
+    serverCrystals.forEach(c => {
+      if (this.gems.some(g => g.id === c.id)) return;
+      const gem = new Gem(c.x, c.y, c.value, null);
+      gem.id = c.id;
+      this.gems.push(gem);
+      this.scene.add(gem.mesh);
+    });
+  }
+
+  syncServerExistingPlayers(existingPlayers) {
+    if (!existingPlayers) return;
+    existingPlayers.forEach(p => {
+      if (p.id === this.network.myId) return;
+      this.addRemotePlayer(p);
+    });
+  }
+
+  onServerJoinSuccess(playerData, spawn) {
+    console.log('[GAME] Server onayladı, konumlandırılıyor:', spawn);
+    if (this.player) {
+      this.player.id = playerData.id;
+      this.player.x = spawn.x;
+      this.player.y = spawn.y;
+      this.player.nation = playerData.nation;
+      if (this.player.mesh) {
+        this.player.mesh.position.set(spawn.x, -spawn.y, 0);
+      }
+      this.camera.position.set(spawn.x, -spawn.y, 750);
+    }
+  }
+
+  syncRemotePlayersTick(playersList) {
+    if (!playersList) return;
+    const activeIds = new Set();
+
+    playersList.forEach(pData => {
+      if (pData.id === this.network.myId) {
+        return;
+      }
+      activeIds.add(pData.id);
+
+      let rp = this.remotePlayers.get(pData.id);
+      if (!rp) {
+        rp = this.addRemotePlayer(pData);
+      }
+
+      if (rp) {
+        rp.targetX = pData.x;
+        rp.targetY = pData.y;
+        rp.targetVx = pData.vx;
+        rp.targetVy = pData.vy;
+        rp.targetRotation = pData.rotation;
+        rp.isThrusting = pData.isThrusting;
+        rp.shield = pData.shield;
+        rp.energy = pData.energy;
+        rp.score = pData.score || 0;
+        rp.crystals = pData.crystals || 0;
+        rp.isDead = !!pData.isDead;
+        rp.spawnShieldTimer = pData.spawnShieldTimer || 0;
+
+        if (pData.shipKey && pData.shipKey !== rp.shipKey) {
+          rp.evolve(pData.shipKey, this.scene);
+        }
+      }
+    });
+
+    // Remove any disconnected players not in tick
+    for (const [id, rp] of this.remotePlayers) {
+      if (!activeIds.has(id)) {
+        this.removeRemotePlayer(id);
+      }
+    }
+  }
+
+  addRemotePlayer(pData) {
+    if (this.remotePlayers.has(pData.id)) return this.remotePlayers.get(pData.id);
+    const rp = new RemotePlayer(pData.id, pData.name, pData.shipKey || 'fly', pData.x, pData.y, pData.nation, this.scene);
+    rp.score = pData.score || 0;
+    rp.crystals = pData.crystals || 0;
+    rp.shield = pData.shield || 170;
+    rp.spawnShieldTimer = pData.spawnShieldTimer || 0;
+    this.remotePlayers.set(pData.id, rp);
+    this.scene.add(rp.mesh);
+    return rp;
+  }
+
+  removeRemotePlayer(playerId) {
+    const rp = this.remotePlayers.get(playerId);
+    if (rp) {
+      rp.destroy(this.scene);
+      this.remotePlayers.delete(playerId);
+    }
+  }
+
+  spawnRemoteLasers(data) {
+    if (!data.lasers) return;
+    data.lasers.forEach(l => {
+      const laser = new Laser(
+        l.x, l.y, l.vx, l.vy, l.damage, l.isHeavy, data.playerId,
+        l.color, data.nation, l.maxRange, l.isHealBeam
+      );
+      this.lasers.push(laser);
+      this.scene.add(laser.mesh);
+    });
+
+    const vol = this.getPositionalVolume(data.lasers[0].x, data.lasers[0].y, 650);
+    if (vol > 0.04) {
+      window.soundSystem.playLaser(data.lasers[0].isHeavy, vol * 0.65);
+    }
+  }
+
+  onRemotePlayerEvolve(playerId, shipKey) {
+    const rp = this.remotePlayers.get(playerId);
+    if (rp) {
+      rp.evolve(shipKey, this.scene);
+      this.createExplosionParticles(rp.x, rp.y, NATIONS[rp.nation].color, 35);
+    }
+  }
+
+  onServerAsteroidDamaged(data) {
+    const ast = this.asteroids.find(a => a.id === data.asteroidId);
+    if (ast) {
+      ast.health = data.health;
+      this.createLaserHitParticles(ast.x, ast.y, 0xffbb44);
+      const hitVol = this.getPositionalVolume(ast.x, ast.y, 650);
+      if (hitVol > 0.04) window.soundSystem.playHit(hitVol);
+    }
+  }
+
+  onServerAsteroidDestroyed(data) {
+    const idx = this.asteroids.findIndex(a => a.id === data.asteroidId);
+    if (idx !== -1) {
+      const ast = this.asteroids[idx];
+      this.createCrystalBurstEffect(data.x, data.y, (data.crystals ? data.crystals.length : 14));
+      if (ast.mesh) this.scene.remove(ast.mesh);
+      this.asteroids.splice(idx, 1);
+    }
+
+    if (Array.isArray(data.crystals)) {
+      data.crystals.forEach(c => {
+        const gem = new Gem(c.x, c.y, c.value, null);
+        gem.id = c.id;
+        this.gems.push(gem);
+        this.scene.add(gem.mesh);
+      });
+    }
+  }
+
+  onServerAsteroidSpawned(astData) {
+    const ast = new Asteroid(astData.x, astData.y, astData.tier);
+    ast.id = astData.id;
+    ast.health = astData.health;
+    ast.maxHealth = astData.maxHealth;
+    ast.radius = astData.radius;
+    ast.crystalCount = astData.crystalCount;
+    ast.crystalTotalValue = astData.crystalTotalValue;
+    this.asteroids.push(ast);
+    this.scene.add(ast.mesh);
+  }
+
+  onServerCrystalCollected(data) {
+    const idx = this.gems.findIndex(g => g.id === data.crystalId);
+    if (idx !== -1) {
+      const gem = this.gems[idx];
+      this.createGemPickupFlash(gem.x, gem.y, gem.value);
+      gem.destroy(this.scene);
+      this.gems.splice(idx, 1);
+    }
+    if (this.network && data.collectorId === this.network.myId && this.player) {
+      this.player.crystals = data.playerCrystals;
+      this.player.score = data.playerScore;
+      window.soundSystem.playGemPickup();
+      this.ui.updateHUD(this.player, this.stations);
+    }
+  }
+
+  onServerPlayerDamaged(data) {
+    if (this.network && data.targetId === this.network.myId && this.player) {
+      this.player.shield = data.currentShield;
+      this.player.shieldDamageFlash = 0.25;
+      window.soundSystem.playHit(1.0);
+      this.createLaserHitParticles(this.player.x, this.player.y, NATIONS[this.player.nation].color);
+      this.ui.updateHUD(this.player, this.stations);
+    } else {
+      const rp = this.remotePlayers.get(data.targetId);
+      if (rp) {
+        rp.shield = data.currentShield;
+        rp.shieldDamageFlash = 0.25;
+        this.createLaserHitParticles(rp.x, rp.y, NATIONS[rp.nation].color);
+        const hitVol = this.getPositionalVolume(rp.x, rp.y, 650);
+        if (hitVol > 0.04) window.soundSystem.playHit(hitVol);
+      }
+    }
+  }
+
+  onServerPlayerHealed(data) {
+    if (this.network && data.targetId === this.network.myId && this.player) {
+      this.player.shield = data.currentShield;
+      this.createHealingParticle(this.player.x, this.player.y);
+      window.soundSystem.playUpgrade();
+      this.ui.updateHUD(this.player, this.stations);
+    } else {
+      const rp = this.remotePlayers.get(data.targetId);
+      if (rp) {
+        rp.shield = data.currentShield;
+        this.createHealingParticle(rp.x, rp.y);
+        const vol = this.getPositionalVolume(rp.x, rp.y, 650);
+        if (vol > 0.04) window.soundSystem.playUpgrade();
+      }
+    }
+  }
+
+  onServerPlayerKilled(data) {
+    this.createExplosionParticles(data.x, data.y, NATIONS[data.victimNation] ? NATIONS[data.victimNation].color : 0xff3355, 55);
+    const vol = this.getPositionalVolume(data.x, data.y, 850);
+    if (vol > 0.04) window.soundSystem.playExplosion(true);
+
+    if (Array.isArray(data.crystals)) {
+      data.crystals.forEach(c => {
+        const gem = new Gem(c.x, c.y, c.value, null);
+        gem.id = c.id;
+        this.gems.push(gem);
+        this.scene.add(gem.mesh);
+      });
+    }
+
+    if (this.network && data.victimId === this.network.myId && this.player) {
+      this.player.isDead = true;
+      this.player.shield = 0;
+      this.player.crystals = 0;
+      this.lastPlayerShipKey = this.player.shipKey;
+      this.lastPlayerUpgrades = { ...this.player.upgrades };
+      this.lastPlayerScore = this.player.score;
+      this.player.destroy(this.scene);
+      this.ui.showGameOver(this.player);
+    } else {
+      const rp = this.remotePlayers.get(data.victimId);
+      if (rp) {
+        rp.isDead = true;
+      }
+    }
+  }
+
+  onServerPlayerRespawned(data) {
+    if (this.network && data.playerId === this.network.myId) {
+      // Local player respawn handled by respawnPlayer
+    } else {
+      const rp = this.remotePlayers.get(data.playerId);
+      if (rp) {
+        rp.isDead = false;
+        rp.x = data.x;
+        rp.y = data.y;
+        rp.targetX = data.x;
+        rp.targetY = data.y;
+        rp.shield = 350;
+        rp.spawnShieldTimer = 4.0;
+        if (rp.mesh) {
+          rp.mesh.visible = true;
+          rp.mesh.position.set(data.x, -data.y, 0);
+        }
+      }
+    }
+  }
+
+  onServerBaseDamaged(data) {
+    const base = this.stations[data.nation];
+    if (base) {
+      base.hp = data.hp;
+      base.maxHp = data.maxHp;
+      const vol = this.getPositionalVolume(base.x, base.y, 850);
+      if (vol > 0.04) window.soundSystem.playHit(vol);
+    }
+  }
+
+  onServerBaseUpdated(data) {
+    const base = this.stations[data.nation];
+    if (base) {
+      base.hp = data.hp;
+      base.maxHp = data.maxHp;
+      base.crystalsDonated = data.crystalsDonated;
+      base.crystalsRequired = data.crystalsRequired;
+      if (data.level && data.level !== base.level) {
+        base.level = data.level;
+        if (data.leveledUp) {
+          window.soundSystem.playTierUp();
+          this.createExplosionParticles(base.x, base.y, NATIONS[data.nation].color, 35);
+        }
+      }
+    }
+  }
+
+  onServerBaseDestroyed(data) {
+    const base = this.stations[data.nation];
+    if (base) {
+      base.hp = 0;
+      base.isDead = true;
+      this.createExplosionParticles(base.x, base.y, 0xff2200, 60);
+      window.soundSystem.playExplosion(true);
+    }
   }
 }
 

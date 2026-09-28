@@ -694,6 +694,112 @@ class Ship extends Entity {
   }
 }
 
+// ==========================================
+// Real-time Network Remote Player
+// ==========================================
+class RemotePlayer extends Ship {
+  constructor(id, name, shipKey = 'fly', x = 0, y = 0, nation = 'red', scene = null) {
+    super(id, name, shipKey, x, y, false, nation, scene);
+    this.targetX = x;
+    this.targetY = y;
+    this.targetVx = 0;
+    this.targetVy = 0;
+    this.targetRotation = 0;
+    this.isRemote = true;
+    this.createPlayerNameTag(scene);
+  }
+
+  createPlayerNameTag(scene) {
+    if (!scene) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 256, 64);
+    ctx.font = 'bold 24px Orbitron, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = (this.nation === 'red') ? '#ff5577' : (this.nation === 'blue') ? '#00d0ff' : '#ffd044';
+    ctx.fillText(this.name, 128, 42);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+    this.nameSprite = new THREE.Sprite(spriteMat);
+    this.nameSprite.scale.set(65, 16.25, 1);
+    this.nameSprite.position.set(this.x, -this.y + this.radius + 30, 5);
+    scene.add(this.nameSprite);
+  }
+
+  updateInterpolation(dt) {
+    if (this.isDead) {
+      if (this.mesh) this.mesh.visible = false;
+      if (this.healthBarGroup) this.healthBarGroup.visible = false;
+      if (this.nameSprite) this.nameSprite.visible = false;
+      return;
+    }
+
+    if (this.mesh) this.mesh.visible = true;
+    if (this.nameSprite) this.nameSprite.visible = true;
+
+    // Smooth position interpolation
+    const lerpFactor = Math.min(1.0, dt * 18);
+    this.x += (this.targetX - this.x) * lerpFactor;
+    this.y += (this.targetY - this.y) * lerpFactor;
+
+    // Angle interpolation (shortest path)
+    let diff = (this.targetRotation - this.rotation);
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    this.rotation += diff * lerpFactor;
+
+    // Mesh position & rotation
+    if (this.mesh) {
+      this.mesh.position.set(this.x, -this.y, 0);
+      this.mesh.rotation.z = -this.rotation + Math.PI / 2;
+    }
+
+    // Name tag position
+    if (this.nameSprite) {
+      this.nameSprite.position.set(this.x, -this.y + this.radius + 30, 5);
+    }
+
+    // Engine flame
+    if (this.engineFlame) {
+      this.engineFlame.visible = !!this.isThrusting;
+      if (this.isThrusting) {
+        const pulse = 0.8 + Math.random() * 0.4;
+        this.engineFlame.scale.set(pulse, pulse, pulse);
+      }
+    }
+
+    // Shield bubble
+    if (this.shieldBubble) {
+      if (this.spawnShieldTimer > 0) {
+        this.shieldBubble.visible = true;
+        this.shieldBubble.material.opacity = 0.65;
+        this.spawnShieldTimer -= dt;
+      } else if (this.shieldDamageFlash > 0) {
+        this.shieldBubble.visible = true;
+        this.shieldBubble.material.opacity = this.shieldDamageFlash;
+        this.shieldDamageFlash -= dt * 2.5;
+      } else {
+        this.shieldBubble.visible = false;
+      }
+    }
+
+    this.updateHealthBar();
+  }
+
+  destroy(scene) {
+    super.destroy(scene);
+    if (this.nameSprite && scene) {
+      scene.remove(this.nameSprite);
+      if (this.nameSprite.material.map) this.nameSprite.material.map.dispose();
+      this.nameSprite.material.dispose();
+      this.nameSprite = null;
+    }
+  }
+}
+
 // AI Controlled Bot Ship with Smart Tactics
 class BotShip extends Ship {
   constructor(id, name, shipKey = 'fly', x = 0, y = 0, nation = 'red', scene = null) {

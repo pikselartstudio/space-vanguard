@@ -118,9 +118,13 @@ class UIManager {
         updateLore(nation);
       });
 
-      // Click to select (silent per user request: "ulus seçim ekranında ses olmasın")
+      // Click to select with team balance check
       card.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (card.classList.contains('locked')) {
+          this.showAnnouncement('Bu ulus dolu! Takım dengesini korumak için lütfen diğer açık uluslardan birini seçin.', 3000);
+          return;
+        }
         cards.forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
         this.selectedNation = card.dataset.nation;
@@ -135,13 +139,63 @@ class UIManager {
       });
     }
 
-    // Play Button -> launches smooth loading sequence (silent on click)
+    // Play Button -> checks team balance and launches smooth loading sequence
     const playBtn = document.getElementById('play-btn');
     if (playBtn) {
       playBtn.addEventListener('click', () => {
+        const currentCard = document.querySelector(`.nation-card.${this.selectedNation}`);
+        if (currentCard && currentCard.classList.contains('locked')) {
+          this.showAnnouncement('Seçili ulus şu anda dolu! Lütfen açık olan bir ulusu seçin.', 3000);
+          return;
+        }
         const nameInput = document.getElementById('player-name-input');
         const name = (nameInput ? nameInput.value.trim() : '') || 'KOMUTAN';
         this.startLoadingSequence(name, this.selectedNation);
+      });
+    }
+
+    // Server Settings Modal Event Listeners
+    const serverSettingsBtn = document.getElementById('server-settings-btn');
+    const serverModal = document.getElementById('server-modal');
+    const serverModalClose = document.getElementById('server-modal-close');
+    const serverSaveBtn = document.getElementById('server-save-btn');
+    const serverLocalBtn = document.getElementById('server-local-btn');
+    const serverUrlInput = document.getElementById('server-url-input');
+
+    if (serverSettingsBtn && serverModal) {
+      serverSettingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (serverUrlInput && this.game && this.game.network) {
+          serverUrlInput.value = this.game.network.serverUrl;
+        }
+        serverModal.style.display = 'flex';
+      });
+    }
+
+    if (serverModalClose && serverModal) {
+      serverModalClose.addEventListener('click', () => {
+        serverModal.style.display = 'none';
+      });
+    }
+
+    if (serverSaveBtn && serverModal && serverUrlInput) {
+      serverSaveBtn.addEventListener('click', () => {
+        const val = serverUrlInput.value.trim();
+        if (val && this.game && this.game.network) {
+          this.game.network.setServerUrl(val);
+        }
+        serverModal.style.display = 'none';
+      });
+    }
+
+    if (serverLocalBtn && serverModal && serverUrlInput) {
+      serverLocalBtn.addEventListener('click', () => {
+        if (this.game && this.game.network) {
+          const defaultUrl = (window.location.protocol === 'file:') ? 'http://localhost:3000' : window.location.origin;
+          serverUrlInput.value = defaultUrl;
+          this.game.network.setServerUrl(defaultUrl);
+        }
+        serverModal.style.display = 'none';
       });
     }
 
@@ -321,12 +375,70 @@ class UIManager {
     this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
   }
 
+  updateTeamStatus(data) {
+    if (!data) return;
+    const { counts, status } = data;
+    if (!counts || !status) return;
+
+    for (const nation of ['red', 'blue', 'gold']) {
+      const badge = document.getElementById(`pilot-count-${nation}`);
+      if (badge) {
+        badge.textContent = `${counts[nation] || 0} Pilot`;
+      }
+      const card = document.querySelector(`.nation-card.${nation}`);
+      const lockOverlay = document.getElementById(`nation-lock-${nation}`);
+      const isLocked = !!(status[nation] && status[nation].locked);
+
+      if (card) {
+        card.classList.toggle('locked', isLocked);
+      }
+      if (lockOverlay) {
+        lockOverlay.style.display = isLocked ? 'flex' : 'none';
+      }
+    }
+
+    // Auto-switch away from locked nation if currently selected
+    const currentCard = document.querySelector(`.nation-card.${this.selectedNation}`);
+    if (currentCard && currentCard.classList.contains('locked')) {
+      const open = ['red', 'blue', 'gold'].filter(n => status[n] && !status[n].locked);
+      if (open.length > 0) {
+        this.selectNation(open[0]);
+        this.showAnnouncement(`Takım dengesini korumak için ${open[0].toUpperCase()} ulusuna geçildi!`, 3500);
+      }
+    }
+  }
+
+  selectNation(nationKey) {
+    const cards = document.querySelectorAll('.nation-card');
+    cards.forEach(c => c.classList.remove('selected'));
+    const target = document.querySelector(`.nation-card.${nationKey}`);
+    if (target) {
+      target.classList.add('selected');
+      this.selectedNation = nationKey;
+
+      const nationData = {
+        red: { title: '🔴 KRYOS ULUSU', desc: 'Soğuk, hesapçı ve bürokratik bir askeri-sanayi gücü çağrıştırır. Yapay zekâ entegrasyonu, insansız filo sistemleri veya maden/kaynak kontrolünü elinde tutan teknokratik bir yapıya çok iyi uyar.' },
+        blue: { title: '🌍 VEYLARIAN ULUSU', desc: 'Kadim, disiplinli ve teknolojik olarak üstün bir ırk/ulus hissi verir. Ağır zırhlı kruvazörler, merkezi bir imparatorluk yapısı ve enerji silahlarında uzmanlaşmış bir doktrin için idealdir.' },
+        gold: { title: '🪐 AETHELON ULUSU', desc: 'Birden fazla yıldız sisteminin veya özgür koloninin kurduğu diplomatik ve esnek bir koalisyon havası taşır. Hızlı saldırı gemileri, ticaret filoları ve gelişmiş kalkan teknolojisi kullanan dengeli bir ulus için uygundur.' }
+      };
+
+      const loreTitle = document.getElementById('nation-lore-title');
+      const loreDesc = document.getElementById('nation-lore-desc');
+      const data = nationData[nationKey] || nationData['blue'];
+      if (loreTitle) loreTitle.textContent = data.title;
+      if (loreDesc) loreDesc.textContent = data.desc;
+    }
+  }
+
   sendPlayerChat() {
     if (!this.chatInput) return;
     const text = this.chatInput.value.trim();
     if (text.length > 0 && this.game && this.game.player) {
-      this.addChatMessage(this.game.player.name, text, this.game.player.nation);
-      this.game.handlePlayerChat(text);
+      if (this.game.network && this.game.network.isConnected) {
+        this.game.network.sendChat(text);
+      } else {
+        this.addChatMessage(this.game.player.name, text, this.game.player.nation);
+      }
       this.chatInput.value = '';
     }
     this.closeChat();
@@ -614,8 +726,9 @@ class UIManager {
 
     // Gems are hidden from radar per user request: "radarda düşen ganimetin görülmesini engelleyelim"
 
-    // Draw Bots on Radar (Colored by their nation)
-    for (const b of bots) {
+    // Draw Remote Ships on Radar (Colored by their nation)
+    const otherShips = Array.isArray(bots) ? bots : (bots instanceof Map ? Array.from(bots.values()) : []);
+    for (const b of otherShips) {
       if (b.isDead) continue;
       const dx = b.x - player.x;
       const dy = b.y - player.y;
@@ -644,14 +757,15 @@ class UIManager {
     ctx.restore();
   }
 
-  updateLeaderboard(player, bots) {
+  updateLeaderboard(player, remotePlayers = []) {
     const all = [];
     if (player && !player.isDead) {
       all.push({ name: player.name, score: player.score, isPlayer: true, nation: player.nation });
     }
-    for (const b of bots) {
+    const remotes = Array.isArray(remotePlayers) ? remotePlayers : (remotePlayers instanceof Map ? Array.from(remotePlayers.values()) : []);
+    for (const b of remotes) {
       if (!b.isDead) {
-        all.push({ name: b.name, score: b.score, isPlayer: false, nation: b.nation });
+        all.push({ name: b.name, score: b.score || 0, isPlayer: false, nation: b.nation });
       }
     }
 

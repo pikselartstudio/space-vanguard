@@ -108,13 +108,21 @@
     <div id="start-screen" class="overlay-screen interactive">
       <div class="game-logo">SPACE VANGUARD</div>
 
+      <!-- Live Online Multiplayer Server Status Bar -->
+      <div id="server-status-pill" class="server-status-pill">
+        <span id="server-status-dot" class="server-dot connecting"></span>
+        <span id="server-status-text">Sunucuya bağlanılıyor...</span>
+        <button id="server-settings-btn" class="server-gear-btn" title="Sunucu Adresi Ayarla">⚙️</button>
+      </div>
+
       <div class="start-box">
         <input type="text" id="player-name-input" class="name-input" placeholder="KOMUTAN ADINIZ" maxlength="15" value="VANGUARD-1">
 
-        <!-- 3 Nations Selection (Mars, Earth, Saturn - Compact) -->
+        <!-- 3 Nations Selection (Dynamic Team Balancing) -->
         <div class="nation-select-title">HİZMET EDECEĞİNİZ ULUSU SEÇİN:</div>
         <div class="nation-cards" id="nation-cards-container">
           <div class="nation-card red" data-nation="red" title="Kryos Ulusu">
+            <span class="nation-pilot-badge" id="pilot-count-red">0 Pilot</span>
             <div class="nation-flag-icon">
               <svg viewBox="0 0 40 40" width="42" height="42" class="planet-svg">
                 <defs>
@@ -131,8 +139,13 @@
               </svg>
             </div>
             <div class="nation-card-name">KRYOS ULUSU</div>
+            <div class="nation-lock-overlay" id="nation-lock-red" style="display: none;">
+              <span class="lock-icon">🔒</span>
+              <span class="lock-text">DOLU<br><small>(DENGE KORUNUYOR)</small></span>
+            </div>
           </div>
           <div class="nation-card blue selected" data-nation="blue" title="Veylarian Ulusu">
+            <span class="nation-pilot-badge" id="pilot-count-blue">0 Pilot</span>
             <div class="nation-flag-icon">
               <svg viewBox="0 0 40 40" width="42" height="42" class="planet-svg">
                 <defs>
@@ -151,8 +164,13 @@
               </svg>
             </div>
             <div class="nation-card-name">VEYLARIAN ULUSU</div>
+            <div class="nation-lock-overlay" id="nation-lock-blue" style="display: none;">
+              <span class="lock-icon">🔒</span>
+              <span class="lock-text">DOLU<br><small>(DENGE KORUNUYOR)</small></span>
+            </div>
           </div>
           <div class="nation-card gold" data-nation="gold" title="Aethelon Ulusu">
+            <span class="nation-pilot-badge" id="pilot-count-gold">0 Pilot</span>
             <div class="nation-flag-icon">
               <svg viewBox="0 0 48 40" width="50" height="42" class="planet-svg">
                 <defs>
@@ -176,6 +194,10 @@
               </svg>
             </div>
             <div class="nation-card-name">AETHELON ULUSU</div>
+            <div class="nation-lock-overlay" id="nation-lock-gold" style="display: none;">
+              <span class="lock-icon">🔒</span>
+              <span class="lock-text">DOLU<br><small>(DENGE KORUNUYOR)</small></span>
+            </div>
           </div>
         </div>
 
@@ -186,6 +208,26 @@
         </div>
 
         <button id="play-btn" class="play-btn">OYUNA KATIL</button>
+      </div>
+    </div>
+
+    <!-- Server Settings Modal -->
+    <div id="server-modal" class="modal-overlay interactive" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span class="modal-title">📡 SUNUCU BAĞLANTISI</span>
+          <button id="server-modal-close" class="modal-close-btn" title="Kapat">✕</button>
+        </div>
+        <div class="modal-desc">
+          Arkadaşlarınızla aynı galakside oynamak için çalışan online WebSocket sunucu adresini belirleyin:
+        </div>
+        <div class="server-input-wrapper">
+          <input type="text" id="server-url-input" class="name-input" placeholder="Örn: https://space-vanguard.onrender.com veya http://localhost:3000">
+        </div>
+        <div class="modal-actions">
+          <button id="server-save-btn" class="play-btn-small">KAYDET VE BAĞLAN</button>
+          <button id="server-local-btn" class="play-btn-ghost">VARSAYILAN</button>
+        </div>
       </div>
     </div>
 
@@ -323,10 +365,12 @@
 
   <!-- Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/shipTree.js"></script>
   <script src="js/models.js"></script>
   <script src="js/entities.js"></script>
+  <script src="js/network.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/game.js"></script>
 </body>

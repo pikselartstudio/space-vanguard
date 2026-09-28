@@ -1453,3 +1453,249 @@ body, html {
     overflow-y: auto;
   }
 }
+
+/* ==========================================
+   Multiplayer Server Status & Team Balancing
+   ========================================== */
+.server-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(4, 16, 32, 0.85);
+  border: 1px solid rgba(0, 200, 255, 0.35);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  color: #9eccdf;
+  margin-bottom: 12px;
+  box-shadow: 0 0 15px rgba(0, 150, 255, 0.2);
+  backdrop-filter: blur(6px);
+}
+
+.server-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.server-dot.online {
+  background: #00e676;
+  box-shadow: 0 0 8px #00e676;
+}
+
+.server-dot.connecting {
+  background: #ffaa00;
+  box-shadow: 0 0 8px #ffaa00;
+  animation: pulse-dot 1.2s infinite ease-in-out;
+}
+
+.server-dot.offline {
+  background: #ff3344;
+  box-shadow: 0 0 8px #ff3344;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.server-gear-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0;
+  margin-left: 4px;
+  opacity: 0.7;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.server-gear-btn:hover {
+  opacity: 1;
+  transform: rotate(45deg);
+}
+
+/* Nation Card Pilot Badge & Lock Overlay */
+.nation-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.nation-pilot-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  letter-spacing: 0.5px;
+}
+
+.nation-card.red .nation-pilot-badge {
+  color: #ff88a0;
+  border-color: rgba(255, 60, 90, 0.4);
+}
+
+.nation-card.blue .nation-pilot-badge {
+  color: #88d5ff;
+  border-color: rgba(0, 180, 255, 0.4);
+}
+
+.nation-card.gold .nation-pilot-badge {
+  color: #ffe066;
+  border-color: rgba(255, 200, 0, 0.4);
+}
+
+.nation-lock-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 4, 8, 0.88);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 8px;
+  z-index: 5;
+  border: 1px solid rgba(255, 50, 80, 0.6);
+  pointer-events: none;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.nation-lock-overlay .lock-icon {
+  font-size: 1.3rem;
+  filter: drop-shadow(0 0 8px #ff2255);
+}
+
+.nation-lock-overlay .lock-text {
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: #ff4b6e;
+  letter-spacing: 0.8px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.nation-lock-overlay .lock-text small {
+  font-size: 0.62rem;
+  color: #ff99aa;
+  font-weight: 600;
+}
+
+.nation-card.locked {
+  cursor: not-allowed !important;
+  opacity: 0.65;
+  filter: grayscale(0.4);
+  transform: none !important;
+}
+
+.nation-card.locked:hover {
+  border-color: rgba(255, 50, 80, 0.5) !important;
+  box-shadow: 0 0 15px rgba(255, 0, 50, 0.3) !important;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 5, 12, 0.8);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-card {
+  background: rgba(6, 18, 36, 0.95);
+  border: 2px solid rgba(0, 200, 255, 0.45);
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 0 0 35px rgba(0, 180, 255, 0.35);
+  color: #fff;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: #00d0ff;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  color: #88aacc;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.modal-close-btn:hover {
+  color: #fff;
+}
+
+.modal-desc {
+  font-size: 0.88rem;
+  color: #a0c0db;
+  line-height: 1.4;
+  margin-bottom: 14px;
+}
+
+.server-input-wrapper {
+  margin-bottom: 16px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.play-btn-small {
+  background: linear-gradient(135deg, #0088ff 0%, #00e1ff 100%);
+  border: none;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+
+.play-btn-small:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px rgba(0, 200, 255, 0.5);
+}
+
+.play-btn-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: #ccc;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.play-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
