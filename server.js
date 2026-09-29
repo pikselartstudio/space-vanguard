@@ -233,8 +233,23 @@ io.on('connection', (socket) => {
 
   // Player joins the battle
   socket.on('join_game', (data) => {
-    const rawName = (data && data.name) ? String(data.name).trim().slice(0, 15) : 'KOMUTAN';
-    const name = rawName || 'KOMUTAN';
+    const rawName = (data && data.name) ? String(data.name).trim().slice(0, 15) : 'VANGUARD-1';
+    let name = rawName || 'VANGUARD-1';
+
+    // Enforce unique pilot name: if name already exists in active game, append/increment number
+    const activeNames = new Set(Array.from(players.values()).map(p => p.name.toUpperCase()));
+    let baseName = name;
+    let num = 1;
+    const match = name.match(/^(.*?)[-_](\d+)$/);
+    if (match) {
+      baseName = match[1];
+      num = parseInt(match[2], 10);
+    }
+    while (activeNames.has(name.toUpperCase())) {
+      num++;
+      name = `${baseName}-${num}`;
+    }
+
     let chosenNation = (data && data.nation) ? data.nation : 'blue';
     if (!['red', 'blue', 'gold'].includes(chosenNation)) chosenNation = 'blue';
 

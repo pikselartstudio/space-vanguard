@@ -116,98 +116,242 @@
       </div>
 
       <div class="start-box">
-        <input type="text" id="player-name-input" class="name-input" placeholder="KOMUTAN ADINIZ" maxlength="15" value="VANGUARD-1">
+        <input type="text" id="player-name-input" class="name-input" placeholder="NAME" maxlength="15" autocomplete="off">
 
         <!-- 3 Nations Selection (Dynamic Team Balancing) -->
-        <div class="nation-select-title">HİZMET EDECEĞİNİZ ULUSU SEÇİN:</div>
+        <div class="nation-select-title">ULUSUNUZU SEÇİN</div>
         <div class="nation-cards" id="nation-cards-container">
           <div class="nation-card red" data-nation="red" title="Kryos Ulusu">
-            <span class="nation-pilot-badge" id="pilot-count-red">0 Pilot</span>
+            <div class="nation-card-top">
+              <span class="nation-pilot-badge" title="Pilot"><svg viewBox="0 0 24 24" class="pilot-icon" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg><span id="pilot-count-red">0</span></span>
+            </div>
             <div class="nation-flag-icon">
-              <svg viewBox="0 0 40 40" width="42" height="42" class="planet-svg">
+              <svg viewBox="0 0 40 40" width="62" height="62" class="planet-svg" xmlns="http://www.w3.org/2000/svg">
                 <defs>
-                  <radialGradient id="mars-grad" cx="35%" cy="35%" r="65%">
-                    <stop offset="0%" stop-color="#ff7b6b"/>
-                    <stop offset="60%" stop-color="#d62828"/>
-                    <stop offset="100%" stop-color="#67000d"/>
+                  <clipPath id="mars-clip">
+                    <circle cx="20" cy="20" r="16"/>
+                  </clipPath>
+                  <radialGradient id="mars-base" cx="35%" cy="35%" r="65%">
+                    <stop offset="0%" stop-color="#f87171"/>
+                    <stop offset="55%" stop-color="#b91c1c"/>
+                    <stop offset="100%" stop-color="#55070f"/>
+                  </radialGradient>
+                  <radialGradient id="mars-shading" cx="28%" cy="28%" r="72%">
+                    <stop offset="0%" stop-color="#ffb4a2" stop-opacity="0.32"/>
+                    <stop offset="25%" stop-color="#ffffff" stop-opacity="0.05"/>
+                    <stop offset="60%" stop-color="#1a0005" stop-opacity="0.45"/>
+                    <stop offset="100%" stop-color="#080002" stop-opacity="0.88"/>
                   </radialGradient>
                 </defs>
-                <circle cx="20" cy="20" r="16" fill="url(#mars-grad)"/>
-                <ellipse cx="20" cy="16" rx="14" ry="4" fill="#a51323" opacity="0.5"/>
-                <ellipse cx="20" cy="24" rx="13" ry="3.5" fill="#58000b" opacity="0.5"/>
-                <circle cx="20" cy="20" r="16" stroke="rgba(255, 120, 100, 0.7)" stroke-width="1.5" fill="none"/>
+                <circle cx="20" cy="20" r="16.4" fill="none" stroke="rgba(255, 90, 70, 0.22)" stroke-width="0.9" class="planet-glow"/>
+                <g clip-path="url(#mars-clip)">
+                  <circle cx="20" cy="20" r="16" fill="url(#mars-base)"/>
+                  <g class="planet-spin-mars">
+                    <g>
+                      <path d="M 3 13 Q 12 11 18 14 Q 26 12 32 16 Q 37 14 40 17 L 40 21 Q 30 18 20 22 Q 10 20 0 23 Z" fill="#6e0f17" opacity="0.75"/>
+                      <path d="M 5 24 Q 15 22 25 26 Q 34 23 40 27 L 40 31 Q 32 29 22 31 Q 12 28 0 30 Z" fill="#4d060d" opacity="0.8"/>
+                      <circle cx="11" cy="9" r="2.2" fill="#3a0409" opacity="0.6"/>
+                      <circle cx="27" cy="10" r="3" fill="#3a0409" opacity="0.55"/>
+                      <ellipse cx="16" cy="18" rx="3.5" ry="1.5" fill="#fca5a5" opacity="0.35"/>
+                      <circle cx="34" cy="22" r="2" fill="#350508" opacity="0.6"/>
+                      <ellipse cx="23" cy="27" rx="4" ry="1.8" fill="#2d0206" opacity="0.7"/>
+                      <ellipse cx="20" cy="5" rx="6" ry="1.8" fill="#ffcdd2" opacity="0.75"/>
+                    </g>
+                    <g transform="translate(40, 0)">
+                      <path d="M 3 13 Q 12 11 18 14 Q 26 12 32 16 Q 37 14 40 17 L 40 21 Q 30 18 20 22 Q 10 20 0 23 Z" fill="#6e0f17" opacity="0.75"/>
+                      <path d="M 5 24 Q 15 22 25 26 Q 34 23 40 27 L 40 31 Q 32 29 22 31 Q 12 28 0 30 Z" fill="#4d060d" opacity="0.8"/>
+                      <circle cx="11" cy="9" r="2.2" fill="#3a0409" opacity="0.6"/>
+                      <circle cx="27" cy="10" r="3" fill="#3a0409" opacity="0.55"/>
+                      <ellipse cx="16" cy="18" rx="3.5" ry="1.5" fill="#fca5a5" opacity="0.35"/>
+                      <circle cx="34" cy="22" r="2" fill="#350508" opacity="0.6"/>
+                      <ellipse cx="23" cy="27" rx="4" ry="1.8" fill="#2d0206" opacity="0.7"/>
+                      <ellipse cx="20" cy="5" rx="6" ry="1.8" fill="#ffcdd2" opacity="0.75"/>
+                    </g>
+                  </g>
+                  <circle cx="20" cy="20" r="16" fill="url(#mars-shading)"/>
+                </g>
+                <circle cx="20" cy="20" r="16" stroke="rgba(255, 120, 100, 0.42)" stroke-width="0.9" fill="none"/>
               </svg>
             </div>
-            <div class="nation-card-name">KRYOS ULUSU</div>
+            <div class="nation-card-bottom">
+              <div class="nation-card-name">KRYOS</div>
+            </div>
             <div class="nation-lock-overlay" id="nation-lock-red" style="display: none;">
               <span class="lock-icon">🔒</span>
-              <span class="lock-text">DOLU<br><small>(DENGE KORUNUYOR)</small></span>
+              <span class="lock-text">DOLU<br><small>(DENGE)</small></span>
             </div>
           </div>
           <div class="nation-card blue selected" data-nation="blue" title="Veylarian Ulusu">
-            <span class="nation-pilot-badge" id="pilot-count-blue">0 Pilot</span>
+            <div class="nation-card-top">
+              <span class="nation-pilot-badge" title="Pilot"><svg viewBox="0 0 24 24" class="pilot-icon" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg><span id="pilot-count-blue">0</span></span>
+            </div>
             <div class="nation-flag-icon">
-              <svg viewBox="0 0 40 40" width="42" height="42" class="planet-svg">
+              <svg viewBox="0 0 40 40" width="62" height="62" class="planet-svg" xmlns="http://www.w3.org/2000/svg">
                 <defs>
-                  <radialGradient id="earth-grad" cx="35%" cy="35%" r="65%">
-                    <stop offset="0%" stop-color="#4cc9f0"/>
-                    <stop offset="55%" stop-color="#0077b6"/>
-                    <stop offset="100%" stop-color="#03045e"/>
+                  <clipPath id="earth-clip">
+                    <circle cx="20" cy="20" r="16"/>
+                  </clipPath>
+                  <radialGradient id="earth-ocean" cx="35%" cy="35%" r="65%">
+                    <stop offset="0%" stop-color="#38bdf8"/>
+                    <stop offset="50%" stop-color="#0284c7"/>
+                    <stop offset="100%" stop-color="#03256c"/>
+                  </radialGradient>
+                  <radialGradient id="earth-shading" cx="28%" cy="28%" r="72%">
+                    <stop offset="0%" stop-color="#bfe3ff" stop-opacity="0.35"/>
+                    <stop offset="25%" stop-color="#ffffff" stop-opacity="0.05"/>
+                    <stop offset="60%" stop-color="#010c22" stop-opacity="0.45"/>
+                    <stop offset="100%" stop-color="#000511" stop-opacity="0.90"/>
                   </radialGradient>
                 </defs>
-                <circle cx="20" cy="20" r="16" fill="url(#earth-grad)"/>
-                <path d="M 12 12 Q 18 10 22 14 Q 20 20 15 18 Z" fill="#2ec4b6" opacity="0.8"/>
-                <path d="M 18 22 Q 25 21 28 26 Q 22 30 18 27 Z" fill="#2ec4b6" opacity="0.8"/>
-                <path d="M 9 19 Q 15 16 17 22 Q 12 25 9 19 Z" fill="#2ec4b6" opacity="0.7"/>
-                <ellipse cx="20" cy="18" rx="14" ry="2.5" fill="#ffffff" opacity="0.4"/>
-                <circle cx="20" cy="20" r="16" stroke="rgba(100, 220, 255, 0.8)" stroke-width="1.5" fill="none"/>
+                <circle cx="20" cy="20" r="16.4" fill="none" stroke="rgba(80, 200, 255, 0.25)" stroke-width="0.9" class="planet-glow"/>
+                <g clip-path="url(#earth-clip)">
+                  <circle cx="20" cy="20" r="16" fill="url(#earth-ocean)"/>
+                  <g class="planet-spin-earth-continents">
+                    <g>
+                      <path d="M 5 13 Q 10 9 17 11 Q 20 15 16 19 Q 20 24 17 28 Q 12 26 10 20 Q 5 18 5 13 Z" fill="#10b981" opacity="0.92"/>
+                      <path d="M 26 10 Q 32 8 36 12 Q 33 17 30 19 Q 33 24 35 29 Q 30 29 27 22 Q 24 16 26 10 Z" fill="#059669" opacity="0.9"/>
+                      <ellipse cx="22" cy="7" rx="3.5" ry="1.8" fill="#e0f2fe" opacity="0.85"/>
+                      <ellipse cx="37" cy="18" rx="2.5" ry="1.5" fill="#10b981" opacity="0.85"/>
+                      <circle cx="12" cy="25" r="1.5" fill="#047857" opacity="0.85"/>
+                    </g>
+                    <g transform="translate(40, 0)">
+                      <path d="M 5 13 Q 10 9 17 11 Q 20 15 16 19 Q 20 24 17 28 Q 12 26 10 20 Q 5 18 5 13 Z" fill="#10b981" opacity="0.92"/>
+                      <path d="M 26 10 Q 32 8 36 12 Q 33 17 30 19 Q 33 24 35 29 Q 30 29 27 22 Q 24 16 26 10 Z" fill="#059669" opacity="0.9"/>
+                      <ellipse cx="22" cy="7" rx="3.5" ry="1.8" fill="#e0f2fe" opacity="0.85"/>
+                      <ellipse cx="37" cy="18" rx="2.5" ry="1.5" fill="#10b981" opacity="0.85"/>
+                      <circle cx="12" cy="25" r="1.5" fill="#047857" opacity="0.85"/>
+                    </g>
+                  </g>
+                  <g class="planet-spin-earth-clouds">
+                    <g>
+                      <path d="M 2 11 Q 12 14 22 10 Q 32 12 40 9" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.45"/>
+                      <ellipse cx="14" cy="17" rx="8" ry="2.2" fill="#ffffff" opacity="0.4"/>
+                      <path d="M 0 22 Q 10 26 24 21 Q 34 25 40 23" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.48"/>
+                      <ellipse cx="30" cy="27" rx="7" ry="1.8" fill="#ffffff" opacity="0.38"/>
+                    </g>
+                    <g transform="translate(40, 0)">
+                      <path d="M 2 11 Q 12 14 22 10 Q 32 12 40 9" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.45"/>
+                      <ellipse cx="14" cy="17" rx="8" ry="2.2" fill="#ffffff" opacity="0.4"/>
+                      <path d="M 0 22 Q 10 26 24 21 Q 34 25 40 23" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.48"/>
+                      <ellipse cx="30" cy="27" rx="7" ry="1.8" fill="#ffffff" opacity="0.38"/>
+                    </g>
+                  </g>
+                  <circle cx="20" cy="20" r="16" fill="url(#earth-shading)"/>
+                </g>
+                <circle cx="20" cy="20" r="16" stroke="rgba(100, 220, 255, 0.45)" stroke-width="0.9" fill="none"/>
               </svg>
             </div>
-            <div class="nation-card-name">VEYLARIAN ULUSU</div>
+            <div class="nation-card-bottom">
+              <div class="nation-card-name">VEYLARIAN</div>
+            </div>
             <div class="nation-lock-overlay" id="nation-lock-blue" style="display: none;">
               <span class="lock-icon">🔒</span>
-              <span class="lock-text">DOLU<br><small>(DENGE KORUNUYOR)</small></span>
+              <span class="lock-text">DOLU<br><small>(DENGE)</small></span>
             </div>
           </div>
           <div class="nation-card gold" data-nation="gold" title="Aethelon Ulusu">
-            <span class="nation-pilot-badge" id="pilot-count-gold">0 Pilot</span>
-            <div class="nation-flag-icon">
-              <svg viewBox="0 0 48 40" width="50" height="42" class="planet-svg">
-                <defs>
-                  <radialGradient id="saturn-grad" cx="40%" cy="35%" r="65%">
-                    <stop offset="0%" stop-color="#ffe699"/>
-                    <stop offset="60%" stop-color="#e5a93c"/>
-                    <stop offset="100%" stop-color="#7a4e0a"/>
-                  </radialGradient>
-                  <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#ffe082" stop-opacity="0.85"/>
-                    <stop offset="50%" stop-color="#ffb74d" stop-opacity="0.95"/>
-                    <stop offset="100%" stop-color="#ff9800" stop-opacity="0.7"/>
-                  </linearGradient>
-                </defs>
-                <ellipse cx="24" cy="20" rx="22" ry="7" fill="none" stroke="url(#ring-grad)" stroke-width="3.2" transform="rotate(-18 24 20)" stroke-dasharray="75 75" stroke-dashoffset="0"/>
-                <circle cx="24" cy="20" r="13" fill="url(#saturn-grad)"/>
-                <ellipse cx="24" cy="18" rx="11" ry="2.2" fill="#c48a28" opacity="0.45"/>
-                <ellipse cx="24" cy="22" rx="12" ry="2.5" fill="#8c580d" opacity="0.45"/>
-                <ellipse cx="24" cy="20" rx="22" ry="7" fill="none" stroke="url(#ring-grad)" stroke-width="3.2" transform="rotate(-18 24 20)" stroke-dasharray="75 75" stroke-dashoffset="75"/>
-                <circle cx="24" cy="20" r="13" stroke="rgba(255, 230, 150, 0.7)" stroke-width="1.2" fill="none"/>
-              </svg>
+            <div class="nation-card-top">
+              <span class="nation-pilot-badge" title="Pilot"><svg viewBox="0 0 24 24" class="pilot-icon" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg><span id="pilot-count-gold">0</span></span>
             </div>
-            <div class="nation-card-name">AETHELON ULUSU</div>
+            <div class="nation-flag-icon">
+                <svg viewBox="0 0 48 40" width="62" height="52" class="planet-svg" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <clipPath id="saturn-clip">
+                      <circle cx="24" cy="20" r="12.8"/>
+                    </clipPath>
+                    <radialGradient id="saturn-base" cx="38%" cy="35%" r="65%">
+                      <stop offset="0%" stop-color="#fff2be"/>
+                      <stop offset="55%" stop-color="#d49b38"/>
+                      <stop offset="100%" stop-color="#5a3504"/>
+                    </radialGradient>
+                    <radialGradient id="saturn-shading" cx="28%" cy="28%" r="72%">
+                      <stop offset="0%" stop-color="#fff5cc" stop-opacity="0.35"/>
+                      <stop offset="30%" stop-color="#ffffff" stop-opacity="0.05"/>
+                      <stop offset="65%" stop-color="#1e1002" stop-opacity="0.5"/>
+                      <stop offset="100%" stop-color="#0a0500" stop-opacity="0.92"/>
+                    </radialGradient>
+                    <linearGradient id="ring-grad-back" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#ffb74d" stop-opacity="0.75"/>
+                      <stop offset="50%" stop-color="#e69500" stop-opacity="0.85"/>
+                      <stop offset="100%" stop-color="#ffe082" stop-opacity="0.7"/>
+                    </linearGradient>
+                    <linearGradient id="ring-grad-front" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#ffe57f" stop-opacity="0.95"/>
+                      <stop offset="50%" stop-color="#ffc107" stop-opacity="1"/>
+                      <stop offset="100%" stop-color="#ff9800" stop-opacity="0.85"/>
+                    </linearGradient>
+                  </defs>
+                  <g class="saturn-ring-wobble">
+                    <ellipse cx="24" cy="20" rx="22.5" ry="6.8" fill="none" stroke="url(#ring-grad-back)" stroke-width="3" transform="rotate(-18 24 20)" stroke-dasharray="75 75" stroke-dashoffset="0"/>
+                    <ellipse cx="24" cy="20" rx="19.5" ry="5.8" fill="none" stroke="rgba(255, 235, 160, 0.4)" stroke-width="0.8" transform="rotate(-18 24 20)" stroke-dasharray="75 75" stroke-dashoffset="0"/>
+                  </g>
+                  <g clip-path="url(#saturn-clip)">
+                    <circle cx="24" cy="20" r="12.8" fill="url(#saturn-base)"/>
+                    <g class="planet-spin-saturn">
+                      <g>
+                        <rect x="0" y="10" width="48" height="2.2" fill="#ffeaa7" opacity="0.65"/>
+                        <rect x="0" y="13.5" width="48" height="2.8" fill="#a4711b" opacity="0.6"/>
+                        <rect x="0" y="18" width="48" height="3.5" fill="#fcd34d" opacity="0.5"/>
+                        <rect x="0" y="23" width="48" height="2.4" fill="#784805" opacity="0.65"/>
+                        <rect x="0" y="27" width="48" height="2" fill="#ffe082" opacity="0.55"/>
+                        <ellipse cx="15" cy="18.5" rx="3.5" ry="1.5" fill="#fff9db" opacity="0.75"/>
+                        <ellipse cx="36" cy="23.5" rx="3" ry="1.2" fill="#633903" opacity="0.7"/>
+                      </g>
+                      <g transform="translate(48, 0)">
+                        <rect x="0" y="10" width="48" height="2.2" fill="#ffeaa7" opacity="0.65"/>
+                        <rect x="0" y="13.5" width="48" height="2.8" fill="#a4711b" opacity="0.6"/>
+                        <rect x="0" y="18" width="48" height="3.5" fill="#fcd34d" opacity="0.5"/>
+                        <rect x="0" y="23" width="48" height="2.4" fill="#784805" opacity="0.65"/>
+                        <rect x="0" y="27" width="48" height="2" fill="#ffe082" opacity="0.55"/>
+                        <ellipse cx="15" cy="18.5" rx="3.5" ry="1.5" fill="#fff9db" opacity="0.75"/>
+                        <ellipse cx="36" cy="23.5" rx="3" ry="1.2" fill="#633903" opacity="0.7"/>
+                      </g>
+                    </g>
+                    <circle cx="24" cy="20" r="12.8" fill="url(#saturn-shading)"/>
+                  </g>
+                  <g class="saturn-ring-wobble">
+                    <ellipse cx="24" cy="20" rx="22.5" ry="6.8" fill="none" stroke="url(#ring-grad-front)" stroke-width="3.2" transform="rotate(-18 24 20)" stroke-dasharray="75 75" stroke-dashoffset="75"/>
+                    <ellipse cx="24" cy="20" rx="19.5" ry="5.8" fill="none" stroke="rgba(255, 255, 220, 0.7)" stroke-width="0.8" transform="rotate(-18 24 20)" stroke-dasharray="75 75" stroke-dashoffset="75"/>
+                  </g>
+                  <circle cx="24" cy="20" r="12.8" stroke="rgba(255, 230, 150, 0.45)" stroke-width="0.9" fill="none"/>
+                </svg>
+            </div>
+            <div class="nation-card-bottom">
+              <div class="nation-card-name">AETHELON</div>
+            </div>
             <div class="nation-lock-overlay" id="nation-lock-gold" style="display: none;">
               <span class="lock-icon">🔒</span>
-              <span class="lock-text">DOLU<br><small>(DENGE KORUNUYOR)</small></span>
+              <span class="lock-text">DOLU<br><small>(DENGE)</small></span>
             </div>
           </div>
         </div>
 
-        <!-- Dedicated Lore Preview Box on Hover & Selection -->
-        <div id="nation-lore-box" class="nation-lore-box">
-          <div id="nation-lore-title" class="nation-lore-title">🌍 VEYLARIAN ULUSU</div>
-          <div id="nation-lore-desc" class="nation-lore-desc">Kadim, disiplinli ve teknolojik olarak üstün bir ırk/ulus hissi verir. Ağır zırhlı kruvazörler, merkezi bir imparatorluk yapısı ve enerji silahlarında uzmanlaşmış bir doktrin için idealdir.</div>
-        </div>
 
-        <button id="play-btn" class="play-btn">OYUNA KATIL</button>
+        <button id="play-btn" class="play-btn">START</button>
+      </div>
+
+      <!-- Bottom Social Icons Bar (Visual only, non-clickable) -->
+      <div class="start-social-bar" aria-hidden="true">
+        <!-- Discord -->
+        <span class="social-icon discord" title="Discord">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+          </svg>
+        </span>
+        <!-- Instagram -->
+        <span class="social-icon instagram" title="Instagram">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+          </svg>
+        </span>
+        <!-- YouTube -->
+        <span class="social-icon youtube" title="YouTube">
+          <svg viewBox="0 0 24 24" width="22" height="20" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+        </span>
       </div>
     </div>
 
@@ -231,86 +375,33 @@
       </div>
     </div>
 
-    <!-- Loading Screen with Organized Controls Presentation -->
+    <!-- Loading Screen with Modern Controls Presentation -->
     <div id="loading-screen" class="overlay-screen interactive" style="display: none;">
       <div class="loading-container">
-        <div class="loading-logo">SPACE VANGUARD</div>
-        <div class="loading-status-text" id="loading-status">GRAVİTASYON MOTORLARI BAŞLATILIYOR...</div>
-        <div class="loading-bar-wrapper">
-          <div class="loading-bar-fill" id="loading-bar-fill"></div>
-        </div>
-        <div class="loading-pct" id="loading-pct">0%</div>
+        <div class="loading-logo" id="loading-logo">SPACE VANGUARD</div>
+        
+        <div id="loading-sub-elements" class="loading-sub-elements">
+          <div class="loading-status-text" id="loading-status">EVREN YÜKLENİYOR...</div>
+          <div class="loading-bar-wrapper">
+            <div class="loading-bar-fill" id="loading-bar-fill"></div>
+          </div>
+          <div class="loading-pct" id="loading-pct">0%</div>
 
-        <!-- Organized Controls Presentation -->
-        <div class="loading-controls-box">
-          <div class="loading-controls-title">🎮 UÇUŞ & SAVAŞ KONTROLLERİ</div>
-          <div class="controls-columns-row">
-            <div class="control-column">
-              <div class="control-col-header">
-                <span class="col-icon">🎯</span>
-                <span class="col-title">YÖNLENDİRME & İTİŞ</span>
+          <!-- Modern Monochromatic Controls Presentation (Mouse Only) -->
+          <div class="loading-controls-box">
+            <div class="loading-controls-title">CONTROLS</div>
+            <div class="controls-mouse-list">
+              <div class="control-row">
+                <span class="key-badge">Left Click</span>
+                <span class="key-desc">Fire</span>
               </div>
               <div class="control-row">
-                <div class="key-badge">Fare Hareketi</div>
-                <div class="key-desc">Gemi Burun Yönü (360°)</div>
+                <span class="key-badge">Right Click</span>
+                <span class="key-desc">Thrust</span>
               </div>
               <div class="control-row">
-                <div class="key-badge">Sağ Tık / W / ↑</div>
-                <div class="key-desc">İleri İtici Motorlar</div>
-              </div>
-              <div class="control-row">
-                <div class="key-badge">S / ↓</div>
-                <div class="key-desc">Ters İtiş / Acil Fren</div>
-              </div>
-              <div class="control-row">
-                <div class="key-badge">Shift / Ctrl</div>
-                <div class="key-desc">RCS Dengeleyici</div>
-              </div>
-            </div>
-
-            <div class="control-column">
-              <div class="control-col-header">
-                <span class="col-icon">⚡</span>
-                <span class="col-title">SİLAHLAR & MEKANİKLER</span>
-              </div>
-              <div class="control-row">
-                <div class="key-badge">Sol Tık / Boşluk</div>
-                <div class="key-desc">Lazer Toplarını Ateşle</div>
-              </div>
-              <div class="control-row">
-                <div class="key-badge">Savunma (Tank)</div>
-                <div class="key-desc">Tekli Ağır Kuşatma Topu</div>
-              </div>
-              <div class="control-row">
-                <div class="key-badge">Manevra (Hız)</div>
-                <div class="key-desc">3'lü Seri Atış (Isınma Frenli)</div>
-              </div>
-              <div class="control-row">
-                <div class="key-badge">Dengeli / Şifacı</div>
-                <div class="key-desc">2'li İkiz Işınlar & Can Yenileme</div>
-              </div>
-            </div>
-
-            <div class="control-column">
-              <div class="control-col-header">
-                <span class="col-icon">🚀</span>
-                <span class="col-title">GELİŞİM & İLETİŞİM</span>
-              </div>
-              <div class="control-row">
-                <div class="key-badge">1 - 8 Tuşları</div>
-                <div class="key-desc">Özellikleri Anında Yükselt</div>
-              </div>
-              <div class="control-row">
-                <div class="key-badge">B Tuşu</div>
-                <div class="key-desc">Ana Üsse Kristal Bağışı Yap</div>
-              </div>
-              <div class="control-row">
-                <div class="key-badge">T Tuşu</div>
-                <div class="key-desc">Taktik Telsiz / Sohbet Aç</div>
-              </div>
-              <div class="control-row">
-                <div class="key-badge">Kargo Dolunca</div>
-                <div class="key-desc">Üst Seviye Gemiye Evrimleş!</div>
+                <span class="key-badge">Mouse Move</span>
+                <span class="key-desc">Steer</span>
               </div>
             </div>
           </div>
