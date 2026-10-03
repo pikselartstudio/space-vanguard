@@ -14,7 +14,7 @@ class SoundSystem {
     this.musicStep = 0;
     this.nextNoteTime = 0;
     this.musicTimer = null;
-    this.tempo = 114; // Futuristic space tempo
+    this.tempo = 84; // Gloomy, deep space atmospheric tempo
   }
 
   init() {
@@ -109,51 +109,50 @@ class SoundSystem {
   scheduleMusicStep(step, time) {
     if (this.isMusicMuted) return;
 
-    // Chord Progression across 4 bars (16 sixteenth notes per bar)
-    // Bar 0: D minor (D3/F3/A3)
-    // Bar 1: Bb major (Bb2/D3/F3)
-    // Bar 2: F major (F2/A2/C3)
-    // Bar 3: C major / A minor (C3/E3/G3)
+    // Gloomy, Atmospheric Deep Space Chord Progression across 4 bars:
+    // Bar 0: C minor (C2 sub drone, dark cosmic abyss)
+    // Bar 1: Ab major (Ab1 sub drone, somber celestial drift)
+    // Bar 2: F minor (F1 sub drone, melancholy interstellar void)
+    // Bar 3: Eb minor / G suspended (Eb1 sub drone, cosmic mystery)
     const bar = Math.floor(step / 16);
     const stepInBar = step % 16;
 
-    // 1. Bass Note on beat 0 and beat 8 of each bar (pulse rhythm)
+    // 1. Deep Sub-Bass Drone on beat 0 and beat 8
     if (stepInBar === 0 || stepInBar === 8) {
-      const bassFreqs = [73.42, 58.27, 87.31, 65.41]; // D2, Bb1, F2, C2
-      this.playSynthBass(bassFreqs[bar], time, 0.42);
+      const bassFreqs = [65.41, 51.91, 43.65, 38.89]; // C2, Ab1, F1, Eb1
+      this.playSynthBass(bassFreqs[bar], time, 0.55);
     }
 
-    // 2. Cosmic Ambient Pad at the beginning of each bar
+    // 2. Gloomy Cosmic Ambient Pad
     if (stepInBar === 0) {
       const padChords = [
-        [146.83, 220.00, 261.63], // D3, A3, C4 (Dm7)
-        [116.54, 174.61, 233.08], // Bb2, F3, Bb3 (Bb)
-        [87.31, 130.81, 174.61],  // F2, C3, F3 (F)
-        [130.81, 164.81, 196.00]  // C3, E3, G3 (C)
+        [130.81, 155.56, 196.00, 246.94], // C3, Eb3, G3, B3 (Cm maj7)
+        [103.83, 130.81, 155.56, 207.65], // Ab2, C3, Eb3, Ab3 (Ab)
+        [87.31, 130.81, 155.56, 207.65],  // F2, C3, Eb3, Ab3 (Fm7)
+        [77.78, 116.54, 155.56, 185.00]   // Eb2, Bb2, Eb3, F#3 (Ebm)
       ];
       this.playSynthPad(padChords[bar], time, (60 / this.tempo) * 3.8);
     }
 
-    // 3. Cosmic Pluck Arpeggiator (syncopated high sci-fi notes)
-    // D Minor scale frequencies: D4=293.66, E4=329.63, F4=349.23, G4=392.00, A4=440.00, Bb4=466.16, C5=523.25, D5=587.33, E5=659.25, F5=698.46, A5=880.00
+    // 3. Ethereal, Sparse Cosmic Bell Echoes
     const arpPatterns = [
-      // Bar 0 (D minor arpeggios)
-      [293.66, 0, 440.00, 349.23, 523.25, 0, 440.00, 587.33, 349.23, 0, 440.00, 523.25, 659.25, 587.33, 523.25, 440.00],
-      // Bar 1 (Bb major arpeggios)
-      [233.08, 0, 349.23, 293.66, 466.16, 0, 349.23, 587.33, 293.66, 0, 349.23, 466.16, 587.33, 466.16, 349.23, 293.66],
-      // Bar 2 (F major arpeggios)
-      [174.61, 0, 261.63, 349.23, 523.25, 0, 349.23, 659.25, 261.63, 0, 349.23, 523.25, 698.46, 659.25, 523.25, 349.23],
-      // Bar 3 (C major / Am arpeggios)
-      [196.00, 0, 329.63, 392.00, 523.25, 0, 392.00, 659.25, 329.63, 0, 392.00, 523.25, 783.99, 659.25, 523.25, 392.00]
+      // Bar 0 (Cm space bells)
+      [261.63, 0, 0, 392.00, 0, 311.13, 0, 0, 523.25, 0, 392.00, 0, 0, 311.13, 0, 0],
+      // Bar 1 (Ab space bells)
+      [207.65, 0, 0, 311.13, 0, 261.63, 0, 0, 415.30, 0, 311.13, 0, 0, 261.63, 0, 0],
+      // Bar 2 (Fm space bells)
+      [174.61, 0, 0, 261.63, 0, 311.13, 0, 0, 349.23, 0, 261.63, 0, 0, 311.13, 0, 0],
+      // Bar 3 (Ebm space bells)
+      [155.56, 0, 0, 233.08, 0, 293.66, 0, 0, 311.13, 0, 233.08, 0, 0, 293.66, 0, 0]
     ];
 
     const freq = arpPatterns[bar][stepInBar];
     if (freq > 0) {
-      const isAccent = (stepInBar % 4 === 0);
-      this.playSynthPluck(freq, time, isAccent ? 0.22 : 0.15, isAccent ? 0.14 : 0.09);
+      const isAccent = (stepInBar === 0 || stepInBar === 8);
+      this.playSynthPluck(freq, time, isAccent ? 0.35 : 0.22, isAccent ? 0.12 : 0.08);
     }
 
-    // 4. Subtle Cosmic Pulse / Shimmer on steps 4 and 12
+    // 4. Ghostly space sub-pulse
     if (stepInBar === 4 || stepInBar === 12) {
       this.playSpacePulse(time);
     }
@@ -260,99 +259,156 @@ class SoundSystem {
 
   // --- SOUND EFFECTS (Connected to sfxGain) ---
 
-  // Metallic collision sound when ship crashes into asteroid or another ship
+  // Realistic metallic hull collision sound (FM bell/clang synthesis + metal overtones)
   playMetalCrash(volume = 1.0, impactForce = 50) {
     if (!this.initialized || this.isSoundMuted || volume <= 0.02) return;
     const now = this.ctx.currentTime;
 
-    if (this.lastCrashTime && (now - this.lastCrashTime < 0.06)) return;
+    if (this.lastCrashTime && (now - this.lastCrashTime < 0.05)) return;
     this.lastCrashTime = now;
 
-    const clampedVol = Math.min(1.0, Math.max(0.1, volume)) * Math.min(1.2, Math.max(0.4, impactForce / 60));
-    const duration = 0.28;
+    const clampedVol = Math.min(1.0, Math.max(0.12, volume)) * Math.min(1.2, Math.max(0.4, impactForce / 55));
+    const duration = 0.35;
 
-    // 1. Initial crunchy metal crunch impact transient (filtered noise)
-    const bufSize = Math.floor(this.ctx.sampleRate * 0.06);
+    // 1. Sharp metallic impact crack / snap transient
+    const snapOsc = this.ctx.createOscillator();
+    const snapFilter = this.ctx.createBiquadFilter();
+    const snapGain = this.ctx.createGain();
+    snapOsc.type = 'triangle';
+    snapOsc.frequency.setValueAtTime(3200, now);
+    snapOsc.frequency.exponentialRampToValueAtTime(140, now + 0.035);
+
+    snapFilter.type = 'highpass';
+    snapFilter.frequency.setValueAtTime(800, now);
+
+    snapGain.gain.setValueAtTime(clampedVol * 0.5, now);
+    snapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+
+    snapOsc.connect(snapFilter);
+    snapFilter.connect(snapGain);
+    snapGain.connect(this.sfxGain);
+    snapOsc.start(now);
+    snapOsc.stop(now + 0.035);
+
+    // 2. High-frequency inharmonic crunch noise (hull shear)
+    const bufSize = Math.floor(this.ctx.sampleRate * 0.05);
     const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
     const data = buf.getChannelData(0);
-    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.8;
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.7;
 
     const noise = this.ctx.createBufferSource();
     noise.buffer = buf;
     const nFilter = this.ctx.createBiquadFilter();
     nFilter.type = 'bandpass';
-    nFilter.frequency.setValueAtTime(1400, now);
-    nFilter.Q.setValueAtTime(2.0, now);
+    nFilter.frequency.setValueAtTime(2200, now);
+    nFilter.Q.setValueAtTime(2.5, now);
 
     const nGain = this.ctx.createGain();
-    nGain.gain.setValueAtTime(clampedVol * 0.45, now);
-    nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    nGain.gain.setValueAtTime(clampedVol * 0.38, now);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
 
     noise.connect(nFilter);
     nFilter.connect(nGain);
     nGain.connect(this.sfxGain);
     noise.start(now);
 
-    // 2. Inharmonic metallic ringing resonant modes (titanium hull ring)
-    const metalTones = [280, 620, 1140, 1850];
-    metalTones.forEach((freq, idx) => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = (idx === 0) ? 'triangle' : 'sine';
-      osc.frequency.setValueAtTime(freq, now);
-      // Slight pitch sag on impact
-      osc.frequency.exponentialRampToValueAtTime(freq * 0.88, now + duration);
+    // 3. FM Synthesis metallic clang: Inharmonic modulation (Carrier ~460Hz, Modulator ~650Hz [1.414 ratio])
+    const carrier = this.ctx.createOscillator();
+    const modulator = this.ctx.createOscillator();
+    const modIndex = this.ctx.createGain();
+    const carrierGain = this.ctx.createGain();
+    const clangFilter = this.ctx.createBiquadFilter();
 
-      const toneVol = (clampedVol * 0.25) / (idx + 1);
-      gain.gain.setValueAtTime(toneVol, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    carrier.type = 'sine';
+    carrier.frequency.setValueAtTime(460, now);
+    carrier.frequency.exponentialRampToValueAtTime(380, now + duration);
 
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(now);
-      osc.stop(now + duration);
+    modulator.type = 'sine';
+    modulator.frequency.setValueAtTime(460 * 1.414, now);
+    modulator.frequency.exponentialRampToValueAtTime(380 * 1.414, now + duration);
+
+    modIndex.gain.setValueAtTime(950 * clampedVol, now);
+    modIndex.gain.exponentialRampToValueAtTime(1, now + duration);
+
+    modulator.connect(modIndex);
+    modIndex.connect(carrier.frequency);
+
+    clangFilter.type = 'bandpass';
+    clangFilter.frequency.setValueAtTime(1250, now);
+    clangFilter.Q.setValueAtTime(1.8, now);
+
+    carrierGain.gain.setValueAtTime(clampedVol * 0.42, now);
+    carrierGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    carrier.connect(clangFilter);
+    clangFilter.connect(carrierGain);
+    carrierGain.connect(this.sfxGain);
+
+    carrier.start(now);
+    modulator.start(now);
+    carrier.stop(now + duration);
+    modulator.stop(now + duration);
+
+    // 4. Ringing metallic hull overtones (titanium resonance: 780Hz, 1420Hz, 2600Hz)
+    const resonantFreqs = [780, 1420, 2600];
+    resonantFreqs.forEach((freq, idx) => {
+      const rOsc = this.ctx.createOscillator();
+      const rGain = this.ctx.createGain();
+      rOsc.type = 'sine';
+      rOsc.frequency.setValueAtTime(freq, now);
+      rOsc.frequency.exponentialRampToValueAtTime(freq * 0.94, now + duration);
+
+      const rVol = (clampedVol * 0.22) / (idx + 1);
+      rGain.gain.setValueAtTime(rVol, now);
+      rGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * (0.8 + idx * 0.15));
+
+      rOsc.connect(rGain);
+      rGain.connect(this.sfxGain);
+      rOsc.start(now);
+      rOsc.stop(now + duration);
     });
   }
 
-  // Punchy, sci-fi arcade laser sound with sub-punch & frequency sweep
+  // Crisp, punchy sci-fi laser blaster sound with resonant chirp & plasma harmonic
   playLaser(isHeavy = false, volume = 1.0) {
     if (!this.initialized || this.isSoundMuted || volume <= 0.02) return;
     const now = this.ctx.currentTime;
     const masterVol = Math.min(1.0, Math.max(0, volume));
 
-    // 1. Visceral sub-punch transient (kick attack)
+    // 1. Visceral tactile sub-punch transient (kick thump)
     const kickOsc = this.ctx.createOscillator();
     const kickGain = this.ctx.createGain();
     kickOsc.type = 'sine';
-    kickOsc.frequency.setValueAtTime(isHeavy ? 120 : 180, now);
-    kickOsc.frequency.exponentialRampToValueAtTime(isHeavy ? 35 : 55, now + 0.06);
+    kickOsc.frequency.setValueAtTime(isHeavy ? 160 : 210, now);
+    kickOsc.frequency.exponentialRampToValueAtTime(isHeavy ? 35 : 50, now + 0.045);
 
-    kickGain.gain.setValueAtTime((isHeavy ? 0.35 : 0.22) * masterVol, now);
-    kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    kickGain.gain.setValueAtTime((isHeavy ? 0.38 : 0.24) * masterVol, now);
+    kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
 
     kickOsc.connect(kickGain);
     kickGain.connect(this.sfxGain);
     kickOsc.start(now);
-    kickOsc.stop(now + 0.06);
+    kickOsc.stop(now + 0.045);
 
-    // 2. Main sci-fi laser frequency sweep
+    // 2. High-energy sci-fi chirp sweep with resonant filter
     const laserOsc = this.ctx.createOscillator();
     const laserFilter = this.ctx.createBiquadFilter();
     const laserGain = this.ctx.createGain();
 
-    laserOsc.type = isHeavy ? 'sawtooth' : 'triangle';
-    const startFreq = isHeavy ? 680 : 1350;
-    const endFreq = isHeavy ? 80 : 190;
-    const duration = isHeavy ? 0.24 : 0.13;
+    const duration = isHeavy ? 0.16 : 0.10;
+    const startFreq = isHeavy ? 1800 : 2600;
+    const endFreq = isHeavy ? 140 : 220;
 
+    laserOsc.type = isHeavy ? 'sawtooth' : 'triangle';
     laserOsc.frequency.setValueAtTime(startFreq, now);
     laserOsc.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
 
-    laserFilter.type = 'lowpass';
-    laserFilter.frequency.setValueAtTime(isHeavy ? 2800 : 4200, now);
-    laserFilter.frequency.exponentialRampToValueAtTime(600, now + duration);
+    laserFilter.type = 'bandpass';
+    laserFilter.frequency.setValueAtTime(isHeavy ? 2200 : 3400, now);
+    laserFilter.frequency.exponentialRampToValueAtTime(320, now + duration);
+    laserFilter.Q.setValueAtTime(3.2, now); // Crisp resonant laser "pew" zing
 
-    laserGain.gain.setValueAtTime((isHeavy ? 0.38 : 0.26) * masterVol, now);
+    laserGain.gain.setValueAtTime((isHeavy ? 0.42 : 0.32) * masterVol, now);
     laserGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     laserOsc.connect(laserFilter);
@@ -361,6 +417,21 @@ class SoundSystem {
 
     laserOsc.start(now);
     laserOsc.stop(now + duration);
+
+    // 3. Plasma sizzle overtone harmonic (gives futuristic energy snap)
+    const sizzleOsc = this.ctx.createOscillator();
+    const sizzleGain = this.ctx.createGain();
+    sizzleOsc.type = 'square';
+    sizzleOsc.frequency.setValueAtTime(isHeavy ? 2800 : 3800, now);
+    sizzleOsc.frequency.exponentialRampToValueAtTime(600, now + duration * 0.7);
+
+    sizzleGain.gain.setValueAtTime(0.07 * masterVol, now);
+    sizzleGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.7);
+
+    sizzleOsc.connect(sizzleGain);
+    sizzleGain.connect(this.sfxGain);
+    sizzleOsc.start(now);
+    sizzleOsc.stop(now + duration * 0.7);
   }
 
   // Asteroid or ship explosion with distance volume scaling

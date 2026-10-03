@@ -85,7 +85,7 @@ class Particle {
 
 // Laser Bolt
 class Laser extends Entity {
-  constructor(x, y, vx, vy, damage, isHeavy, ownerId, color = 0x00f0ff, nation = 'blue', maxRange = 600, isHealBeam = false) {
+  constructor(x, y, vx, vy, damage, isHeavy, ownerId, color = 0x00f0ff, nation = 'blue', maxRange = 600, isHealBeam = false, element = 'standard') {
     const radiusScale = Math.max(0.85, Math.min(2.2, Math.sqrt(damage / 10)));
     super(x, y, (isHeavy ? 6 : 4) * radiusScale, 0.1);
     this.startX = x;
@@ -98,13 +98,25 @@ class Laser extends Entity {
     this.nation = nation;
     this.maxRange = maxRange;
     this.isHealBeam = isHealBeam;
+    this.element = element;
+    this.color = color;
     const speed = Math.hypot(vx, vy);
     this.lifetime = speed > 0 ? (this.maxRange / speed) * 1.08 : 1.5;
     this.rotation = Math.atan2(vy, vx);
 
-    this.mesh = ModelBuilder.createLaserMesh(isHeavy, color, damage);
+    this.mesh = ModelBuilder.createLaserMesh(isHeavy, color, damage, element);
     this.mesh.position.set(x, -y, 1);
     this.mesh.rotation.z = -this.rotation + Math.PI / 2;
+  }
+
+  // Exact particle color matching laser bolt per user request: "lazer ile ateş ettiğimizde hangi renkse çarptığı yerde partiküllerine ayrılsın"
+  getHitColor() {
+    if (this.isHealBeam) return 0x00ff88;
+    if (this.element === 'ice') return 0x00f0ff;
+    if (this.element === 'fire') return 0xff4500;
+    if (this.element === 'dark') return 0xc084fc;
+    if (this.color) return this.color;
+    return 0x00ff44;
   }
 
   update(dt, worldSize) {
@@ -131,22 +143,49 @@ class Laser extends Entity {
 
 // Gem / Crystal dropped from asteroids & destroyed ships
 class Gem extends Entity {
-  constructor(x, y, value = 1) {
-    super(x, y, value > 5 ? 10 : 7, 0.5);
+  constructor(x, y, value = 1, element = 'green', id = null) {
+    super(x, y, value >= 60 ? 16 : (value > 8 ? 10 : 7), 0.5);
+    this.id = id || `gem-${Date.now()}-${Math.floor(Math.random() * 10000000)}`;
     this.value = value;
+    this.element = element || 'green';
     // Gentle radial dispersal burst
     const angle = Math.random() * Math.PI * 2;
     const burstSpeed = 35 + Math.random() * 45;
     this.vx = Math.cos(angle) * burstSpeed;
     this.vy = Math.sin(angle) * burstSpeed;
     this.drag = 0.95;
-    this.mesh = ModelBuilder.createGemMesh(value);
+    this.mesh = ModelBuilder.createGemMesh(value, this.element);
     this.mesh.position.set(x, -y, 0);
     this.rotSpeedX = (Math.random() - 0.5) * 3;
     this.rotSpeedY = (Math.random() - 0.5) * 3;
+    this.life = 35.0;
+    this.isExpired = false;
+  }
+
+  destroy(scene) {
+    this.isDead = true;
+    if (this.mesh) {
+      this.mesh.visible = false;
+      if (scene) scene.remove(this.mesh);
+    }
   }
 
   update(dt, worldSize, ships) {
+    if (this.isDead || this.isExpired) {
+      if (this.mesh) this.mesh.visible = false;
+      return;
+    }
+    this.life -= dt;
+    if (this.life <= 0) {
+      this.isExpired = true;
+      if (this.mesh) this.mesh.visible = false;
+      return;
+    }
+    if (this.life <= 5.0 && this.mesh) {
+      // Gentle blinking effect before despawning
+      this.mesh.visible = Math.floor(this.life * 6) % 2 === 0;
+    }
+
     // Local proximity magnet: only activates if a ship is very close (within 18 units of ship hull)
     let magnetShip = null;
     let minHullDist = 18;
@@ -203,34 +242,41 @@ class Gem extends Entity {
 
 // Asteroid (7 Proportional Sizes: Size 1 = Smallest, Size 7 = Largest)
 class Asteroid extends Entity {
-  constructor(x, y, sizeTier = 1) {
+  constructor(x, y, sizeTier = 1, id = null, element = 'ice') {
     const tier = Math.max(1, Math.min(7, sizeTier));
     // Size 1 (radius 13) to Size 7 (radius 64)
     const radius = 13 + (tier - 1) * 8.5;
     const mass = 1.5 + tier * 2.5;
     super(x, y, radius, mass);
 
+    this.id = id || `ast-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     this.sizeTier = tier;
+    this.element = element || 'ice';
 
     // Proportional health from tier 1 (16 HP) to tier 7 (1650 HP)
     const healths = [0, 16, 42, 105, 230, 460, 920, 1650];
     this.maxHealth = healths[tier] || (tier * 220);
     this.health = this.maxHealth;
 
-    // Yield configuration (Tier 1 drops strictly 1-3 crystals, scaling proportionally up to Tier 7)
+    // Yield configuration: Max 1 - 4 pieces! ("en fazla 1-4 arası dağılma olssun ve parçalar en büyük asteroitten büyük bir tek parça çıkabilir şeklinde")
     const tierYields = [
       null,
-      { min: 1, max: 3, valMult: 1.0 },   // Tier 1: 1 - 3 crystals
-      { min: 3, max: 6, valMult: 1.4 },   // Tier 2: 4 - 8 crystals
-      { min: 6, max: 11, valMult: 1.8 },  // Tier 3: 11 - 20 crystals
-      { min: 11, max: 18, valMult: 2.2 }, // Tier 4: 24 - 40 crystals
-      { min: 18, max: 28, valMult: 2.5 }, // Tier 5: 45 - 70 crystals
-      { min: 28, max: 42, valMult: 2.8 }, // Tier 6: 78 - 118 crystals
-      { min: 42, max: 60, valMult: 3.2 }  // Tier 7: 135 - 192 crystals
+      { min: 1, max: 2, totalPoints: 2 },
+      { min: 1, max: 3, totalPoints: 6 },
+      { min: 2, max: 3, totalPoints: 15 },
+      { min: 2, max: 4, totalPoints: 32 },
+      { min: 2, max: 4, totalPoints: 60 },
+      { min: 2, max: 4, totalPoints: 105 },
+      { min: 1, max: 4, totalPoints: 180 }
     ];
     const yCfg = tierYields[tier] || tierYields[1];
-    this.crystalCount = Math.floor(Math.random() * (yCfg.max - yCfg.min + 1)) + yCfg.min;
-    this.crystalTotalValue = Math.round(this.crystalCount * yCfg.valMult);
+    let count = Math.floor(Math.random() * (yCfg.max - yCfg.min + 1)) + yCfg.min;
+    if (tier === 7 && Math.random() < 0.45) {
+      count = 1; // Devasa asteroidden tek büyük zengin parça
+    }
+    this.crystalCount = Math.max(1, Math.min(4, count));
+    // Balanced EXP yield: reduced points so leveling requires active asteroid hunting
+    this.crystalTotalValue = yCfg.totalPoints;
 
     // Completely stationary (no movement across space)
     this.vx = 0;
@@ -239,7 +285,7 @@ class Asteroid extends Entity {
     // Track damage dealt by each player / bot (highest damager gets the drops!)
     this.damageLog = {};
 
-    this.mesh = ModelBuilder.createAsteroidMesh(radius, tier);
+    this.mesh = ModelBuilder.createAsteroidMesh(radius, tier, this.element);
     this.mesh.position.set(x, -y, 0);
 
     this.rotSpeed = {
@@ -247,6 +293,19 @@ class Asteroid extends Entity {
       y: (Math.random() - 0.5) * 0.3,
       z: (Math.random() - 0.5) * 0.3
     };
+
+    // Damage flash & visual feedback (No health bar per user request: 'asteroidler can bari görülmemeli')
+    this.damageFlashTimer = 0;
+    this.shakeTimer = 0;
+  }
+
+  createHealthBar(scene) {
+    // Disabled: user requested asteroid health bars be completely hidden
+  }
+
+  flashDamage() {
+    // User request: "asteroitler hasar alırken titreme gibi efekti olmasın sabit durabilir"
+    // Absolutely stationary, no shake
   }
 
   takeDamage(dmg, attackerId = null) {
@@ -254,7 +313,10 @@ class Asteroid extends Entity {
       this.damageLog[attackerId] = (this.damageLog[attackerId] || 0) + dmg;
     }
     this.health -= dmg;
+    this.flashDamage();
+
     if (this.health <= 0) {
+      this.health = 0;
       this.isDead = true;
       return true; // Destroyed
     }
@@ -274,15 +336,21 @@ class Asteroid extends Entity {
   }
 
   update(dt, worldSize) {
-    // Asteroid stays stationary at its fixed coordinates
+    // Asteroid stays strictly stationary at its fixed coordinates
     this.vx = 0;
     this.vy = 0;
+
     if (this.mesh) {
       this.mesh.position.set(this.x, -this.y, 0);
       this.mesh.rotation.x += this.rotSpeed.x * dt;
       this.mesh.rotation.y += this.rotSpeed.y * dt;
       this.mesh.rotation.z += this.rotSpeed.z * dt;
     }
+  }
+
+  destroy(scene) {
+    this.isDead = true;
+    super.destroy(scene);
   }
 }
 
@@ -300,7 +368,8 @@ class Ship extends Entity {
     this.scene = scene;
     const nationCfg = NATIONS[this.nation] || NATIONS['blue'];
     this.customColor = nationCfg.color;
-    this.laserColor = nationCfg.laserColor;
+    // Initial standard laser is strictly neon green per user request: "ilk lazer her zaman yeşil olacak."
+    this.laserColor = 0x00ff44;
 
     // Upgrades level (0 to 6)
     this.upgrades = {
@@ -316,7 +385,24 @@ class Ship extends Entity {
 
     this.crystals = 0;
     this.score = 0;
+    this.kills = 0;
+    this.mined = 0;
+    this.donations = 0;
     this.rcsEnabled = true; // Reaction Control System (auto-damping)
+
+    // Elemental & Tactical Action Systems
+    // User request: "ekstra kredi ile açılmasına gerek yok hiç birinin space ve r direkt aktif olsun."
+    this.unlockedWeapons = { standard: true, ice: true, fire: true, dark: true };
+    this.activeWeapon = 'standard';
+    this.warpUnlocked = true;
+    this.warpCooldown = 0;
+    this.warpActiveTimer = 0; // 3-second continuous sustained warp thrust timer
+    this.superCooldown = 0;
+    this.statusEffects = { burnTimer: 0, burnDps: 0, freezeTimer: 0, freezeFactor: 0.40 };
+
+    // Elemental crystal material reservoirs (User request: S1-S2-S3 starts at 75-50-25)
+    this.elementalAmmo = { ice: 75, fire: 50, dark: 25 };
+    this.maxElementalAmmo = { ice: 150, fire: 120, dark: 80 };
 
     this.recomputeStats();
     this.shield = this.stats.shieldCap;
@@ -336,13 +422,15 @@ class Ship extends Entity {
     this.mesh = ModelBuilder.createShipMesh(shipKey, this.customColor);
     this.engineFlame = this.mesh.getObjectByName('engineFlame');
     this.shieldBubble = this.mesh.getObjectByName('shieldBubble');
+    this.wingTrails = this.mesh.getObjectByName('wingTrails');
 
     if (this.mesh) {
       this.mesh.position.set(this.x, -this.y, 0);
       this.mesh.rotation.z = -this.rotation + Math.PI / 2;
+      this.mesh.renderOrder = 10; // Guaranteed to render in front of space station geometry
     }
 
-    if (this.scene) {
+    if (this.scene && !this.isMenuBot && !this.isMenuSkirmish && !(window.game && window.game.isMenuBattle)) {
       this.createHealthBar(this.scene);
     }
   }
@@ -391,16 +479,18 @@ class Ship extends Entity {
     this.mesh = ModelBuilder.createShipMesh(newShipKey, this.customColor);
     this.engineFlame = this.mesh.getObjectByName('engineFlame');
     this.shieldBubble = this.mesh.getObjectByName('shieldBubble');
+    this.wingTrails = this.mesh.getObjectByName('wingTrails');
     if (this.mesh) {
       this.mesh.position.set(this.x, -this.y, 0);
       this.mesh.rotation.z = -this.rotation + Math.PI / 2;
+      this.mesh.renderOrder = 10;
     }
     if (activeScene) {
       activeScene.add(this.mesh);
     }
   }
 
-  takeDamage(amount) {
+  takeDamage(amount, isCollision = false) {
     if (this.spawnShieldTimer > 0) {
       return false; // Invulnerable during spawn base protection
     }
@@ -410,19 +500,99 @@ class Ship extends Entity {
 
     if (this.shield <= 0) {
       this.shield = 0;
+      // User request: "ve 0a kadar düşerse envanterdeki malzemeler gökyüzüne çarptığı sürece dağılsın"
+      // If ship has crystals during collision impact, do not instantly explode - allow crystals to spill first!
+      if (isCollision && this.crystals > 0) {
+        return false;
+      }
       this.isDead = true;
       return true;
     }
     return false;
   }
 
+  applyStatusEffect(effect, duration = 3.5, strength = null) {
+    if (this.isDead) return;
+    if (effect === 'freeze') {
+      this.statusEffects.freezeTimer = Math.max(this.statusEffects.freezeTimer, duration);
+      this.statusEffects.freezeFactor = strength || 0.40;
+    } else if (effect === 'burn') {
+      this.statusEffects.burnTimer = Math.max(this.statusEffects.burnTimer, duration);
+      this.statusEffects.burnDps = strength || 8.0;
+    }
+  }
+
+  triggerWarpDash(particlesCallback = null) {
+    if (this.isDead || !this.warpUnlocked || this.warpCooldown > 0) return false;
+    this.warpActiveTimer = 3.0; // 3 seconds continuous propulsion
+    this.warpCooldown = 120.0; // 120 seconds cooldown ("aynı şekilde space 120 saniye olacak")
+    const initialSurge = 180 + (this.stats.shipSpeed || 150) * 0.40;
+    this.vx += Math.cos(this.rotation) * initialSurge;
+    this.vy += Math.sin(this.rotation) * initialSurge;
+    if (particlesCallback) {
+      particlesCallback(this.x, this.y, this.rotation);
+    }
+    return true;
+  }
+
+  triggerSuper(fireLaserCallback = null) {
+    if (this.isDead || this.superCooldown > 0 || this.energy < 25) return false;
+    this.superCooldown = 60.0; // 60 seconds cooldown ("dolma süresi 60 saniye olacak")
+    this.energy = Math.max(0, this.energy - 25);
+    if (fireLaserCallback) {
+      // Localized shockwave burst: radius ~65-68 units (roughly 2 ships placed side by side)
+      // ("r skili alanı o kadar geniş olmyacak ve etkisi yan yana gemileri koysak 2 gemi kadar olacak")
+      const count = 18 + (this.upgrades.energyCap || 0) * 2;
+      const blastRadius = 66; // 2 ships width
+      for (let i = 0; i < count; i++) {
+        const ang = this.rotation + (i / count) * Math.PI * 2;
+        const isHeavyBolt = (i % 2 === 0);
+        const boltSpeed = 220;
+        const vx = Math.cos(ang) * boltSpeed + this.vx * 0.2;
+        const vy = Math.sin(ang) * boltSpeed + this.vy * 0.2;
+        const novaLaser = new Laser(
+          this.x, this.y, vx, vy,
+          this.stats.fireDamage * 2.4, // High concentrated point-blank blast damage
+          isHeavyBolt,
+          this.id,
+          (i % 2 === 0 ? 0xffdd44 : 0x00f0ff),
+          this.nation,
+          blastRadius, // Range confined to 2 ships width
+          false,
+          'fire'
+        );
+        fireLaserCallback(novaLaser);
+      }
+    }
+    return true;
+  }
+
   update(dt, worldSize) {
+    // Cooldown timers
+    if (this.warpCooldown > 0) this.warpCooldown = Math.max(0, this.warpCooldown - dt);
+    if (this.superCooldown > 0) this.superCooldown = Math.max(0, this.superCooldown - dt);
+
+    // Status effect modifiers
+    let speedModifier = 1.0;
+    let turnModifier = 1.0;
+    if (this.statusEffects.freezeTimer > 0) {
+      this.statusEffects.freezeTimer -= dt;
+      speedModifier *= (1 - this.statusEffects.freezeFactor); // 40% slow
+      turnModifier *= 0.65;
+    }
+
+    if (this.statusEffects.burnTimer > 0) {
+      this.statusEffects.burnTimer -= dt;
+      const dotDmg = (this.statusEffects.burnDps || 8.0) * dt;
+      this.takeDamage(dotDmg);
+    }
+
     // Rotate towards target rotation with agility limit
     let angleDiff = this.targetRotation - this.rotation;
     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
-    const maxTurn = this.stats.shipAgility * dt;
+    const maxTurn = this.stats.shipAgility * turnModifier * dt;
     if (Math.abs(angleDiff) < maxTurn) {
       this.rotation = this.targetRotation;
     } else {
@@ -434,26 +604,36 @@ class Ship extends Entity {
       this.isExhaustedSpeedStrain = false;
     }
 
-    // Special speed penalty if straining empty energy reserves on speed ship ("enerji biterse ve sıkmayı bırakmaz ise yavaşlayacak")
-    const speedPenalty = this.isExhaustedSpeedStrain ? 0.55 : 1.0;
+    // Special speed penalty if straining empty energy reserves on speed ship
+    const speedPenalty = (this.isExhaustedSpeedStrain ? 0.55 : 1.0) * speedModifier;
 
-    // Thrust acceleration
+    // 3-Second Sustained Warp Drive Thrust ("space skili 3 saniye itmeli gemiyi")
+    const isWarpActive = (this.warpActiveTimer > 0);
+    if (isWarpActive) {
+      this.warpActiveTimer = Math.max(0, this.warpActiveTimer - dt);
+      const warpAccel = (this.stats.shipSpeed || 150) * 3.8;
+      this.vx += Math.cos(this.rotation) * warpAccel * dt;
+      this.vy += Math.sin(this.rotation) * warpAccel * dt;
+    }
+
+    // Normal Thrust acceleration
     if (this.isThrusting) {
       const accel = this.stats.shipSpeed * 2.2 * speedPenalty;
       this.vx += Math.cos(this.rotation) * accel * dt;
       this.vy += Math.sin(this.rotation) * accel * dt;
     }
 
-    // Speed clamping
-    const maxAllowedSpeed = this.stats.shipSpeed * speedPenalty;
+    // Speed clamping (allows 2.5x speed multiplier during active 3-second warp propulsion)
+    const warpMult = isWarpActive ? 2.5 : 1.0;
+    const maxAllowedSpeed = this.stats.shipSpeed * speedPenalty * warpMult;
     const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
     if (currentSpeed > maxAllowedSpeed) {
       this.vx = (this.vx / currentSpeed) * maxAllowedSpeed;
       this.vy = (this.vy / currentSpeed) * maxAllowedSpeed;
     }
 
-    // RCS Damping (Starblast physics)
-    if (this.rcsEnabled && !this.isThrusting) {
+    // RCS Damping (Starblast physics) - suspended during active warp thrust
+    if (this.rcsEnabled && !this.isThrusting && !isWarpActive) {
       const damping = Math.pow(0.5, dt * 2.5);
       this.vx *= damping;
       this.vy *= damping;
@@ -468,7 +648,6 @@ class Ship extends Entity {
     }
 
     // Energy Starvation check:
-    // If energy drops to 0 (<= 0.1), enters starved state. Must reach at least 30 energy to resume full rapid-fire.
     if (this.energy <= 0.1) {
       this.isEnergyStarved = true;
     } else if (this.isEnergyStarved && this.energy >= 30) {
@@ -477,12 +656,28 @@ class Ship extends Entity {
 
     if (this.fireTimer > 0) this.fireTimer -= dt;
 
-    // Visual updates (engine flames & shield pulse)
+    // Visual updates (smooth sci-fi ion propulsion light & wing slipstream trails)
     if (this.engineFlame) {
-      this.engineFlame.visible = this.isThrusting;
-      if (this.isThrusting) {
-        const flamePulse = 0.8 + Math.random() * 0.4;
-        this.engineFlame.scale.set(flamePulse, flamePulse, flamePulse);
+      const activeThrust = this.isThrusting || isWarpActive;
+      this.engineFlame.visible = activeThrust;
+      if (activeThrust) {
+        this.thrustAnimTime = (this.thrustAnimTime || 0) + dt * 10;
+        const t = this.thrustAnimTime;
+        // Smooth futuristic ion drive wave (NO erratic jitter / NO random shaking)
+        const lengthPulse = (isWarpActive ? 1.6 : 1.0) + Math.sin(t) * 0.08 + Math.cos(t * 1.6) * 0.04;
+        const widthPulse = 0.96 + Math.sin(t * 1.3) * 0.04;
+        this.engineFlame.scale.set(widthPulse, widthPulse, lengthPulse);
+      }
+    }
+
+    if (this.wingTrails) {
+      const speed = Math.hypot(this.vx, this.vy);
+      const isGliding = (this.isThrusting || speed > 60 || isWarpActive);
+      this.wingTrails.visible = isGliding;
+      if (isGliding) {
+        // Restrained aerodynamic wingtip slipstream ("hafif çizgisel bir süzülme efekti, aşırı uzamasın")
+        const trailLen = Math.min(1.2, 0.7 + (speed / 320) * 0.5);
+        this.wingTrails.scale.set(1.0, 1.0, trailLen);
       }
     }
 
@@ -513,6 +708,15 @@ class Ship extends Entity {
   }
 
   createHealthBar(scene) {
+    if (this.isMenuBot || this.isMenuSkirmish || (window.game && window.game.isMenuBattle)) {
+      if (this.healthBarGroup) {
+        const activeScene = scene || this.scene;
+        if (activeScene) activeScene.remove(this.healthBarGroup);
+        this.healthBarGroup = null;
+      }
+      return;
+    }
+
     const activeScene = scene || this.scene;
     if (!activeScene) return;
 
@@ -560,8 +764,12 @@ class Ship extends Entity {
   }
 
   updateHealthBar() {
-    if (this.isMenuSkirmish || (window.game && window.game.isMenuBattle)) {
-      if (this.healthBarGroup) this.healthBarGroup.visible = false;
+    if (this.isMenuBot || this.isMenuSkirmish || (window.game && window.game.isMenuBattle)) {
+      if (this.healthBarGroup) {
+        this.healthBarGroup.visible = false;
+        if (this.scene) this.scene.remove(this.healthBarGroup);
+        this.healthBarGroup = null;
+      }
       return;
     }
 
@@ -607,13 +815,125 @@ class Ship extends Entity {
     super.destroy(activeScene);
   }
 
-  // Shoot lasers from ship's weapon mounts
+  // Shoot lasers from ship's weapon mounts (Elemental or Standard)
   tryFire() {
     if (this.fireTimer > 0) return null;
     const config = SHIP_TREE[this.shipKey];
-    
-    // Check total energy cost
-    const totalCost = config.weapons.reduce((sum, w) => sum + w.energyCost, 0);
+
+    // Check if player is using an elemental weapon (Laser - S1: ice, Laser - S2: fire, Laser - S3: dark)
+    if (this.activeWeapon && this.activeWeapon !== 'standard') {
+      const currentAmmo = (this.elementalAmmo && this.elementalAmmo[this.activeWeapon]) || 0;
+      if (currentAmmo <= 0) {
+        // Material empty: auto revert to initial standard laser
+        this.activeWeapon = 'standard';
+      }
+    }
+
+    if (this.activeWeapon && this.activeWeapon !== 'standard' && this.unlockedWeapons && this.unlockedWeapons[this.activeWeapon]) {
+      // Deduct 1 elemental crystal material from pool
+      if (this.elementalAmmo && this.elementalAmmo[this.activeWeapon] !== undefined) {
+        this.elementalAmmo[this.activeWeapon] = Math.max(0, this.elementalAmmo[this.activeWeapon] - 1);
+      }
+      let energyCost = 14;
+      let damage = Math.round(this.stats.fireDamage * 1.30 + 8);
+      let fireRate = Math.max(0.12, (this.stats.fireRate || 0.22) * 0.90);
+      let laserColor = 0x00f0ff;
+      let isHeavy = false;
+      let maxRange = (this.stats.fireRange || 600) * 1.10;
+      let speedMult = 1.15;
+
+      if (this.activeWeapon === 'ice') {
+        energyCost = 14;
+        damage = Math.round(this.stats.fireDamage * 1.30 + 8);
+        fireRate = Math.max(0.12, (this.stats.fireRate || 0.22) * 0.90);
+        laserColor = 0x00f0ff;
+        isHeavy = false;
+        maxRange = (this.stats.fireRange || 600) * 1.10;
+        speedMult = 1.15;
+      } else if (this.activeWeapon === 'fire') {
+        energyCost = 22;
+        damage = Math.round(this.stats.fireDamage * 1.70 + 16);
+        fireRate = Math.max(0.14, (this.stats.fireRate || 0.22) * 1.05);
+        laserColor = 0xff4500;
+        isHeavy = false;
+        maxRange = (this.stats.fireRange || 600) * 1.05;
+        speedMult = 1.10;
+      } else if (this.activeWeapon === 'dark') {
+        // High power obsidian-core needle laser with white glow ("karanlık lazer de aynı diğerleri gibi ince olabilir")
+        energyCost = 36;
+        damage = Math.round(this.stats.fireDamage * 2.85 + 32);
+        fireRate = Math.max(0.18, (this.stats.fireRate || 0.22) * 1.35);
+        laserColor = 0x111115;
+        isHeavy = false;
+        maxRange = (this.stats.fireRange || 600) * 1.25;
+        speedMult = 1.20;
+      }
+
+      if (this.energy <= 0.1) {
+        this.isEnergyStarved = true;
+      }
+
+      let isEmergencyLowEnergy = false;
+      if (this.energy < energyCost * 0.45) {
+        if (this.isEnergyStarved && this.energy >= 0.5) {
+          isEmergencyLowEnergy = true;
+        } else {
+          return null;
+        }
+      }
+
+      const deduction = isEmergencyLowEnergy ? Math.min(this.energy, 4) : energyCost;
+      this.energy = Math.max(0, this.energy - deduction);
+      if (this.energy <= 0.1) this.isEnergyStarved = true;
+
+      this.fireTimer = this.isEnergyStarved ? Math.max(0.60, fireRate) : fireRate;
+
+      const cosR = Math.cos(this.rotation);
+      const sinR = Math.sin(this.rotation);
+      const finalLaserSpeed = (this.stats.fireSpeed || 800) * speedMult;
+      const baseDmg = isEmergencyLowEnergy ? (damage * 0.65) : damage;
+
+      // User request:
+      // - "seviye 3 numaralı gemi giriş lazeri namlulardan atarken diğer skillerdeki lazerleride aynı yerden ateşlemeli"
+      // - "seviye 5 teki gemi içinde aynı ve o kadar kalın bir lazer atmasına gerk yok"
+      // - "seviye 7 deki gemi içinde aynı çift namlusundan çıkmalı"
+      const weaponMounts = (config && config.weapons && config.weapons.length > 0)
+        ? config.weapons
+        : [{ offset: { x: 0, y: this.radius + 6 }, isHeavy: isHeavy }];
+
+      // Balance damage per mount on multi-nozzle ships (so twin cannons feel powerful without double damage)
+      const mountDmg = (weaponMounts.length > 1) ? Math.round(baseDmg * 0.68) : baseDmg;
+      const lasers = [];
+
+      for (const w of weaponMounts) {
+        const worldX = this.x + (cosR * w.offset.y - sinR * w.offset.x);
+        const worldY = this.y + (sinR * w.offset.y + cosR * w.offset.x);
+        const laserVx = cosR * finalLaserSpeed + this.vx * 0.3;
+        const laserVy = sinR * finalLaserSpeed + this.vy * 0.3;
+
+        const laser = new Laser(
+          worldX,
+          worldY,
+          laserVx,
+          laserVy,
+          mountDmg,
+          w.isHeavy || isHeavy,
+          this.id,
+          laserColor,
+          this.nation,
+          maxRange,
+          false,
+          this.activeWeapon
+        );
+        lasers.push(laser);
+      }
+      return lasers;
+    }
+
+    // Default Ship Tree Multi-Mount Laser Behavior (Initial Laser)
+    // User request: "geminin ilk lazeri daha az enerji harcıyor ama hasarıda diğer 3 kredi lazerden daha az olsun."
+    const baseEnergyCost = config.weapons.reduce((sum, w) => sum + w.energyCost, 0);
+    const totalCost = Math.max(3, Math.round(baseEnergyCost * 0.50)); // Consumes 50% less energy!
     const isSpeedShip = (config.classType === 'speed');
 
     // Special Speed Ship Mechanic:
@@ -660,7 +980,8 @@ class Ship extends Entity {
     const cosR = Math.cos(this.rotation);
     const sinR = Math.sin(this.rotation);
     const isHeal = !!this.isHealer;
-    const laserColor = isHeal ? 0x00ff88 : (this.laserColor || 0x00f0ff);
+    // Initial standard laser is strictly neon green per user request: "ilk lazer her zaman yeşil olacak."
+    const laserColor = isHeal ? 0x00ff88 : 0x00ff44;
 
     for (const w of activeWeapons) {
       // Transform local weapon offset to world position
@@ -669,7 +990,8 @@ class Ship extends Entity {
 
       const laserVx = cosR * this.stats.fireSpeed + this.vx * 0.3;
       const laserVy = sinR * this.stats.fireSpeed + this.vy * 0.3;
-      let laserDmg = w.isHeavy ? this.stats.fireDamage * 1.35 : this.stats.fireDamage;
+      // Initial laser damage is tuned to be less than the 3 elemental credit lasers
+      let laserDmg = (w.isHeavy ? this.stats.fireDamage * 1.12 : this.stats.fireDamage) * 0.82;
       if (isEmergencyLowEnergy) {
         laserDmg *= 0.72; // Emergency lower damage
       }
@@ -685,7 +1007,8 @@ class Ship extends Entity {
         laserColor,
         this.nation,
         this.stats.fireRange || 600,
-        isHeal
+        isHeal,
+        'standard'
       );
       lasers.push(laser);
     }
@@ -762,13 +1085,20 @@ class RemotePlayer extends Ship {
       this.nameSprite.position.set(this.x, -this.y + this.radius + 30, 5);
     }
 
-    // Engine flame
+    // Engine flame (smooth ion light)
     if (this.engineFlame) {
       this.engineFlame.visible = !!this.isThrusting;
       if (this.isThrusting) {
-        const pulse = 0.8 + Math.random() * 0.4;
-        this.engineFlame.scale.set(pulse, pulse, pulse);
+        this.thrustAnimTime = (this.thrustAnimTime || 0) + dt * 10;
+        const t = this.thrustAnimTime;
+        const lengthPulse = 1.0 + Math.sin(t) * 0.08 + Math.cos(t * 1.6) * 0.04;
+        const widthPulse = 0.96 + Math.sin(t * 1.3) * 0.04;
+        this.engineFlame.scale.set(widthPulse, widthPulse, lengthPulse);
       }
+    }
+
+    if (this.wingTrails) {
+      this.wingTrails.visible = !!this.isThrusting;
     }
 
     // Shield bubble
@@ -1281,10 +1611,13 @@ class BotShip extends Ship {
 // Space Station / Nation Home Base
 class SpaceStation extends Entity {
   constructor(nation, x, y, scene) {
-    super(x, y, 140, 99999);
+    super(x, y, 420, 99999); // Radius adjusted to 420 matching 3.2 scale (1x increase)
     this.nation = nation;
     this.scene = scene;
     this.level = 1;
+    this.radius = 450; // Perimeter for docking and healing
+    this.hullRadius = 230; // Physical structure collision radius ("rakibin istasyonuna vurunca istasyon objesine vuruşu hissettirmeli")
+    this.shudder = 0; // Visual impact shudder timer
     this.maxHp = 25000; // Heavily fortified base
     this.hp = 25000;
     this.shieldRegenRate = 45; // 45 HP/sec passive shield repair
@@ -1295,7 +1628,9 @@ class SpaceStation extends Entity {
     this.shieldFlashTimer = 0;
 
     this.mesh = ModelBuilder.createStationMesh(nation, this.level);
-    this.mesh.position.set(x, -y, 0);
+    // Station sits at Z = -150 so player ship flying at Z = 0 is always rendered on top of the entire base
+    this.mesh.position.set(x, -y, -150);
+    this.stationBody = this.mesh.getObjectByName('stationBody');
     this.rotatingRing = this.mesh.getObjectByName('rotatingRing');
     this.shieldMesh = this.mesh.getObjectByName('stationShield');
 
@@ -1317,14 +1652,21 @@ class SpaceStation extends Entity {
       this.crystalsRequired = Math.round(this.crystalsRequired * 2.2);
       leveledUp = true;
 
-      // Rebuild 3D mesh for upgraded station
+      // Preserve current continuous rotation angles so upgrade doesn't jump or change angle
+      const currentBodyRotZ = this.stationBody ? this.stationBody.rotation.z : 0;
+      const currentRingRotX = this.rotatingRing ? this.rotatingRing.rotation.x : 0;
+
+      // Rebuild 3D mesh for upgraded station (radius & scale remain constant: "istasyon lwl alınca büyümesine gerek yok")
       if (this.scene && this.mesh) {
         this.scene.remove(this.mesh);
       }
       this.mesh = ModelBuilder.createStationMesh(this.nation, this.level);
-      this.mesh.position.set(this.x, -this.y, 0);
+      this.mesh.position.set(this.x, -this.y, -150);
+      this.stationBody = this.mesh.getObjectByName('stationBody');
       this.rotatingRing = this.mesh.getObjectByName('rotatingRing');
       this.shieldMesh = this.mesh.getObjectByName('stationShield');
+      if (this.stationBody) this.stationBody.rotation.z = currentBodyRotZ;
+      if (this.rotatingRing) this.rotatingRing.rotation.x = currentRingRotX;
       if (this.scene) {
         this.scene.add(this.mesh);
       }
@@ -1335,6 +1677,7 @@ class SpaceStation extends Entity {
 
   takeDamage(amount) {
     this.hp -= amount;
+    this.shudder = 0.22; // Physical shudder feedback on impact
     if (this.shieldMesh) {
       this.shieldMesh.material.opacity = 0.55;
       this.shieldFlashTimer = 0.18;
@@ -1350,9 +1693,26 @@ class SpaceStation extends Entity {
   update(dt, enemyShips, onFireTurret) {
     if (this.isDead) return;
 
-    // Rotate station ring
+    // Smooth, seamless endless orbital rotation of the station body
+    if (this.stationBody) {
+      this.stationBody.rotation.z = (this.stationBody.rotation.z + 0.035 * dt) % (Math.PI * 2);
+    }
+
+    // Rotate communications radar & sensor array around boom axis
     if (this.rotatingRing) {
-      this.rotatingRing.rotation.z += this.rotationSpeed * dt;
+      this.rotatingRing.rotation.x = (this.rotatingRing.rotation.x + this.rotationSpeed * dt) % (Math.PI * 2);
+    }
+
+    // Apply tactile impact shudder
+    let shudderX = 0;
+    let shudderY = 0;
+    if (this.shudder > 0) {
+      this.shudder -= dt;
+      shudderX = (Math.random() - 0.5) * 8 * (this.shudder / 0.22);
+      shudderY = (Math.random() - 0.5) * 8 * (this.shudder / 0.22);
+    }
+    if (this.mesh) {
+      this.mesh.position.set(this.x + shudderX, -this.y + shudderY, -150);
     }
 
     // Passive base shield / hull regeneration
@@ -1367,11 +1727,11 @@ class SpaceStation extends Entity {
       }
     }
 
-    // Auto-turret defense: shoot at nearest enemy within perimeter (range 850)
+    // Auto-turret defense: shoot at nearest enemy within perimeter (range 2200 for 4x base)
     this.turretTimer -= dt;
     if (this.turretTimer <= 0) {
       let target = null;
-      let minDist = 850;
+      let minDist = 2200;
       for (const s of enemyShips) {
         if (s.isDead || s.nation === this.nation) continue;
         const d = Math.hypot(s.x - this.x, s.y - this.y);
@@ -1386,8 +1746,8 @@ class SpaceStation extends Entity {
         const dx = target.x - this.x;
         const dy = target.y - this.y;
         const angle = Math.atan2(dy, dx);
-        const vx = Math.cos(angle) * 750;
-        const vy = Math.sin(angle) * 750;
+        const vx = Math.cos(angle) * 850;
+        const vy = Math.sin(angle) * 850;
 
         const laserColor = NATIONS[this.nation] ? NATIONS[this.nation].laserColor : 0x00f0ff;
         const laser = new Laser(
@@ -1400,7 +1760,7 @@ class SpaceStation extends Entity {
           `base-${this.nation}`,
           laserColor,
           this.nation,
-          900
+          1800
         );
         if (onFireTurret) onFireTurret(laser);
       }

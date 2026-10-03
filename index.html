@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Play:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="preload" href="/fonts/SpaceMelons.woff" as="font" type="font/woff" crossorigin>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -18,46 +19,82 @@
     <!-- Top-Down Drop Tier-Up Banner -->
     <div id="top-tier-banner" class="interactive">
       <div class="tier-banner-header">
-        <span class="tier-banner-star">★</span>
-        <span>ULUSUNUN HANGİ PİLOTU OLACAKSIN ?</span>
-        <span class="tier-banner-star">★</span>
+        <span class="tier-banner-title">LEVEL UP</span>
       </div>
       <div id="top-tier-choices" class="tier-choices-row">
-        <!-- Populated dynamically by JS -->
+        <!-- Populated dynamically with holographic ship preview cards -->
       </div>
     </div>
 
     <!-- In-Game HUD Elements (Hidden on Main Menu & Loading) -->
     <div id="in-game-hud" style="display: none;">
       <!-- Top Left: Vitals (Shield, Energy, Cargo) & Base Dock Status -->
+      <!-- Top Left: Unified Tactical Flight HUD (Icon + Bar + Value) -->
       <div id="top-left-hud">
-        <div id="top-vitals">
-          <div class="vital-row">
-            <span class="vital-icon shield-icon" title="Kalkan">🛡️</span>
-            <div class="bar-wrapper">
-              <div class="bar-fill shield-fill" style="width: 100%;"></div>
-              <div class="bar-label" id="shield-text">100 / 100</div>
+        <div id="top-vitals" class="cockpit-hud-panel">
+          <div class="hud-meters-container">
+            <!-- Shield Meter (Icon + Value + Bar) -->
+            <div class="hud-meter-row hud-shd">
+              <div class="hud-meter-icon hud-icon-shd" title="Kalkan">
+                <svg viewBox="0 0 24 24" class="hud-svg-icon" fill="none" stroke="#00f0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2L3 6v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V6l-9-4z"/>
+                  <path d="M12 7v10M8 11h8" stroke="#38bdf8" stroke-width="1.6" opacity="0.8"/>
+                </svg>
+              </div>
+              <div class="meter-val bar-label" id="shield-text">100 / 100</div>
+              <div class="meter-track">
+                <div class="meter-bar bar-fill shield-fill" id="shield-fill" style="width: 100%;"></div>
+                <div class="meter-grid-overlay"></div>
+              </div>
             </div>
-          </div>
-          <div class="vital-row">
-            <span class="vital-icon energy-icon" title="Lazer / Enerji">⚡</span>
-            <div class="bar-wrapper">
-              <div class="bar-fill energy-fill" style="width: 100%;"></div>
-              <div class="bar-label" id="energy-text">100 / 100</div>
+            <!-- Energy Meter (Icon + Value + Bar) -->
+            <div class="hud-meter-row hud-eng">
+              <div class="hud-meter-icon hud-icon-eng" title="Lazer Enerjisi">
+                <svg viewBox="0 0 24 24" class="hud-svg-icon" fill="none" stroke="#ffdd33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="#ffdd33" fill-opacity="0.25"/>
+                </svg>
+              </div>
+              <div class="meter-val bar-label" id="energy-text">100 / 100</div>
+              <div class="meter-track">
+                <div class="meter-bar bar-fill energy-fill" id="energy-fill" style="width: 100%;"></div>
+                <div class="meter-grid-overlay"></div>
+              </div>
             </div>
-          </div>
-          <div class="vital-row">
-            <span class="vital-icon cargo-icon" title="Kargo / Cevher">💎</span>
-            <div class="bar-wrapper">
-              <div class="bar-fill cargo-fill" style="width: 0%;"></div>
-              <div class="bar-label" id="cargo-text">0 / 30</div>
+            <!-- Cargo / Ore Meter (Icon + Value + Bar) -->
+            <div class="hud-meter-row hud-crg">
+              <div class="hud-meter-icon hud-icon-crg" title="Kargo & Maden">
+                <svg viewBox="0 0 24 24" class="hud-svg-icon" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="6 3 18 3 22 9 12 22 2 9"/>
+                  <line x1="2" y1="9" x2="22" y2="9"/>
+                  <line x1="12" y1="22" x2="8" y2="9"/>
+                  <line x1="12" y1="22" x2="16" y2="9"/>
+                </svg>
+              </div>
+              <div class="meter-val bar-label" id="cargo-text">0 / 60</div>
+              <div class="meter-track">
+                <div class="meter-bar bar-fill cargo-fill" id="cargo-fill" style="width: 0%;"></div>
+                <div class="meter-grid-overlay"></div>
+              </div>
+            </div>
+            <!-- EXP / Level Progress Meter (Icon + Value + Bar) -->
+            <div class="hud-meter-row hud-exp">
+              <div class="hud-meter-icon hud-icon-exp" title="Seviye & Gelişim">
+                <svg viewBox="0 0 24 24" class="hud-svg-icon" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="#c084fc" fill-opacity="0.25"/>
+                </svg>
+              </div>
+              <div class="meter-val bar-label" id="exp-text">Lv.1</div>
+              <div class="meter-track">
+                <div class="meter-bar bar-fill exp-fill" id="exp-fill" style="width: 0%;"></div>
+                <div class="meter-grid-overlay"></div>
+              </div>
             </div>
           </div>
         </div>
         <div id="base-dock-status" style="display: none;"></div>
       </div>
 
-      <!-- Top Right: Radar / Minimap & Leaderboard -->
+      <!-- Top Right: Radar / Minimap & 3-Tab Leaderboard (PvP Kills, Mining Farm, Base Donations) -->
       <div id="top-right-hud">
         <div id="radar-container">
           <canvas id="radar-canvas" width="240" height="240"></canvas>
@@ -65,7 +102,33 @@
         </div>
 
         <div id="leaderboard">
-          <div class="leaderboard-title">LİDERLİK TABLOSU</div>
+          <div class="leaderboard-tabs">
+            <button type="button" class="lb-tab active" id="lb-tab-kills" data-metric="kills" title="PvP İtlafları">
+              <svg viewBox="0 0 24 24" class="lb-tab-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <line x1="12" y1="2" x2="12" y2="7"/>
+                <line x1="12" y1="17" x2="12" y2="22"/>
+                <line x1="2" y1="12" x2="7" y2="12"/>
+                <line x1="17" y1="12" x2="22" y2="12"/>
+                <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+              </svg>
+            </button>
+            <button type="button" class="lb-tab" id="lb-tab-mined" data-metric="mined" title="Maden Farmı">
+              <svg viewBox="0 0 24 24" class="lb-tab-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="6 3 18 3 22 9 12 22 2 9"/>
+                <line x1="2" y1="9" x2="22" y2="9"/>
+                <line x1="12" y1="22" x2="8" y2="9"/>
+                <line x1="12" y1="22" x2="16" y2="9"/>
+              </svg>
+            </button>
+            <button type="button" class="lb-tab" id="lb-tab-donations" data-metric="donations" title="Üs Bağışı">
+              <svg viewBox="0 0 24 24" class="lb-tab-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
+            </button>
+          </div>
           <div id="leaderboard-list">
             <!-- Populated by JS -->
           </div>
@@ -80,17 +143,133 @@
         </div>
       </div>
 
-      <!-- Bottom Left: Chat Box (Press T to talk) -->
+      <!-- Bottom Left: Chat Box (2 Tabs: GENEL & TAKIM, No icons per user request) -->
       <div id="game-chat-box" class="interactive">
         <div class="chat-header">
-          <span class="chat-title">📡 TAKTİK İLETİŞİM</span>
-          <span class="chat-hint">[T] Sohbet</span>
+          <div class="chat-tabs">
+            <button type="button" class="chat-tab active" id="chat-tab-global" data-channel="global">GENEL</button>
+            <button type="button" class="chat-tab" id="chat-tab-team" data-channel="team">TAKIM</button>
+          </div>
+          <span class="chat-hint">[T]</span>
         </div>
         <div id="chat-messages" class="chat-messages"></div>
         <form id="chat-form" class="chat-input-bar" onsubmit="return false;">
-          <input type="text" id="chat-input" class="chat-input" placeholder="[T] Basarak yazın..." maxlength="65" autocomplete="off">
-          <button type="submit" id="chat-send-btn" class="chat-send-btn" title="Gönder">➤</button>
+          <input type="text" id="chat-input" class="chat-input" placeholder="[T] Mesaj yazın..." maxlength="65" autocomplete="off">
+          <button type="submit" id="chat-send-btn" class="chat-send-btn">GÖNDER</button>
         </form>
+      </div>
+
+      <!-- Modern Bottom 5-Slot Tactical Action Bar (Permanent at bottom) -->
+      <div id="tactical-action-bar" class="interactive">
+        <div class="tactical-bar-container">
+          <!-- Slot 1: Laser - S1 (Buz) -->
+          <div class="tactical-slot unlocked" id="tactical-slot-1" data-slot="1" data-weapon="ice" title="[Q] Laser - S1">
+            <span class="slot-key">Q</span>
+            <div class="slot-fluid-reservoir">
+              <div class="slot-fluid-fill" id="fluid-fill-1"></div>
+            </div>
+            <div class="slot-icon-wrapper">
+              <svg viewBox="0 0 32 32" class="slot-beam-svg">
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#00f0ff" stroke-width="2.5" stroke-linecap="round" />
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" />
+                <line x1="10" y1="22" x2="16" y2="12" stroke="#7dd3fc" stroke-width="1.5" stroke-dasharray="2 2" />
+                <line x1="22" y1="22" x2="16" y2="12" stroke="#7dd3fc" stroke-width="1.5" stroke-dasharray="2 2" />
+                <circle cx="16" cy="6" r="3" fill="#00f0ff" />
+                <circle cx="16" cy="6" r="1.5" fill="#fff" />
+              </svg>
+            </div>
+            <div class="slot-meta">
+              <span class="slot-name">Laser - S1</span>
+            </div>
+            <div class="slot-ammo-badge" id="slot-ammo-1">0</div>
+            <div class="slot-active-glow"></div>
+          </div>
+
+          <!-- Slot 2: Laser - S2 (Alev) -->
+          <div class="tactical-slot unlocked" id="tactical-slot-2" data-slot="2" data-weapon="fire" title="[W] Laser - S2">
+            <span class="slot-key">W</span>
+            <div class="slot-fluid-reservoir">
+              <div class="slot-fluid-fill" id="fluid-fill-2"></div>
+            </div>
+            <div class="slot-icon-wrapper">
+              <svg viewBox="0 0 32 32" class="slot-beam-svg">
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#ff4500" stroke-width="3" stroke-linecap="round" />
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#ffdd44" stroke-width="1.4" stroke-linecap="round" />
+                <polygon points="16,2 12,12 20,12" fill="#ff6600" opacity="0.8" />
+                <line x1="11" y1="18" x2="13" y2="8" stroke="#ffaa00" stroke-width="1.2" />
+                <line x1="21" y1="18" x2="19" y2="8" stroke="#ffaa00" stroke-width="1.2" />
+                <circle cx="16" cy="5" r="2" fill="#ffffff" />
+              </svg>
+            </div>
+            <div class="slot-meta">
+              <span class="slot-name">Laser - S2</span>
+            </div>
+            <div class="slot-ammo-badge" id="slot-ammo-2">0</div>
+            <div class="slot-active-glow"></div>
+          </div>
+
+          <!-- Slot 3: Laser - S3 (Karanlık) -->
+          <div class="tactical-slot unlocked" id="tactical-slot-3" data-slot="3" data-weapon="dark" title="[E] Laser - S3">
+            <span class="slot-key">E</span>
+            <div class="slot-fluid-reservoir">
+              <div class="slot-fluid-fill" id="fluid-fill-3"></div>
+            </div>
+            <div class="slot-icon-wrapper">
+              <svg viewBox="0 0 32 32" class="slot-beam-svg">
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#c084fc" stroke-width="3.5" stroke-linecap="round" />
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#0f0728" stroke-width="1.8" stroke-linecap="round" />
+                <circle cx="16" cy="8" r="4.5" stroke="#a855f7" stroke-width="1.5" fill="none" />
+                <circle cx="16" cy="8" r="2.5" fill="#090514" stroke="#e9d5ff" stroke-width="1" />
+                <line x1="9" y1="20" x2="16" y2="8" stroke="#c084fc" stroke-width="1" stroke-dasharray="1 3" />
+                <line x1="23" y1="20" x2="16" y2="8" stroke="#c084fc" stroke-width="1" stroke-dasharray="1 3" />
+              </svg>
+            </div>
+            <div class="slot-meta">
+              <span class="slot-name">Laser - S3</span>
+            </div>
+            <div class="slot-ammo-badge" id="slot-ammo-3">0</div>
+            <div class="slot-active-glow"></div>
+          </div>
+
+          <!-- Slot 4: Warp Dash -->
+          <div class="tactical-slot unlocked" id="tactical-slot-4" data-slot="4" data-ability="warp" title="[SPACE] Warp Sıçraması">
+            <span class="slot-key">SPACE</span>
+            <div class="slot-icon-wrapper">
+              <svg viewBox="0 0 32 32" class="slot-beam-svg">
+                <line x1="8" y1="27" x2="8" y2="10" stroke="#00f0ff" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />
+                <line x1="16" y1="29" x2="16" y2="3" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" />
+                <line x1="16" y1="29" x2="16" y2="3" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" />
+                <line x1="24" y1="27" x2="24" y2="10" stroke="#00f0ff" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />
+                <polyline points="10,10 16,3 22,10" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <div class="slot-meta">
+              <span class="slot-name">WARP</span>
+            </div>
+            <div class="slot-cooldown-overlay" id="cooldown-warp"></div>
+            <span class="slot-cooldown-text" id="cooldown-warp-text"></span>
+          </div>
+
+          <!-- Slot 5: Super Ulti -->
+          <div class="tactical-slot unlocked" id="tactical-slot-5" data-slot="5" data-ability="super" title="[R] SUPER">
+            <span class="slot-key">R</span>
+            <div class="slot-icon-wrapper">
+              <svg viewBox="0 0 32 32" class="slot-beam-svg">
+                <circle cx="16" cy="16" r="4.5" fill="#fff" />
+                <line x1="16" y1="2" x2="16" y2="30" stroke="#ffd700" stroke-width="1.8" stroke-linecap="round" />
+                <line x1="2" y1="16" x2="30" y2="16" stroke="#ffd700" stroke-width="1.8" stroke-linecap="round" />
+                <line x1="6" y1="6" x2="26" y2="26" stroke="#00f0ff" stroke-width="1.4" stroke-linecap="round" />
+                <line x1="26" y1="6" x2="6" y2="26" stroke="#00f0ff" stroke-width="1.4" stroke-linecap="round" />
+                <circle cx="16" cy="16" r="9" stroke="#ffeaa7" stroke-width="1" stroke-dasharray="2 2" fill="none" />
+              </svg>
+            </div>
+            <div class="slot-meta">
+              <span class="slot-name">SUPER</span>
+            </div>
+            <div class="slot-cooldown-overlay" id="cooldown-super"></div>
+            <span class="slot-cooldown-text" id="cooldown-super-text"></span>
+          </div>
+        </div>
       </div>
 
       <!-- Bottom Right: Audio Controls (Music & Sound Icons Only) -->
@@ -452,6 +631,11 @@
         <button id="victory-restart-btn" class="play-btn">YENİDEN OYNA</button>
       </div>
     </div>
+
+    <!-- Nation Eliminated Screen -->
+    <div id="nation-eliminated-overlay" style="display: none;">
+      <div class="eliminated-message">ulusunuz yok oldu...</div>
+    </div>
   </div>
 
   <!-- Scripts -->
@@ -463,6 +647,7 @@
   <script src="js/entities.js"></script>
   <script src="js/network.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/universe/space-universe.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

@@ -23,15 +23,17 @@ class NetworkManager {
       return saved.trim();
     }
 
-    // 2. If running on local machine
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')) {
-      return (window.location.protocol === 'file:') ? 'http://localhost:3000' : window.location.origin;
+    // 2. If running on HTTP or HTTPS (Render, Railway, Fly, Localhost, etc.)
+    if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+      // If hosted statically on GitHub Pages (username.github.io), fallback to remote backend
+      if (window.location.hostname.endsWith('github.io')) {
+        return 'https://space-vanguard.onrender.com';
+      }
+      return window.location.origin;
     }
 
-    // 3. Fallback for GitHub Pages or remote hosting
-    // You can set your deployed Render/Railway/Fly server URL here
-    return 'https://space-vanguard.onrender.com';
+    // 3. Local file:// fallback
+    return 'http://localhost:3000';
   }
 
   setServerUrl(newUrl) {
@@ -136,6 +138,18 @@ class NetworkManager {
     this.socket.on('join_success', (data) => {
       console.log('[NETWORK] Oyuna Başarıyla Katılındı:', data.player);
       if (this.game) {
+        if (data.asteroids) {
+          this.game.syncServerAsteroids(data.asteroids);
+        }
+        if (data.stations) {
+          this.game.syncServerStations(data.stations);
+        }
+        if (data.crystals) {
+          this.game.syncServerCrystals(data.crystals);
+        }
+        if (data.players) {
+          this.game.syncServerExistingPlayers(data.players);
+        }
         this.game.onServerJoinSuccess(data.player, data.spawn);
       }
     });
@@ -211,6 +225,12 @@ class NetworkManager {
       }
     });
 
+    this.socket.on('crystals_expired', (data) => {
+      if (this.game && Array.isArray(data.crystalIds)) {
+        this.game.removeExpiredCrystals(data.crystalIds);
+      }
+    });
+
     // Player Combat Hits
     this.socket.on('player_damaged', (data) => {
       if (this.game) {
@@ -258,7 +278,7 @@ class NetworkManager {
     // Tactical Chat
     this.socket.on('chat_message', (data) => {
       if (this.game && this.game.ui) {
-        this.game.ui.addChatMessage(data.senderName, data.text, data.nation, data.isSystem);
+        this.game.ui.addChatMessage(data.senderName, data.text, data.nation, data.isSystem, data.channel || 'global');
       }
     });
   }
@@ -308,9 +328,14 @@ class NetworkManager {
     this.socket.emit('fire_lasers', { lasers });
   }
 
-  emitHitAsteroid(asteroidId, damage) {
+  emitHitAsteroid(asteroidId, damage, x = null, y = null) {
     if (!this.isConnected || !this.socket) return;
-    this.socket.emit('hit_asteroid', { asteroidId, damage });
+    this.socket.emit('hit_asteroid', {
+      asteroidId,
+      damage,
+      x: x !== null ? Math.round(x) : undefined,
+      y: y !== null ? Math.round(y) : undefined
+    });
   }
 
   emitHitPlayer(targetId, damage, isHeal = false) {
@@ -323,9 +348,13 @@ class NetworkManager {
     this.socket.emit('hit_base', { nation, damage, isHeal });
   }
 
-  emitCollectCrystal(crystalId) {
+  emitCollectCrystal(crystalId, x = null, y = null) {
     if (!this.isConnected || !this.socket) return;
-    this.socket.emit('collect_crystal', { crystalId });
+    this.socket.emit('collect_crystal', {
+      crystalId,
+      x: x !== null ? Math.round(x) : undefined,
+      y: y !== null ? Math.round(y) : undefined
+    });
   }
 
   emitEvolve(shipKey) {
@@ -343,9 +372,9 @@ class NetworkManager {
     this.socket.emit('respawn_player');
   }
 
-  sendChat(text) {
+  sendChat(text, channel = 'global') {
     if (!this.isConnected || !this.socket) return;
-    this.socket.emit('send_chat', { text });
+    this.socket.emit('send_chat', { text, channel });
   }
 }
 

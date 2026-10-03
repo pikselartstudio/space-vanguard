@@ -16,7 +16,11 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.wav': 'audio/wav',
-  '.mp3': 'audio/mpeg'
+  '.mp3': 'audio/mpeg',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf'
 };
 
 const server = http.createServer((req, res) => {
@@ -79,12 +83,12 @@ const io = new Server(server, {
 // ==========================================
 // PERSISTENT GALAXY WORLD STATE
 // ==========================================
-const WORLD_SIZE = 10000;
+const WORLD_SIZE = 16500;
 
 const BASE_LOCATIONS = {
-  blue: { x: 0, y: -3800 },
-  red:  { x: -3300, y: 2200 },
-  gold: { x: 3300, y: 2200 }
+  blue: { x: 0, y: -6300 },
+  red:  { x: -5500, y: 3650 },
+  gold: { x: 5500, y: 3650 }
 };
 
 const stations = {
@@ -93,17 +97,17 @@ const stations = {
   gold: { nation: 'gold', x: BASE_LOCATIONS.gold.x, y: BASE_LOCATIONS.gold.y, hp: 25000, maxHp: 25000, level: 1, crystalsDonated: 0, crystalsRequired: 100, isDead: false }
 };
 
-// Asteroid Yields Configuration
+// Asteroid Yields Configuration (Max 1-4 Pieces per user request)
 const ASTEROID_HEALTHS = [0, 16, 42, 105, 230, 460, 920, 1650];
 const TIER_YIELDS = [
   null,
-  { min: 1, max: 3, valMult: 1.0 },
-  { min: 3, max: 6, valMult: 1.4 },
-  { min: 6, max: 11, valMult: 1.8 },
-  { min: 11, max: 18, valMult: 2.2 },
-  { min: 18, max: 28, valMult: 2.5 },
-  { min: 28, max: 42, valMult: 2.8 },
-  { min: 42, max: 60, valMult: 3.2 }
+  { min: 1, max: 2, totalPoints: 2 },
+  { min: 1, max: 3, totalPoints: 6 },
+  { min: 2, max: 3, totalPoints: 15 },
+  { min: 2, max: 4, totalPoints: 32 },
+  { min: 2, max: 4, totalPoints: 60 },
+  { min: 2, max: 4, totalPoints: 105 },
+  { min: 1, max: 4, totalPoints: 180, allowSingleMega: true }
 ];
 
 const asteroids = new Map();
@@ -114,13 +118,18 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null) {
   const radius = 13 + (sizeTier - 1) * 8.5;
   const maxHealth = ASTEROID_HEALTHS[sizeTier] || (sizeTier * 220);
   const yCfg = TIER_YIELDS[sizeTier] || TIER_YIELDS[1];
-  const crystalCount = Math.floor(Math.random() * (yCfg.max - yCfg.min + 1)) + yCfg.min;
-  const crystalTotalValue = Math.round(crystalCount * yCfg.valMult);
+
+  // User request: "en fazla 1-4 arası dağılma olsun ve parçalar en büyük asteroitten büyük bir tek parça çıkabilir şeklinde"
+  let crystalCount = Math.floor(Math.random() * (yCfg.max - yCfg.min + 1)) + yCfg.min;
+  if (sizeTier === 7 && Math.random() < 0.45) {
+    crystalCount = 1; // Devasa asteroidden tek büyük zengin parça
+  }
+  crystalCount = Math.max(1, Math.min(4, crystalCount));
 
   let x, y;
   if (nearBase) {
     const angle = Math.random() * Math.PI * 2;
-    const r = 200 + Math.random() * 520;
+    const r = 700 + Math.random() * 950;
     x = nearBase.x + Math.cos(angle) * r;
     y = nearBase.y + Math.sin(angle) * r;
   } else {
@@ -130,6 +139,30 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null) {
     y = Math.sin(angle) * dist;
   }
 
+  let element = 'ice';
+  const distFromCenter = Math.hypot(x, y);
+
+  if (nearNation === 'blue') {
+    element = Math.random() < 0.82 ? 'ice' : 'fire';
+  } else if (nearNation === 'red') {
+    element = Math.random() < 0.82 ? 'fire' : 'ice';
+  } else if (nearNation === 'gold') {
+    element = Math.random() < 0.50 ? 'ice' : 'fire';
+  } else {
+    // Deep Space / Galactic Core (Expanded core threshold for 16500 map)
+    if (distFromCenter < 4800) {
+      // Core Anomaly: Rich Dark Matter Basin (65% Dark, 20% Fire, 15% Ice)
+      const roll = Math.random();
+      element = roll < 0.65 ? 'dark' : (roll < 0.85 ? 'fire' : 'ice');
+    } else {
+      const roll = Math.random();
+      element = roll < 0.45 ? 'ice' : (roll < 0.85 ? 'fire' : 'dark');
+    }
+  }
+
+  // Balanced crystal yield: reduced multiplier so leveling requires active asteroid mining
+  const crystalTotalValue = yCfg.totalPoints;
+
   const id = `ast-${nextAsteroidId++}`;
   const ast = {
     id,
@@ -137,6 +170,7 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null) {
     y: Math.round(y),
     tier: sizeTier,
     radius,
+    element,
     health: maxHealth,
     maxHealth,
     crystalCount,
@@ -148,12 +182,12 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null) {
   return ast;
 }
 
-// Populate galaxy: 120 persistent deep-space asteroids + 18 beginner asteroids per home base
-for (let i = 0; i < 120; i++) {
+// Populate galaxy: 580 persistent deep-space asteroids (scaled 1.5x) + 36 beginner asteroids per home base
+for (let i = 0; i < 580; i++) {
   generateAsteroid((i % 7) + 1);
 }
-// Each base gets 18 small/medium asteroids (Tier 1 & 2 heavily weighted for easy early-game mining)
-const baseTiers = [1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3];
+// Each base gets 36 beginner asteroids
+const baseTiers = [1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3, 1, 1, 2, 2, 1, 2, 3, 1, 2, 3, 1, 1, 2, 2, 3, 1, 2, 2];
 for (const n of ['blue', 'red', 'gold']) {
   const b = BASE_LOCATIONS[n];
   for (const tier of baseTiers) {
@@ -180,15 +214,19 @@ function getTeamDistribution() {
   }
 
   const total = counts.red + counts.blue + counts.gold;
-  const minCount = Math.min(counts.red, counts.blue, counts.gold);
+  const livingCounts = [];
+  for (const n of ['red', 'blue', 'gold']) {
+    if (!stations[n].isDead) livingCounts.push(counts[n]);
+  }
+  const minLivingCount = livingCounts.length > 0 ? Math.min(...livingCounts) : 0;
 
   // A team is locked if:
-  // 1. Total players > 0
-  // 2. Its count is strictly greater than the minimum count of any other team
+  // 1. Station is destroyed (isDead: true)
+  // 2. OR Total players > 0 AND Its count is strictly greater than the minimum count of any other non-destroyed team
   const status = {
-    red:  { count: counts.red,  locked: total > 0 && counts.red > minCount },
-    blue: { count: counts.blue, locked: total > 0 && counts.blue > minCount },
-    gold: { count: counts.gold, locked: total > 0 && counts.gold > minCount }
+    red:  { count: counts.red,  locked: stations.red.isDead  || (total > 0 && counts.red > minLivingCount),  destroyed: stations.red.isDead },
+    blue: { count: counts.blue, locked: stations.blue.isDead || (total > 0 && counts.blue > minLivingCount), destroyed: stations.blue.isDead },
+    gold: { count: counts.gold, locked: stations.gold.isDead || (total > 0 && counts.gold > minLivingCount), destroyed: stations.gold.isDead }
   };
 
   return { counts, status, total };
@@ -202,7 +240,7 @@ function broadcastTeamStatus() {
 function getNationSpawn(nation) {
   const baseLoc = BASE_LOCATIONS[nation] || BASE_LOCATIONS['blue'];
   const offsetAngle = Math.random() * Math.PI * 2;
-  const offsetDist = 200 + Math.random() * 80;
+  const offsetDist = 480 + Math.random() * 90;
   return {
     x: Math.round(baseLoc.x + Math.cos(offsetAngle) * offsetDist),
     y: Math.round(baseLoc.y + Math.sin(offsetAngle) * offsetDist)
@@ -214,6 +252,11 @@ function getNationSpawn(nation) {
 // ==========================================
 io.on('connection', (socket) => {
   console.log(`[+] Yeni Pilot Bağlandı: ${socket.id}`);
+
+  // If no players are online, clean up all residual crystals so new pilots enter a clean galaxy
+  if (players.size === 0) {
+    activeCrystals.clear();
+  }
 
   // Send initial galaxy data & current team distribution
   const teamDist = getTeamDistribution();
@@ -253,10 +296,23 @@ io.on('connection', (socket) => {
     let chosenNation = (data && data.nation) ? data.nation : 'blue';
     if (!['red', 'blue', 'gold'].includes(chosenNation)) chosenNation = 'blue';
 
-    // Enforce team balance: if requested team is locked, switch to the team with lowest count
+    // Enforce dead station restriction and team balance
     const dist = getTeamDistribution();
-    if (dist.status[chosenNation] && dist.status[chosenNation].locked) {
-      const openNations = ['red', 'blue', 'gold'].filter(n => !dist.status[n].locked);
+    if (stations[chosenNation] && stations[chosenNation].isDead) {
+      const openNations = ['red', 'blue', 'gold'].filter(n => !stations[n].isDead && !dist.status[n].locked);
+      if (openNations.length > 0) {
+        chosenNation = openNations[Math.floor(Math.random() * openNations.length)];
+      } else {
+        const anyLiving = ['red', 'blue', 'gold'].filter(n => !stations[n].isDead);
+        if (anyLiving.length > 0) {
+          chosenNation = anyLiving[0];
+        } else {
+          socket.emit('game_over', { reason: 'Tüm uzay üsleri imha edildi!' });
+          return;
+        }
+      }
+    } else if (dist.status[chosenNation] && dist.status[chosenNation].locked) {
+      const openNations = ['red', 'blue', 'gold'].filter(n => !stations[n].isDead && !dist.status[n].locked);
       if (openNations.length > 0) {
         chosenNation = openNations[Math.floor(Math.random() * openNations.length)];
       }
@@ -278,6 +334,9 @@ io.on('connection', (socket) => {
       energy: 100,
       crystals: 0,
       score: 0,
+      kills: 0,
+      mined: 0,
+      donations: 0,
       upgrades: {
         shieldCap: 0, shieldRegen: 0, energyCap: 0, energyRegen: 0,
         fireDamage: 0, fireSpeed: 0, shipSpeed: 0, shipAgility: 0
@@ -286,6 +345,11 @@ io.on('connection', (socket) => {
       spawnShieldTimer: 4.0,
       lastUpdate: Date.now()
     };
+
+    // If this is the only player joining an empty galaxy, ensure all old floating crystals are cleared
+    if (players.size === 0) {
+      activeCrystals.clear();
+    }
 
     players.set(socket.id, newPlayer);
 
@@ -383,17 +447,30 @@ io.on('connection', (socket) => {
       ast.isDead = true;
       ast.health = 0;
 
-      // Spawn crystal drops
+      // Spawn crystal drops (85% green for level-up, rare S1/S2/S3 ammo)
       const droppedGems = [];
       const valEach = Math.max(1, Math.round(ast.crystalTotalValue / ast.crystalCount));
       for (let i = 0; i < ast.crystalCount; i++) {
         const gemId = `gem-${nextCrystalId++}`;
+        const roll = Math.random();
+        let gemElem = 'green';
+        if (roll < 0.07) {
+          gemElem = 'ice';    // Rare Laser - S1
+        } else if (roll < 0.12) {
+          gemElem = 'fire';   // Rare Laser - S2
+        } else if (roll < 0.15) {
+          gemElem = 'dark';   // Ultra-rare Laser - S3
+        } else {
+          gemElem = 'green';  // EXP / Level-up
+        }
         const gem = {
           id: gemId,
           x: ast.x + (Math.random() - 0.5) * 35,
           y: ast.y + (Math.random() - 0.5) * 35,
           value: valEach,
-          targetId: socket.id
+          element: gemElem,
+          targetId: socket.id,
+          createdAt: Date.now()
         };
         activeCrystals.set(gemId, gem);
         droppedGems.push(gem);
@@ -409,12 +486,17 @@ io.on('connection', (socket) => {
         killerId: socket.id
       });
 
-      // Schedule asteroid respawn in 10s (preserves nearBase location if asteroid was near home base)
+      // Schedule rapid asteroid respawn in 3s and keep galaxy crowded
       setTimeout(() => {
         const baseLoc = ast.nearNation ? BASE_LOCATIONS[ast.nearNation] : null;
         const newAst = generateAsteroid(ast.tier, baseLoc, ast.nearNation);
         io.emit('asteroid_spawned', newAst);
-      }, 10000);
+        // Also spawn an extra asteroid 35% of the time so universe feels densely populated
+        if (Math.random() < 0.35) {
+          const extraAst = generateAsteroid();
+          io.emit('asteroid_spawned', extraAst);
+        }
+      }, 3000);
 
     } else {
       io.emit('asteroid_damaged', {
@@ -459,11 +541,13 @@ io.on('connection', (socket) => {
       victim.isDead = true;
       victim.shield = 0;
 
-      // Scatter carried crystals
+      // Drop carried credits as bounty. Victim crystals reset to 0 upon death per user request
       const carried = victim.crystals || 0;
-      const count = Math.min(50, Math.max(carried > 0 ? 5 : 0, Math.floor(carried / 2)));
+      victim.crystals = 0; // Envanter 0a indi!
+
+      const count = Math.min(30, Math.max(carried > 0 ? 4 : 0, Math.floor(carried / 30)));
       const droppedGems = [];
-      if (count > 0) {
+      if (count > 0 && carried > 0) {
         const valEach = Math.max(1, Math.round(carried / count));
         for (let i = 0; i < count; i++) {
           const gemId = `gem-${nextCrystalId++}`;
@@ -472,14 +556,16 @@ io.on('connection', (socket) => {
             x: victim.x + (Math.random() - 0.5) * 45,
             y: victim.y + (Math.random() - 0.5) * 45,
             value: valEach,
-            targetId: attacker.id
+            element: 'fire',
+            targetId: attacker.id,
+            createdAt: Date.now()
           };
           activeCrystals.set(gemId, gem);
           droppedGems.push(gem);
         }
       }
-      victim.crystals = 0;
 
+      attacker.kills = (attacker.kills || 0) + 1;
       attacker.score += 500 + carried * 10;
 
       io.emit('player_killed', {
@@ -534,6 +620,16 @@ io.on('connection', (socket) => {
       base.hp = 0;
       base.isDead = true;
 
+      // User request: "üssü yok olmasına rağmen örnek olarka mavi üssü patlatıldı mavi gemiler oyundan düşecek ve giriş için ana ekrana yönelndirilecek."
+      for (const [pid, pl] of players) {
+        if (pl.nation === base.nation) {
+          pl.isDead = true;
+          pl.shield = 0;
+        }
+      }
+
+      broadcastTeamStatus();
+
       io.emit('base_destroyed', {
         nation: base.nation,
         killerName: attacker.name,
@@ -570,7 +666,7 @@ io.on('connection', (socket) => {
       const hitX = (data.x !== undefined) ? Number(data.x) : p.x;
       const hitY = (data.y !== undefined) ? Number(data.y) : p.y;
       for (const [id, g] of activeCrystals) {
-        if (Math.hypot(g.x - hitX, g.y - hitY) < 90) {
+        if (Math.hypot(g.x - hitX, g.y - hitY) < 180) {
           gem = g;
           targetGemId = id;
           break;
@@ -581,6 +677,7 @@ io.on('connection', (socket) => {
 
     activeCrystals.delete(targetGemId);
     p.crystals = (p.crystals || 0) + gem.value;
+    p.mined = (p.mined || 0) + gem.value;
     p.score = (p.score || 0) + gem.value * 15;
 
     io.emit('crystal_collected', {
@@ -606,7 +703,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Base Donation
+  // Base Donation (Strict base perimeter check)
   socket.on('donate_base', (data) => {
     const p = players.get(socket.id);
     if (!p || p.isDead) return;
@@ -614,10 +711,15 @@ io.on('connection', (socket) => {
     const base = stations[p.nation];
     if (!base || base.isDead) return;
 
+    // Strict rule: base donation only when inside base perimeter
+    const dist = Math.hypot(p.x - base.x, p.y - base.y);
+    if (dist > 650) return;
+
     const amt = Math.min(p.crystals || 0, Number(data.amount) || 0);
     if (amt <= 0) return;
 
     p.crystals -= amt;
+    p.donations = (p.donations || 0) + amt;
     p.score += amt * 25;
     base.crystalsDonated += amt;
     base.hp = Math.min(base.maxHp, base.hp + amt * 30);
@@ -670,7 +772,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Tactical Chat Message
+  // Tactical Chat Message (Supports 'global' and 'team' channels)
   socket.on('send_chat', (data) => {
     const p = players.get(socket.id);
     if (!p) return;
@@ -678,10 +780,13 @@ io.on('connection', (socket) => {
     const text = String(data.text || '').trim().slice(0, 70);
     if (!text) return;
 
+    const channel = (data && data.channel === 'team') ? 'team' : 'global';
+
     const msg = {
       id: `chat-${Date.now()}-${Math.random()}`,
       senderName: p.name,
       nation: p.nation,
+      channel,
       text,
       timestamp: Date.now()
     };
@@ -707,7 +812,8 @@ io.on('connection', (socket) => {
             x: p.x + (Math.random() - 0.5) * 40,
             y: p.y + (Math.random() - 0.5) * 40,
             value: valEach,
-            targetId: null
+            targetId: null,
+            createdAt: Date.now()
           };
           activeCrystals.set(gemId, gem);
           drops.push(gem);
@@ -717,6 +823,12 @@ io.on('connection', (socket) => {
 
       players.delete(socket.id);
       io.emit('player_left', { playerId: socket.id });
+
+      // If no players remain online, reset all orphaned floating crystals so next pilots enter a clean galaxy
+      if (players.size === 0) {
+        activeCrystals.clear();
+        console.log('[*] Tüm oyuncular ayrıldı: Boşta kalan tüm kristal ve cevherler sıfırlandı.');
+      }
 
       // Update team balance on all clients immediately
       broadcastTeamStatus();
@@ -747,6 +859,9 @@ setInterval(() => {
       energy: p.energy,
       crystals: p.crystals,
       score: p.score,
+      kills: p.kills || 0,
+      mined: p.mined || 0,
+      donations: p.donations || 0,
       isDead: p.isDead,
       spawnShieldTimer: p.spawnShieldTimer
     });
@@ -754,6 +869,27 @@ setInterval(() => {
 
   io.emit('players_tick', { players: states });
 }, 40); // 25 times per second
+
+// ==========================================
+// CRYSTAL LIFESPAN & DECAY TIMER (35 SECONDS)
+// Uncollected gems fade and despawn so space stays clean
+// ==========================================
+setInterval(() => {
+  if (activeCrystals.size === 0) return;
+  const now = Date.now();
+  const expiredIds = [];
+  for (const [id, gem] of activeCrystals) {
+    if (now - (gem.createdAt || now) > 35000) {
+      expiredIds.push(id);
+    }
+  }
+  if (expiredIds.length > 0) {
+    for (const id of expiredIds) {
+      activeCrystals.delete(id);
+    }
+    io.emit('crystals_expired', { crystalIds: expiredIds });
+  }
+}, 2000);
 
 // Start HTTP & WebSocket Server
 server.listen(PORT, () => {
