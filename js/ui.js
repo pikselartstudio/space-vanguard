@@ -1180,7 +1180,7 @@ class UIManager {
     const cx = w / 2;
     const cy = h / 2;
     const radarRadius = 106; // Usable radius inside 240px container
-    const tacticalRange = 3600; // Local tactical scanning range (~2.5 screen widths)
+    const tacticalRange = 2400; // Local tactical scanning range (scaled for 8250 galaxy)
     const scale = radarRadius / tacticalRange;
 
     // 1. Draw Radar Range Rings & Crosshairs

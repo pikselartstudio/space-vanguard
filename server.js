@@ -83,12 +83,12 @@ const io = new Server(server, {
 // ==========================================
 // PERSISTENT GALAXY WORLD STATE
 // ==========================================
-const WORLD_SIZE = 16500;
+const WORLD_SIZE = 8250;
 
 const BASE_LOCATIONS = {
-  blue: { x: 0, y: -6300 },
-  red:  { x: -5500, y: 3650 },
-  gold: { x: 5500, y: 3650 }
+  blue: { x: 0, y: -3150 },
+  red:  { x: -2750, y: 1825 },
+  gold: { x: 2750, y: 1825 }
 };
 
 const stations = {
@@ -129,11 +129,11 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null) {
   let x, y;
   if (nearBase) {
     const angle = Math.random() * Math.PI * 2;
-    const r = 700 + Math.random() * 950;
+    const r = 600 + Math.random() * 700;
     x = nearBase.x + Math.cos(angle) * r;
     y = nearBase.y + Math.sin(angle) * r;
   } else {
-    const dist = 350 + Math.random() * (WORLD_SIZE / 2 - 500);
+    const dist = 300 + Math.random() * (WORLD_SIZE / 2 - 400);
     const angle = Math.random() * Math.PI * 2;
     x = Math.cos(angle) * dist;
     y = Math.sin(angle) * dist;
@@ -149,8 +149,8 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null) {
   } else if (nearNation === 'gold') {
     element = Math.random() < 0.50 ? 'ice' : 'fire';
   } else {
-    // Deep Space / Galactic Core (Expanded core threshold for 16500 map)
-    if (distFromCenter < 4800) {
+    // Deep Space / Galactic Core (Expanded core threshold for 8250 map)
+    if (distFromCenter < 2400) {
       // Core Anomaly: Rich Dark Matter Basin (65% Dark, 20% Fire, 15% Ice)
       const roll = Math.random();
       element = roll < 0.65 ? 'dark' : (roll < 0.85 ? 'fire' : 'ice');
@@ -182,8 +182,8 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null) {
   return ast;
 }
 
-// Populate galaxy: 580 persistent deep-space asteroids (scaled 1.5x) + 36 beginner asteroids per home base
-for (let i = 0; i < 580; i++) {
+// Populate galaxy: 320 persistent deep-space asteroids (scaled 2x smaller) + 36 beginner asteroids per home base
+for (let i = 0; i < 320; i++) {
   generateAsteroid((i % 7) + 1);
 }
 // Each base gets 36 beginner asteroids
@@ -283,7 +283,7 @@ function resetGalaxyServer(prevWinner = null) {
   // 2. Clear and regenerate full asteroid fields
   asteroids.clear();
   nextAsteroidId = 1;
-  for (let i = 0; i < 580; i++) {
+  for (let i = 0; i < 320; i++) {
     generateAsteroid((i % 7) + 1);
   }
   const baseTiers = [1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3, 1, 1, 2, 2, 1, 2, 3, 1, 2, 3, 1, 1, 2, 2, 3, 1, 2, 2];

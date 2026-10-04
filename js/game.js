@@ -19,7 +19,7 @@ const NATION_BOT_NAMES = {
 
 class StarblastGame {
   constructor() {
-    this.worldSize = 16500; // Scaled down 1.5x per user request: "evreni 1.5 kat daha küçült"
+    this.worldSize = 8250; // Scaled down 2x per user request: "haritamızı 2x daha küçültelim"
     this.isPlaying = false;
     this.playerNation = 'blue';
     this.playerDeadHandled = false;
@@ -70,11 +70,11 @@ class StarblastGame {
     this.remotePlayers = new Map();
     this.stations = {};
 
-    // 3 Nation Base Locations (120-degree balanced layout across 16500x16500 galaxy, scaled 1.5x smaller)
+    // 3 Nation Base Locations (120-degree balanced layout across 8250x8250 galaxy, scaled 2x smaller)
     this.baseLocations = {
-      blue: { x: 0, y: -6300 },      // South (scaled 1.5x smaller)
-      red:  { x: -5500, y: 3650 },   // North-West (scaled 1.5x smaller)
-      gold: { x: 5500, y: 3650 }     // North-East (scaled 1.5x smaller)
+      blue: { x: 0, y: -3150 },      // South (scaled 2x smaller)
+      red:  { x: -2750, y: 1825 },   // North-West (scaled 2x smaller)
+      gold: { x: 2750, y: 1825 }     // North-East (scaled 2x smaller)
     };
 
     // Inputs
@@ -483,6 +483,12 @@ class StarblastGame {
     const inGameHud = document.getElementById('in-game-hud');
     if (inGameHud) inGameHud.style.display = 'block';
 
+    const actionBar = document.getElementById('tactical-action-bar');
+    if (actionBar) {
+      actionBar.style.display = 'block';
+      actionBar.classList.remove('nation-eliminated-filter');
+    }
+
     this.ui.hideGameOver();
     this.isPlaying = true;
 
@@ -544,6 +550,11 @@ class StarblastGame {
     this.ui.showAnnouncement('Üssünüzden yeniden doğdunuz! (4sn Koruma Aktif)', 3500);
 
     this.ui.updateHUD(this.player, this.stations);
+    const actionBar = document.getElementById('tactical-action-bar');
+    if (actionBar) {
+      actionBar.style.display = 'block';
+      actionBar.classList.remove('nation-eliminated-filter');
+    }
     this.isPlaying = true;
 
     if (this.network && this.network.isConnected) {
@@ -581,9 +592,9 @@ class StarblastGame {
   }
 
   spawnInitialWorld() {
-    // Only spawn offline asteroids if not populated by server (scaled 1.5x: 580 asteroids)
+    // Only spawn offline asteroids if not populated by server (scaled 2x smaller: 320 asteroids)
     if (this.asteroids.length === 0) {
-      for (let i = 0; i < 580; i++) {
+      for (let i = 0; i < 320; i++) {
         const tier = (i % 7) + 1;
         this.spawnRandomAsteroid(tier);
       }
@@ -593,7 +604,7 @@ class StarblastGame {
         const b = this.baseLocations[n];
         for (const tier of baseTiers) {
           const angle = Math.random() * Math.PI * 2;
-          const r = 700 + Math.random() * 950;
+          const r = 600 + Math.random() * 700;
           const x = b.x + Math.cos(angle) * r;
           const y = b.y + Math.sin(angle) * r;
           const ast = new Asteroid(x, y, tier);
@@ -609,7 +620,7 @@ class StarblastGame {
   spawnRandomAsteroid(tier = null) {
     if (this.isMenuBattle) return null;
     const sizeTier = tier || Math.floor(Math.random() * 7) + 1;
-    const dist = 350 + Math.random() * (this.worldSize / 2 - 500);
+    const dist = 300 + Math.random() * (this.worldSize / 2 - 400);
     const angle = Math.random() * Math.PI * 2;
     const x = Math.cos(angle) * dist;
     const y = Math.sin(angle) * dist;
@@ -2064,7 +2075,24 @@ class StarblastGame {
       this.player.id = playerData.id;
       this.player.x = spawn.x;
       this.player.y = spawn.y;
-      this.player.nation = playerData.nation;
+
+      const newNation = playerData.nation;
+      if (newNation && this.player.nation !== newNation) {
+        console.log(`[GAME] Takım dengelendi: ${this.player.nation} -> ${newNation}. Gemi modeli güncelleniyor.`);
+        this.playerNation = newNation;
+        if (typeof this.player.setNation === 'function') {
+          this.player.setNation(newNation, this.scene);
+        } else {
+          this.player.nation = newNation;
+        }
+        if (this.ui) {
+          const nCfg = NATIONS[newNation] || NATIONS['blue'];
+          this.ui.showNotification(`Takım dengesi sağlandı: ${nCfg.name} filosuna atandınız!`, 4000);
+          this.ui.addChatMessage('KOMUTA MERKEZİ', `Dengeleme protokolü: ${nCfg.name} filosuna aktarıldınız!`, newNation, true);
+          this.ui.updateHUD(this.player, this.stations);
+        }
+      }
+
       if (this.player.mesh) {
         this.player.mesh.position.set(spawn.x, -spawn.y, 0);
       }

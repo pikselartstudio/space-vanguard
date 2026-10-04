@@ -490,6 +490,29 @@ class Ship extends Entity {
     }
   }
 
+  setNation(newNation, scene = null) {
+    if (!newNation || this.nation === newNation) return;
+    this.nation = newNation;
+    const nationCfg = NATIONS[this.nation] || NATIONS['blue'];
+    this.customColor = nationCfg.color;
+    const activeScene = scene || this.scene || (window.game && window.game.scene);
+    if (this.mesh && activeScene) {
+      activeScene.remove(this.mesh);
+    }
+    this.mesh = ModelBuilder.createShipMesh(this.shipKey, this.customColor);
+    this.engineFlame = this.mesh.getObjectByName('engineFlame');
+    this.shieldBubble = this.mesh.getObjectByName('shieldBubble');
+    this.wingTrails = this.mesh.getObjectByName('wingTrails');
+    if (this.mesh) {
+      this.mesh.position.set(this.x, -this.y, 0);
+      this.mesh.rotation.z = -this.rotation + Math.PI / 2;
+      this.mesh.renderOrder = 10;
+    }
+    if (activeScene) {
+      activeScene.add(this.mesh);
+    }
+  }
+
   takeDamage(amount, isCollision = false) {
     if (this.spawnShieldTimer > 0) {
       return false; // Invulnerable during spawn base protection
