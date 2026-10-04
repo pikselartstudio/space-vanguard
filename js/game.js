@@ -744,7 +744,7 @@ class StarblastGame {
     this.createExplosionParticles(this.player.x, this.player.y, NATIONS[this.player.nation].color, 40);
     this.ui.updateHUD(this.player);
     if (this.network && this.network.isConnected) {
-      this.network.emitEvolve(shipKey);
+      this.network.emitEvolve(shipKey, this.player.tier);
     }
   }
 
@@ -769,11 +769,12 @@ class StarblastGame {
       return;
     }
 
-    const amount = this.player.crystals;
-    this.player.crystals = 0;
+    // User request: "b tuşunu basılınca hepisini değil 10ar şekilde envanterden üsse boşalma olsun"
+    const amount = Math.min(10, this.player.crystals);
+    this.player.crystals -= amount;
     this.player.score += amount * 25;
     this.player.donations = (this.player.donations || 0) + amount;
-    this.player.shield = this.player.stats.shieldCap;
+    this.player.shield = Math.min(this.player.stats.shieldCap, this.player.shield + amount * 8);
 
     if (this.network && this.network.isConnected) {
       this.network.emitDonateBase(amount);
@@ -785,24 +786,24 @@ class StarblastGame {
     }
 
     window.soundSystem.playUpgrade();
-    this.createExplosionParticles(homeBase.x, homeBase.y, NATIONS[this.player.nation].color, 25);
+    this.createExplosionParticles(homeBase.x, homeBase.y, NATIONS[this.player.nation].color, 16);
     if (this.ui) {
-      this.ui.showAnnouncement(`🏛️ Üsse ${amount} Kredi bağışlandı! Kalkanınız yenilendi.`, 2500);
+      this.ui.showAnnouncement(`🏛️ Üsse ${amount} Kredi aktarıldı! (Kalan Kargo: ${this.player.crystals})`, 1800);
       this.ui.updateHUD(this.player, this.stations);
     }
   }
 
-  // User request: "sol panelin altına DFRT + CTRL ON/OFF olan bir küçük kısmı da ekle oynayanlar ctrl tuşunun süzülme işlevini oradan görebilsin"
+  // User request: "ctrl nin işlevini tam tersine çevirelim üst panelde açıkken kayma yok kapalıyken kayma var"
   toggleDriftMode(forceState = null) {
     if (!this.player || this.player.isDead) return;
-    const newState = (forceState !== null) ? forceState : !this.player.isDriftActive;
-    this.player.isDriftActive = newState;
-    this.player.rcsEnabled = !newState;
+    const newState = (forceState !== null) ? forceState : !this.player.isStabilizerActive;
+    this.player.isStabilizerActive = newState;
+    this.player.rcsEnabled = newState; // AÇIKKEN rcs ve fren devrede
     if (this.ui) {
       this.ui.updateDriftIndicator(newState);
       const msg = newState
-        ? '🚀 DFRT Modu AÇIK: Uzayda sürtünmesiz süzülme aktif! (İvmeniz korunur)'
-        : '🛑 DFRT Modu KAPALI: Otomatik frenleme devrede.';
+        ? '🛡️ DFRT Sabitleme AÇIK: Kayma yok, otomatik fren devrede.'
+        : '🚀 DFRT Sabitleme KAPALI: Kayma var, uzayda sürtünmesiz süzülme aktif!';
       this.ui.showAnnouncement(msg, 2000);
     }
   }
@@ -824,7 +825,7 @@ class StarblastGame {
 
     if (action.startsWith('drone_')) {
       const droneType = action.replace('drone_', ''); // 'attack', 'defense', 'mining'
-      const maxDrones = (this.player.tier || 1) + 1;
+      const maxDrones = this.player.maxDrones;
       if (!this.player.drones) this.player.drones = [];
 
       if (this.player.drones.length >= maxDrones) {
@@ -1182,6 +1183,24 @@ class StarblastGame {
     if (this.keys['MouseLeft'] || (this.keys['Space'] && !this.player.warpUnlocked)) {
       const newLasers = this.player.tryFire();
       if (newLasers && newLasers.length > 0) {
+        // Track targeted asteroid for mining drone
+        let targetedAst = null;
+        let minAimDist = 180;
+        for (let ai = 0; ai < this.asteroids.length; ai++) {
+          const a = this.asteroids[ai];
+          if (a && !a.isDead) {
+            const d = Math.hypot(a.x - this.mouseWorld.x, a.y - this.mouseWorld.y);
+            if (d < (a.radius + 70) && d < minAimDist) {
+              minAimDist = d;
+              targetedAst = a;
+            }
+          }
+        }
+        if (targetedAst) {
+          this.player.lastTargetAsteroid = targetedAst;
+          this.player.lastTargetAsteroidTime = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+        }
+
         newLasers.forEach(laser => {
           this.lasers.push(laser);
           this.scene.add(laser.mesh);
@@ -1357,6 +1376,12 @@ class StarblastGame {
 
         // Instant local damage prediction & visual flash feedback
         const destroyedLocally = ast.takeDamage(laser.damage, laser.ownerId);
+
+        // User request: "maden dronu ben ateş ettiğim asteroite atak yapacak"
+        if (this.player && (laser.ownerId === 'player' || (this.network && laser.ownerId === this.network.myId) || laser.ownerId === this.player.id)) {
+          this.player.lastTargetAsteroid = ast;
+          this.player.lastTargetAsteroidTime = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+        }
 
         if (destroyedLocally) {
           if (this.locallyDestroyedAsteroidIds) {

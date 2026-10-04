@@ -431,6 +431,7 @@ io.on('connection', (socket) => {
       name,
       nation: chosenNation,
       shipKey: 'fly',
+      tier: 1,
       x: spawn.x,
       y: spawn.y,
       vx: 0,
@@ -816,12 +817,16 @@ io.on('connection', (socket) => {
     if (!p || p.isDead) return;
 
     p.shipKey = data.shipKey;
+    if (data && data.tier) {
+      p.tier = Number(data.tier);
+    }
     p.crystals = 0; // reset cargo on evolve
     p.shield = 500;
 
     socket.broadcast.emit('player_evolved', {
       playerId: socket.id,
-      shipKey: data.shipKey
+      shipKey: data.shipKey,
+      tier: p.tier
     });
   });
 

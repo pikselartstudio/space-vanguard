@@ -181,11 +181,11 @@ class SpaceUniverse {
     majorGeo.setAttribute('color', new THREE.BufferAttribute(majorCol, 3));
 
     const majorMat = new THREE.PointsMaterial({
-      size: 13.5, // Significantly larger, bold, luminous
+      size: 6.8, // User request: 2 tiers smaller so radiant stars do not dazzle eyes
       map: this.starTexture,
       vertexColors: true,
       transparent: true,
-      opacity: 0.96,
+      opacity: 0.72,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
@@ -288,25 +288,27 @@ class SpaceUniverse {
 
     this.flareStars = [];
     const flareColors = [0xffffff, 0xfce7f3, 0xf472b6, 0xfbcfe8, 0xe0e7ff, 0xddd6fe, 0xfef3c7];
-    // 3X Increase in large sparkling radiant diamond stars (48 -> 150)
-    for (let i = 0; i < 150; i++) {
+    // User request: "aşırı parlayan yıldızlar çok göz alıyor 2 boy büyük olanları çıkart arka plandan"
+    // Scaled down 2 sizes: reduced count and max size from 122 to 24
+    for (let i = 0; i < 40; i++) {
       const color = flareColors[i % flareColors.length];
       const fMat = new THREE.SpriteMaterial({
         map: flareTexture,
         color: color,
         transparent: true,
+        opacity: 0.55,
         blending: THREE.AdditiveBlending,
         depthWrite: false
       });
       const sprite = new THREE.Sprite(fMat);
-      const fx = (Math.random() - 0.5) * 16000;
-      const fy = (Math.random() - 0.5) * 16000;
+      const fx = (Math.random() - 0.5) * 8250;
+      const fy = (Math.random() - 0.5) * 8250;
       const fz = -100 - Math.random() * 850;
       sprite.position.set(fx, fy, fz);
-      const baseSize = 58 + Math.random() * 64; // Noticeably larger radiant diffraction spikes
+      const baseSize = 14 + Math.random() * 12; // Modest, non-glaring sparkle size
       sprite.scale.set(baseSize, baseSize, 1);
       sprite.baseSize = baseSize;
-      sprite.twinkleSpeed = 1.0 + Math.random() * 1.8;
+      sprite.twinkleSpeed = 0.8 + Math.random() * 1.4;
       sprite.twinklePhase = Math.random() * Math.PI * 2;
       this.starfieldGroup.add(sprite);
       this.flareStars.push(sprite);
@@ -324,8 +326,8 @@ class SpaceUniverse {
     this.bgAsteroids = [];
 
     // Distinct depth layers from near-deep to abyssal void
-    const count = 75;
-    const worldSpan = 18000;
+    const count = 65;
+    const worldSpan = 8250; // Match exact world size to ensure seamless boundary crossing
 
     // Dark near-black obsidian / charcoal / basalt rock tones ("siyaha yakın bir koyu renk")
     const darkObsidianTones = [
@@ -713,7 +715,7 @@ class SpaceUniverse {
 
     // Deep-Space Background Asteroids: 3D tumble, space drift, and clean continuous wrapping
     if (this.bgAsteroids) {
-      const fieldSize = 18000;
+      const fieldSize = (window.game && window.game.worldSize) ? window.game.worldSize : 8250;
       const halfField = fieldSize * 0.5;
 
       for (let i = 0; i < this.bgAsteroids.length; i++) {

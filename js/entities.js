@@ -401,18 +401,33 @@ class Drone {
     }
 
     // Follow formation behind parent ship in an orderly tactical arc
-    const spread = Math.PI * 0.70;
+    const spread = Math.PI * 0.75;
     const baseAngle = parentShip.rotation + Math.PI; // trailing behind
     const angleStep = totalDrones > 1 ? spread / (totalDrones - 1) : 0;
     const targetAngle = totalDrones > 1 ? (baseAngle - spread / 2 + index * angleStep) : baseAngle;
-    const followDist = (parentShip.radius || 18) + 24;
+    const followDist = (parentShip.radius || 18) + 48; // Increased for 3x drone scale
 
     const targetX = parentShip.x + Math.cos(targetAngle) * followDist;
     const targetY = parentShip.y + Math.sin(targetAngle) * followDist;
 
+    // Seamless world border crossing: if parent ship wrapped around the world boundary, instantly wrap drone too!
+    let dx = targetX - this.x;
+    let dy = targetY - this.y;
+    const worldSpan = (game && game.worldSize) ? game.worldSize : 8250;
+    const halfWorld = worldSpan * 0.5;
+
+    if (Math.abs(dx) > halfWorld) {
+      this.x += (dx > 0) ? worldSpan : -worldSpan;
+      dx = targetX - this.x;
+    }
+    if (Math.abs(dy) > halfWorld) {
+      this.y += (dy > 0) ? worldSpan : -worldSpan;
+      dy = targetY - this.y;
+    }
+
     // Smooth formation following
-    this.x += (targetX - this.x) * Math.min(1.0, dt * 11);
-    this.y += (targetY - this.y) * Math.min(1.0, dt * 11);
+    this.x += dx * Math.min(1.0, dt * 11);
+    this.y += dy * Math.min(1.0, dt * 11);
     this.rotation = parentShip.rotation;
 
     if (this.mesh) {
@@ -424,9 +439,9 @@ class Drone {
     if (this.type === 'attack') {
       this.fireTimer -= dt;
       if (this.fireTimer <= 0 && game) {
-        // Find nearest hostile target (enemy ship or nearest asteroid)
+        // User request: "saldırı dronu sadece pvp için olacak asteroitlere atak yapmayacak"
         let bestTarget = null;
-        let minDist = 420;
+        let minDist = 460;
 
         if (game.remotePlayers) {
           for (const rp of game.remotePlayers.values()) {
@@ -435,18 +450,6 @@ class Drone {
               if (d < minDist) {
                 minDist = d;
                 bestTarget = rp;
-              }
-            }
-          }
-        }
-
-        if (!bestTarget && game.asteroids) {
-          for (const a of game.asteroids) {
-            if (a && !a.isDead) {
-              const d = Math.hypot(a.x - this.x, a.y - this.y);
-              if (d < 300 && d < minDist) {
-                minDist = d;
-                bestTarget = a;
               }
             }
           }
@@ -480,32 +483,28 @@ class Drone {
         this.mesh.rotation.z += dt * 3.5; // High-tech rotating protective core
       }
     } else if (this.type === 'mining') {
-      // Mining Drone: automatically targets and shoots nearby asteroids (up to 340 range)
+      // User request: "maden dronu ben ateş ettiğim asteroite atak yapacak atak yapmadığım durumda saldırı yapmayacak"
       this.fireTimer -= dt;
-      if (this.fireTimer <= 0 && game && game.asteroids) {
-        let nearestAst = null;
-        let minDist = 340;
-        for (const a of game.asteroids) {
-          if (a && !a.isDead) {
-            const d = Math.hypot(a.x - this.x, a.y - this.y);
-            if (d < minDist) {
-              minDist = d;
-              nearestAst = a;
-            }
+      if (this.fireTimer <= 0 && game) {
+        const targetAst = parentShip.lastTargetAsteroid;
+        const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+        const isRecent = parentShip.lastTargetAsteroidTime && (now - parentShip.lastTargetAsteroidTime < 3500);
+
+        if (targetAst && !targetAst.isDead && isRecent) {
+          const d = Math.hypot(targetAst.x - this.x, targetAst.y - this.y);
+          if (d <= 520) {
+            this.fireTimer = 0.80; // Mining laser pulse
+            const ang = Math.atan2(targetAst.y - this.y, targetAst.x - this.x);
+            const spd = 560;
+            const laser = new Laser(
+              this.x, this.y,
+              Math.cos(ang) * spd, Math.sin(ang) * spd,
+              14, false, parentShip.id,
+              0xffaa00, parentShip.nation, 420, false, 'standard'
+            );
+            game.lasers.push(laser);
+            game.scene.add(laser.mesh);
           }
-        }
-        if (nearestAst) {
-          this.fireTimer = 0.85; // Faster mining laser pulse
-          const ang = Math.atan2(nearestAst.y - this.y, nearestAst.x - this.x);
-          const spd = 550;
-          const laser = new Laser(
-            this.x, this.y,
-            Math.cos(ang) * spd, Math.sin(ang) * spd,
-            14, false, parentShip.id,
-            0xffaa00, parentShip.nation, 380, false, 'standard'
-          );
-          game.lasers.push(laser);
-          game.scene.add(laser.mesh);
         }
       }
     }
@@ -526,11 +525,15 @@ class Ship extends Entity {
     this.scene = scene;
     const nationCfg = NATIONS[this.nation] || NATIONS['blue'];
     this.customColor = nationCfg.color;
+    this.tier = (config && config.tier) ? config.tier : 1;
     this.drones = [];
     this.isDockedAtBase = false;
     this.dockShieldMesh = null;
     this.dockShieldTimer = 0;
+    this.isStabilizerActive = true; // User request: AÇIKKEN kayma yok (otomatik frenleme)
     this.isDriftActive = false;
+    this.lastTargetAsteroid = null;
+    this.lastTargetAsteroidTime = 0;
     // Initial standard laser is strictly neon green per user request: "ilk lazer her zaman yeşil olacak."
     this.laserColor = 0x00ff44;
 
@@ -598,8 +601,15 @@ class Ship extends Entity {
     }
   }
 
+  // User request: "gemiler seviye atlıyor fakat dron ekle 2de kaldı düzeltelim"
+  get maxDrones() {
+    const t = this.tier || (SHIP_TREE[this.shipKey] ? SHIP_TREE[this.shipKey].tier : 1);
+    return t + 1; // Tier 1 -> 2, Tier 2 -> 3, Tier 3 -> 4...
+  }
+
   recomputeStats() {
     const config = SHIP_TREE[this.shipKey];
+    if (config && config.tier) this.tier = config.tier;
     this.radius = config.radius;
     this.mass = config.baseStats.mass;
 
@@ -622,6 +632,7 @@ class Ship extends Entity {
     if (!SHIP_TREE[newShipKey]) return;
     this.shipKey = newShipKey;
     const config = SHIP_TREE[newShipKey];
+    this.tier = (config && config.tier) ? config.tier : 1;
     this.crystals = 0; // reset cargo on evolution
 
     this.isHealer = !!config.isHealer;
@@ -890,20 +901,20 @@ class Ship extends Entity {
       hull.rotation.z = this.currentBank;
     }
 
-    // DFRT + CTRL inertial drift mode: when active, drag is 0.993 so ship glides effortlessly
-    if (this.isDriftActive) {
-      this.drag = 0.993;
+    // User request: "ctrl nin işlevini tam tersine çevirelim üst panelde açıkken kayma yok kapalıyken kayma var"
+    if (this.isStabilizerActive) {
+      this.drag = 0.94; // AÇIK: kayma yok (otomatik frenleme)
     } else {
-      this.drag = 0.94;
+      this.drag = 0.993; // KAPALI: kayma var (sürtünmesiz serbest süzülme)
     }
 
     super.update(dt, worldSize);
     this.updateHealthBar();
     if (this.nameSprite) {
-      this.nameSprite.position.set(this.x, -this.y + this.radius + 24, 6);
+      this.nameSprite.position.set(this.x, -this.y + this.radius + 36, 6);
     }
 
-    // User request: "base gelince kalkan hologramı çıksın geminin üzerinde nefes alış verişi gibi yanıp sönsün overlay %70 oranında kullan"
+    // User request: "hologram kalkan görünümünü overlay %20 olarak yapalım daha az görülsün"
     if (this.isDockedAtBase) {
       if (!this.dockShieldMesh && (this.scene || (window.game && window.game.scene))) {
         const sc = this.scene || window.game.scene;
@@ -912,13 +923,16 @@ class Ship extends Entity {
       }
       if (this.dockShieldMesh) {
         this.dockShieldTimer = (this.dockShieldTimer || 0) + dt * 2.8;
-        const pulse = 0.55 + Math.sin(this.dockShieldTimer) * 0.20; // 0.35 to 0.75, averaging ~0.70 overlay
+        const pulse = 0.16 + Math.sin(this.dockShieldTimer) * 0.08; // 0.08 to 0.24, averaging ~0.20 overlay
         this.dockShieldMesh.visible = true;
         if (this.dockShieldMesh.pulseMat) {
           this.dockShieldMesh.pulseMat.opacity = pulse;
         }
         if (this.dockShieldMesh.wireMat) {
-          this.dockShieldMesh.wireMat.opacity = pulse * 0.85;
+          this.dockShieldMesh.wireMat.opacity = pulse * 0.80;
+        }
+        if (this.dockShieldMesh.ringMat) {
+          this.dockShieldMesh.ringMat.opacity = pulse * 0.90;
         }
         this.dockShieldMesh.position.set(this.x, -this.y, 1);
         this.dockShieldMesh.rotation.z += dt * 0.45;
@@ -940,7 +954,7 @@ class Ship extends Entity {
     }
   }
 
-  // User request: "karakterin nicknami ulusun rengine özel çok az glowla net bir yazı ile gemi üzerinde görülsün."
+  // User request: "oyuncu nickleri hiç görülmüyor çok küçük büyült nicknamleri."
   createPlayerNameTag(scene) {
     const activeScene = scene || this.scene;
     if (!activeScene) return;
@@ -956,26 +970,26 @@ class Ship extends Entity {
     ctx.clearRect(0, 0, 512, 128);
 
     const nationColor = (this.nation === 'red') ? '#ff3b5c' : (this.nation === 'gold' ? '#ffd044' : '#00f0ff');
-    ctx.font = 'bold 36px "Share Tech Mono", "Orbitron", sans-serif';
+    ctx.font = 'bold 52px "Orbitron", "Share Tech Mono", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     // Dark solid outline for maximum clarity against deep space & bright stars
     ctx.strokeStyle = 'rgba(0, 5, 12, 0.95)';
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 10;
     ctx.strokeText(this.name || 'PILOT', 256, 64);
 
-    // Subtle nation glow
+    // Nation glow
     ctx.shadowColor = nationColor;
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 12;
     ctx.fillStyle = '#ffffff';
     ctx.fillText(this.name || 'PILOT', 256, 64);
 
     const texture = new THREE.CanvasTexture(canvas);
     const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
     this.nameSprite = new THREE.Sprite(spriteMat);
-    this.nameSprite.scale.set(65, 16.25, 1);
-    this.nameSprite.position.set(this.x, -this.y + this.radius + 24, 6);
+    this.nameSprite.scale.set(150, 37.5, 1);
+    this.nameSprite.position.set(this.x, -this.y + this.radius + 36, 6);
     activeScene.add(this.nameSprite);
   }
 
@@ -1367,7 +1381,7 @@ class RemotePlayer extends Ship {
 
     // Name tag position
     if (this.nameSprite) {
-      this.nameSprite.position.set(this.x, -this.y + this.radius + 30, 5);
+      this.nameSprite.position.set(this.x, -this.y + this.radius + 36, 6);
     }
 
     // Engine flame (smooth ion light)

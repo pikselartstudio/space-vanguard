@@ -528,6 +528,27 @@ body, html {
   box-shadow: 0 0 8px #00f0ff;
 }
 
+.base-market-footer {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: rgba(0, 180, 255, 0.12);
+  border: 1px dashed rgba(0, 240, 255, 0.45);
+  border-radius: 6px;
+  font-size: 0.74rem;
+  color: #bae6fd;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.base-market-footer:hover {
+  background: rgba(0, 240, 255, 0.25);
+  border-color: #00f0ff;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.35);
+}
+
 /* DFRT + CTRL Drift Mode HUD Indicator */
 #drift-mode-indicator {
   display: inline-flex;

@@ -2793,19 +2793,19 @@ const ModelBuilder = {
     return stationRoot;
   },
 
-  // User request: "base gelince kalkan hologramı çıksın geminin üzerinde nefes alış verişi gibi yanıp sönsün overlay %70 oranında kullan"
+  // User request: "hologram kalkan görünümünü overlay %20 olarak yapalım daha az görülsün"
   createDockShieldHologram(shipRadius = 24, nation = 'blue') {
     const nationColor = (nation === 'red') ? 0xff3b5c : (nation === 'gold' ? 0xffd044 : 0x00f0ff);
     const r = Math.max(30, shipRadius * 1.55);
 
     const group = new THREE.Group();
 
-    // 1. Faceted translucent glowing dome
+    // 1. Faceted translucent glowing dome (softened to 20% overlay)
     const sphereGeo = new THREE.IcosahedronGeometry(r, 2);
     const sphereMat = new THREE.MeshBasicMaterial({
       color: nationColor,
       transparent: true,
-      opacity: 0.70,
+      opacity: 0.20,
       wireframe: false,
       blending: THREE.AdditiveBlending,
       depthWrite: false
@@ -2818,7 +2818,7 @@ const ModelBuilder = {
       color: 0xffffff,
       wireframe: true,
       transparent: true,
-      opacity: 0.60,
+      opacity: 0.16,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
@@ -2830,7 +2830,7 @@ const ModelBuilder = {
     const ringMat = new THREE.MeshBasicMaterial({
       color: nationColor,
       transparent: true,
-      opacity: 0.75,
+      opacity: 0.22,
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
       depthWrite: false
@@ -2840,6 +2840,7 @@ const ModelBuilder = {
 
     group.pulseMat = sphereMat; // reference for opacity pulse
     group.wireMat = wireMat;
+    group.ringMat = ringMat;
     return group;
   },
 
@@ -2922,7 +2923,8 @@ const ModelBuilder = {
       root.add(solarR);
     }
 
-    root.scale.set(1.15, 1.15, 1.15);
+    // User request: "dronların boyutunu 3x arttır" (1.15 -> 3.45)
+    root.scale.set(3.45, 3.45, 3.45);
     return root;
   }
 };

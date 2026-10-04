@@ -959,7 +959,7 @@ class UIManager {
 
     // Sync Drift Indicator
     if (player && this.driftIndicator) {
-      this.updateDriftIndicator(player.isDriftActive);
+      this.updateDriftIndicator(player.isStabilizerActive !== false);
     }
 
     // Base docking & donation prompt OR enemy base siege alert
@@ -1092,9 +1092,9 @@ class UIManager {
     if (this.driftIndicator) {
       this.driftIndicator.classList.toggle('active', !!isActive);
       if (isActive) {
-        this.driftIndicator.setAttribute('title', 'Süzülme Modu AÇIK: Uzayda sürtünmesiz akarsınız, ivmeniz korunur. Kapatmak için tıklayın veya CTRL tuşuna basın.');
+        this.driftIndicator.setAttribute('title', 'DFRT Sabitleme AÇIK: Kayma yok, otomatik fren devrede. Kaymayı açmak için tıklayın veya CTRL tuşuna basın.');
       } else {
-        this.driftIndicator.setAttribute('title', 'Süzülme Modu KAPALI: Otomatik frenleme devrede. Açmak için tıklayın veya CTRL tuşuna basın.');
+        this.driftIndicator.setAttribute('title', 'DFRT Sabitleme KAPALI: Kayma var, uzayda sürtünmesiz süzülme aktif! Freni açmak için tıklayın veya CTRL tuşuna basın.');
       }
     }
     if (this.driftStateText) {
@@ -1102,10 +1102,10 @@ class UIManager {
     }
   }
 
-  // User request: Üs Pazarı 6 kutulu 2x3 ızgara (Saldırı Dronu, Savunma Dronu, Maden Dronu, S1, S2, S3 Lazer Fulleme)
+  // User request: Üs Pazarı ortalı SHOP, 6 kutu, en altta B ile 10ar bağış yapma
   renderBaseMarket(homeBase, player) {
     if (!this.baseDockStatus) return;
-    const maxDrones = (player.tier || 1) + 1;
+    const maxDrones = player.maxDrones;
     const currentDrones = player.drones ? player.drones.length : 0;
     const s1Ammo = (player.elementalAmmo && player.elementalAmmo.ice) || 0;
     const s2Ammo = (player.elementalAmmo && player.elementalAmmo.fire) || 0;
@@ -1113,18 +1113,17 @@ class UIManager {
     const pct = Math.round((homeBase.crystalsDonated / homeBase.crystalsRequired) * 100);
 
     this.baseDockStatus.innerHTML = `
-      <div class="base-market-header">
-        <div class="base-market-title">🏪 ÜS İKMAL PAZARI</div>
-        <div class="base-market-sub"><b>[B]</b> Bağış Yap | Sv: <b>${homeBase.level}/5</b> (%${pct})</div>
+      <div class="base-market-header" style="justify-content: center; padding-bottom: 6px; margin-bottom: 8px;">
+        <div class="base-market-title" style="letter-spacing: 5px; font-size: 1.05rem; font-weight: 900;">SHOP</div>
       </div>
       <div class="base-market-grid">
         <!-- 1. Saldırı Dronu -->
-        <div class="base-market-card" data-action="drone_attack" title="Çift plazma taretli refakatçi avcı dronu (Dron Kapasitesi: ${currentDrones}/${maxDrones})">
+        <div class="base-market-card" data-action="drone_attack" title="Refakatçi PvP Avcı Dronu (Dron Kapasitesi: ${currentDrones}/${maxDrones})">
           <div class="base-market-card-top">
             <div class="base-market-card-icon">⚔️</div>
             <div>
               <div class="base-market-card-name">Saldırı Dronu</div>
-              <div class="base-market-card-desc">Hedefleri otomatik vurur</div>
+              <div class="base-market-card-desc">Sadece PvP düşmana vurur</div>
             </div>
           </div>
           <button type="button" class="base-market-btn">KUŞAN (${currentDrones}/${maxDrones})</button>
@@ -1143,12 +1142,12 @@ class UIManager {
         </div>
 
         <!-- 3. Maden Dronu -->
-        <div class="base-market-card" data-action="drone_mining" title="Yakındaki asteroitleri otomatik parçalayan madenci dron (Dron Kapasitesi: ${currentDrones}/${maxDrones})">
+        <div class="base-market-card" data-action="drone_mining" title="Hedef aldığınız asteroiti parçalayan madenci dron (Dron Kapasitesi: ${currentDrones}/${maxDrones})">
           <div class="base-market-card-top">
             <div class="base-market-card-icon">⛏️</div>
             <div>
               <div class="base-market-card-name">Maden Dronu</div>
-              <div class="base-market-card-desc">Asteroitleri kazır</div>
+              <div class="base-market-card-desc">Hedef asteroiti kazar</div>
             </div>
           </div>
           <button type="button" class="base-market-btn">KUŞAN (${currentDrones}/${maxDrones})</button>
@@ -1190,6 +1189,11 @@ class UIManager {
           <button type="button" class="base-market-btn">DOLDUR</button>
         </div>
       </div>
+
+      <!-- User request: "Bağış Yapma için b tuşuna basın kısmı en altta olsun ve b tuşunu basılınca hepisini değil 10ar şekilde envanterden üsse boşalma olsun" -->
+      <div class="base-market-footer" id="base-market-donate-btn" title="Tıklayın veya klavyeden [B] tuşuna basın (Her seferde 10 Kredi)">
+        🏛️ <b>[B]</b> Tuşuyla Üsse Bağış Yap (10 Kredi Boşalt) • Üs Sv. <b>${homeBase.level}/5</b> (%${pct})
+      </div>
     `;
 
     const cards = this.baseDockStatus.querySelectorAll('.base-market-card');
@@ -1202,6 +1206,16 @@ class UIManager {
         }
       });
     });
+
+    const donateBtn = this.baseDockStatus.querySelector('#base-market-donate-btn');
+    if (donateBtn) {
+      donateBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.game) {
+          this.game.donateToHomeBase();
+        }
+      });
+    }
   }
 
   showTierUpDropBanner(player) {

@@ -380,9 +380,9 @@ class NetworkManager {
     });
   }
 
-  emitEvolve(shipKey) {
+  emitEvolve(shipKey, tier) {
     if (!this.isConnected || !this.socket) return;
-    this.socket.emit('evolve_ship', { shipKey });
+    this.socket.emit('evolve_ship', { shipKey, tier });
   }
 
   emitDonateBase(amount) {
