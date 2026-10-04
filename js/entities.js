@@ -369,6 +369,149 @@ class Asteroid extends Entity {
   }
 }
 
+// Tactical Companion Escort Drone (Attack, Defense, Mining)
+class Drone {
+  constructor(type = 'attack', nation = 'blue', scene = null) {
+    this.type = type; // 'attack', 'defense', 'mining'
+    this.nation = nation || 'blue';
+    this.scene = scene;
+    this.x = 0;
+    this.y = 0;
+    this.rotation = 0;
+    this.fireTimer = 0.4 + Math.random() * 0.4;
+    this.isDead = false;
+    this.mesh = ModelBuilder.createDroneMesh(type, nation);
+    if (scene) scene.add(this.mesh);
+  }
+
+  destroy(scene) {
+    this.isDead = true;
+    const activeScene = scene || this.scene;
+    if (this.mesh && activeScene) {
+      activeScene.remove(this.mesh);
+      this.mesh = null;
+    }
+  }
+
+  update(dt, parentShip, index, totalDrones, game) {
+    if (this.isDead || !parentShip || parentShip.isDead) {
+      this.isDead = true;
+      if (this.mesh && this.scene) this.scene.remove(this.mesh);
+      return;
+    }
+
+    // Follow formation behind parent ship in an orderly tactical arc
+    const spread = Math.PI * 0.70;
+    const baseAngle = parentShip.rotation + Math.PI; // trailing behind
+    const angleStep = totalDrones > 1 ? spread / (totalDrones - 1) : 0;
+    const targetAngle = totalDrones > 1 ? (baseAngle - spread / 2 + index * angleStep) : baseAngle;
+    const followDist = (parentShip.radius || 18) + 24;
+
+    const targetX = parentShip.x + Math.cos(targetAngle) * followDist;
+    const targetY = parentShip.y + Math.sin(targetAngle) * followDist;
+
+    // Smooth formation following
+    this.x += (targetX - this.x) * Math.min(1.0, dt * 11);
+    this.y += (targetY - this.y) * Math.min(1.0, dt * 11);
+    this.rotation = parentShip.rotation;
+
+    if (this.mesh) {
+      this.mesh.position.set(this.x, -this.y, 2);
+      this.mesh.rotation.z = -this.rotation + Math.PI / 2;
+    }
+
+    // Drone Specializations:
+    if (this.type === 'attack') {
+      this.fireTimer -= dt;
+      if (this.fireTimer <= 0 && game) {
+        // Find nearest hostile target (enemy ship or nearest asteroid)
+        let bestTarget = null;
+        let minDist = 420;
+
+        if (game.remotePlayers) {
+          for (const rp of game.remotePlayers.values()) {
+            if (rp && !rp.isDead && rp.nation !== parentShip.nation) {
+              const d = Math.hypot(rp.x - this.x, rp.y - this.y);
+              if (d < minDist) {
+                minDist = d;
+                bestTarget = rp;
+              }
+            }
+          }
+        }
+
+        if (!bestTarget && game.asteroids) {
+          for (const a of game.asteroids) {
+            if (a && !a.isDead) {
+              const d = Math.hypot(a.x - this.x, a.y - this.y);
+              if (d < 300 && d < minDist) {
+                minDist = d;
+                bestTarget = a;
+              }
+            }
+          }
+        }
+
+        if (bestTarget) {
+          this.fireTimer = 1.05; // 1 shot / sec
+          const ang = Math.atan2(bestTarget.y - this.y, bestTarget.x - this.x);
+          const spd = 620;
+          const laserColor = (parentShip.nation === 'red' ? 0xff3b5c : (parentShip.nation === 'gold' ? 0xffd044 : 0x00f0ff));
+          const laser = new Laser(
+            this.x, this.y,
+            Math.cos(ang) * spd, Math.sin(ang) * spd,
+            12, false, parentShip.id,
+            laserColor, parentShip.nation, 450, false, 'standard'
+          );
+          game.lasers.push(laser);
+          game.scene.add(laser.mesh);
+          if (window.soundSystem) {
+            const vol = game.getPositionalVolume(this.x, this.y, 600) * 0.35;
+            if (vol > 0.02) window.soundSystem.playLaser(false, vol);
+          }
+        }
+      }
+    } else if (this.type === 'defense') {
+      // Passive nanite shield repair: +6 shield/sec to parent ship
+      if (parentShip.shield < parentShip.stats.shieldCap) {
+        parentShip.shield = Math.min(parentShip.stats.shieldCap, parentShip.shield + 6.0 * dt);
+      }
+      if (this.mesh) {
+        this.mesh.rotation.z += dt * 3.5; // High-tech rotating protective core
+      }
+    } else if (this.type === 'mining') {
+      // Mining Drone: automatically targets and shoots nearby asteroids (up to 340 range)
+      this.fireTimer -= dt;
+      if (this.fireTimer <= 0 && game && game.asteroids) {
+        let nearestAst = null;
+        let minDist = 340;
+        for (const a of game.asteroids) {
+          if (a && !a.isDead) {
+            const d = Math.hypot(a.x - this.x, a.y - this.y);
+            if (d < minDist) {
+              minDist = d;
+              nearestAst = a;
+            }
+          }
+        }
+        if (nearestAst) {
+          this.fireTimer = 0.85; // Faster mining laser pulse
+          const ang = Math.atan2(nearestAst.y - this.y, nearestAst.x - this.x);
+          const spd = 550;
+          const laser = new Laser(
+            this.x, this.y,
+            Math.cos(ang) * spd, Math.sin(ang) * spd,
+            14, false, parentShip.id,
+            0xffaa00, parentShip.nation, 380, false, 'standard'
+          );
+          game.lasers.push(laser);
+          game.scene.add(laser.mesh);
+        }
+      }
+    }
+  }
+}
+
 // Base Ship Class (Shared by Player and Bot)
 class Ship extends Entity {
   constructor(id, name, shipKey = 'fly', x = 0, y = 0, isPlayer = false, nation = 'blue', scene = null) {
@@ -383,6 +526,11 @@ class Ship extends Entity {
     this.scene = scene;
     const nationCfg = NATIONS[this.nation] || NATIONS['blue'];
     this.customColor = nationCfg.color;
+    this.drones = [];
+    this.isDockedAtBase = false;
+    this.dockShieldMesh = null;
+    this.dockShieldTimer = 0;
+    this.isDriftActive = false;
     // Initial standard laser is strictly neon green per user request: "ilk lazer her zaman yeşil olacak."
     this.laserColor = 0x00ff44;
 
@@ -742,10 +890,53 @@ class Ship extends Entity {
       hull.rotation.z = this.currentBank;
     }
 
+    // DFRT + CTRL inertial drift mode: when active, drag is 0.993 so ship glides effortlessly
+    if (this.isDriftActive) {
+      this.drag = 0.993;
+    } else {
+      this.drag = 0.94;
+    }
+
     super.update(dt, worldSize);
     this.updateHealthBar();
     if (this.nameSprite) {
       this.nameSprite.position.set(this.x, -this.y + this.radius + 24, 6);
+    }
+
+    // User request: "base gelince kalkan hologramı çıksın geminin üzerinde nefes alış verişi gibi yanıp sönsün overlay %70 oranında kullan"
+    if (this.isDockedAtBase) {
+      if (!this.dockShieldMesh && (this.scene || (window.game && window.game.scene))) {
+        const sc = this.scene || window.game.scene;
+        this.dockShieldMesh = ModelBuilder.createDockShieldHologram(this.radius, this.nation);
+        sc.add(this.dockShieldMesh);
+      }
+      if (this.dockShieldMesh) {
+        this.dockShieldTimer = (this.dockShieldTimer || 0) + dt * 2.8;
+        const pulse = 0.55 + Math.sin(this.dockShieldTimer) * 0.20; // 0.35 to 0.75, averaging ~0.70 overlay
+        this.dockShieldMesh.visible = true;
+        if (this.dockShieldMesh.pulseMat) {
+          this.dockShieldMesh.pulseMat.opacity = pulse;
+        }
+        if (this.dockShieldMesh.wireMat) {
+          this.dockShieldMesh.wireMat.opacity = pulse * 0.85;
+        }
+        this.dockShieldMesh.position.set(this.x, -this.y, 1);
+        this.dockShieldMesh.rotation.z += dt * 0.45;
+      }
+    } else if (this.dockShieldMesh) {
+      this.dockShieldMesh.visible = false;
+    }
+
+    // Companion escort drones update
+    if (this.drones && this.drones.length > 0) {
+      for (let i = this.drones.length - 1; i >= 0; i--) {
+        const drone = this.drones[i];
+        drone.update(dt, this, i, this.drones.length, window.game);
+        if (drone.isDead) {
+          drone.destroy(this.scene || (window.game && window.game.scene));
+          this.drones.splice(i, 1);
+        }
+      }
     }
   }
 
@@ -889,6 +1080,16 @@ class Ship extends Entity {
 
   destroy(scene) {
     const activeScene = scene || this.scene;
+    if (this.dockShieldMesh && activeScene) {
+      activeScene.remove(this.dockShieldMesh);
+      this.dockShieldMesh = null;
+    }
+    if (this.drones && this.drones.length > 0) {
+      for (const drone of this.drones) {
+        drone.destroy(activeScene);
+      }
+      this.drones = [];
+    }
     if (this.healthBarGroup && activeScene) {
       activeScene.remove(this.healthBarGroup);
       this.healthBarGroup = null;

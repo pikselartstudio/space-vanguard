@@ -91,19 +91,24 @@
             </div>
           </div>
         </div>
-        <div id="base-dock-status" style="display: none;"></div>
+        <div id="base-dock-status" style="display: none;" class="interactive"></div>
+        <!-- Drift / Inertia Mode Indicator (User request: DFRT + CTRL ON/OFF) -->
+        <div id="drift-mode-indicator" class="interactive" title="Süzülme Modu KAPALI: Otomatik frenleme devrede. Açmak için CTRL tuşuna basın veya tıklayın.">
+          <span class="dfrt-tag">DFRT + CTRL</span>
+          <span class="dfrt-state" id="dfrt-state-text">OFF</span>
+        </div>
       </div>
 
       <!-- Top Right: Radar / Minimap & 3-Tab Leaderboard (PvP Kills, Mining Farm, Base Donations) -->
       <div id="top-right-hud">
-        <div id="radar-container">
+        <div id="radar-container" class="interactive">
           <canvas id="radar-canvas" width="240" height="240"></canvas>
           <div class="radar-sweep"></div>
         </div>
 
         <div id="leaderboard" class="interactive">
           <div class="leaderboard-tabs">
-            <button type="button" class="lb-tab active" id="lb-tab-kills" data-metric="kills" title="PvP İtlafları">
+            <button type="button" class="lb-tab" id="lb-tab-kills" data-metric="kills" title="PvP İtlafları">
               <svg viewBox="0 0 24 24" class="lb-tab-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="9"/>
                 <line x1="12" y1="2" x2="12" y2="7"/>
@@ -113,7 +118,7 @@
                 <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
               </svg>
             </button>
-            <button type="button" class="lb-tab" id="lb-tab-mined" data-metric="mined" title="Maden Farmı">
+            <button type="button" class="lb-tab active" id="lb-tab-mined" data-metric="mined" title="Maden Farmı">
               <svg viewBox="0 0 24 24" class="lb-tab-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="6 3 18 3 22 9 12 22 2 9"/>
                 <line x1="2" y1="9" x2="22" y2="9"/>

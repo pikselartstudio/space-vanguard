@@ -113,7 +113,7 @@ const TIER_YIELDS = [
 const asteroids = new Map();
 let nextAsteroidId = 1;
 
-function generateAsteroid(tier = null, nearBase = null, nearNation = null) {
+function generateAsteroid(tier = null, nearBase = null, nearNation = null, isOuterRim = false) {
   const sizeTier = tier || Math.floor(Math.random() * 7) + 1;
   const radius = 13 + (sizeTier - 1) * 8.5;
   const maxHealth = ASTEROID_HEALTHS[sizeTier] || (sizeTier * 220);
@@ -132,6 +132,11 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null) {
     const r = 600 + Math.random() * 700;
     x = nearBase.x + Math.cos(angle) * r;
     y = nearBase.y + Math.sin(angle) * r;
+  } else if (isOuterRim) {
+    const dist = 3200 + Math.random() * 1900;
+    const angle = Math.random() * Math.PI * 2;
+    x = Math.cos(angle) * dist;
+    y = Math.sin(angle) * dist;
   } else {
     const dist = 300 + Math.random() * (WORLD_SIZE / 2 - 400);
     const angle = Math.random() * Math.PI * 2;
@@ -194,6 +199,14 @@ for (const n of ['blue', 'red', 'gold']) {
     generateAsteroid(tier, b, n);
   }
 }
+// User request: "uzayın boş alanlarında da asteroit ekleyebilirsin farm yapmak isteyenler sotede takılabilecek"
+for (let i = 0; i < 45; i++) {
+  generateAsteroid((i % 7) + 1, null, null, true);
+}
+
+// User request: "evren için birde aynı evrenin uzay yeşilli olan bir evreninide daha üret bu sunucu rastgele başladığında hangisi ile başlarsa diye farklı bir arka planımız daha olsun"
+let currentGalaxyTheme = (Math.random() < 0.5) ? 'deep_blue' : 'emerald_space';
+console.log(`🌌 Aktif Galaksi Teması: ${currentGalaxyTheme === 'emerald_space' ? 'Uzay Yeşili (Emerald)' : 'Derin Mavi/Mor (Deep Blue)'}`);
 
 // Active players and crystals
 const players = new Map();
@@ -293,20 +306,27 @@ function resetGalaxyServer(prevWinner = null) {
       generateAsteroid(tier, b, n);
     }
   }
+  for (let i = 0; i < 45; i++) {
+    generateAsteroid((i % 7) + 1, null, null, true);
+  }
 
   // 3. Clear loose floating crystals
   activeCrystals.clear();
   nextCrystalId = 1;
 
-  // 4. Reset all active player battle states
+  // 4. Randomize cosmic galaxy theme on reset
+  currentGalaxyTheme = (Math.random() < 0.5) ? 'deep_blue' : 'emerald_space';
+
+  // 5. Reset all active player battle states
   players.clear();
 
-  // 5. Broadcast reset galaxy data & team distribution to all clients
+  // 6. Broadcast reset galaxy data & team distribution to all clients
   const teamDist = getTeamDistribution();
   io.emit('galaxy_reset', {
     stations,
     asteroids: Array.from(asteroids.values()),
-    teamStatus: teamDist
+    teamStatus: teamDist,
+    galaxyTheme: currentGalaxyTheme
   });
 
   io.emit('team_status', teamDist);
@@ -352,7 +372,8 @@ io.on('connection', (socket) => {
     stations,
     asteroids: Array.from(asteroids.values()),
     players: Array.from(players.values()),
-    crystals: Array.from(activeCrystals.values())
+    crystals: Array.from(activeCrystals.values()),
+    galaxyTheme: currentGalaxyTheme
   });
 
   // Client requests team status
@@ -446,7 +467,8 @@ io.on('connection', (socket) => {
       asteroids: Array.from(asteroids.values()).filter(a => !a.isDead),
       stations,
       crystals: Array.from(activeCrystals.values()),
-      players: Array.from(players.values()).filter(p => !p.isDead && p.id !== socket.id)
+      players: Array.from(players.values()).filter(p => !p.isDead && p.id !== socket.id),
+      galaxyTheme: currentGalaxyTheme
     });
 
     // Notify all other clients of the new player

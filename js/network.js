@@ -127,6 +127,9 @@ class NetworkManager {
       if (data.players && this.game) {
         this.game.syncServerExistingPlayers(data.players);
       }
+      if (data.galaxyTheme && this.game && this.game.universe) {
+        this.game.universe.setCosmicTheme(data.galaxyTheme);
+      }
     });
 
     // Real-time team balance updates
@@ -138,6 +141,9 @@ class NetworkManager {
     this.socket.on('join_success', (data) => {
       console.log('[NETWORK] Oyuna Başarıyla Katılındı:', data.player);
       if (this.game) {
+        if (data.galaxyTheme && this.game.universe) {
+          this.game.universe.setCosmicTheme(data.galaxyTheme);
+        }
         if (data.asteroids) {
           this.game.syncServerAsteroids(data.asteroids);
         }
@@ -285,6 +291,9 @@ class NetworkManager {
     // Galaxy Reset (New Round Initialized on Server)
     this.socket.on('galaxy_reset', (data) => {
       if (this.game) {
+        if (data.galaxyTheme && this.game.universe) {
+          this.game.universe.setCosmicTheme(data.galaxyTheme);
+        }
         this.game.onServerGalaxyReset(data);
       }
     });

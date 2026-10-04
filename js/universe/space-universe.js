@@ -706,9 +706,9 @@ class SpaceUniverse {
       this.majorStarfield.position.set(0, 0, 0);
     }
 
-    // Nebulae follow with ultra-deep slow parallax
+    // Nebulae follow centered smoothly on camera - completely eliminates border crossing shift per user request
     if (this.nebulaGroup) {
-      this.nebulaGroup.position.set(camX * 0.985, camY * 0.985, 0);
+      this.nebulaGroup.position.set(camX, camY, 0);
     }
 
     // Deep-Space Background Asteroids: 3D tumble, space drift, and clean continuous wrapping
@@ -818,6 +818,49 @@ class SpaceUniverse {
     this.mode = 'menu';
     if (this.flightDustPoints) {
       this.flightDustPoints.material.opacity = 0;
+    }
+  }
+
+  // User request: "evren için birde aynı evrenin uzay yeşilli olan bir evreninide daha üret bu sunucu rastgele başladığında hangisi ile başlarsa diye farklı bir arka planımız daha olsun"
+  setCosmicTheme(theme = 'deep_blue') {
+    this.currentTheme = theme;
+
+    const violetRoseColors = [
+      0xbe185d, 0xa21caf, 0x4338ca, 0xdb2777,
+      0x6b21a8, 0x9d174d, 0x312e81, 0x86198f,
+      0x581c87, 0x701a75, 0x1e1b4b, 0x9333ea,
+      0x831843, 0x3b0764, 0xd946ef, 0x1e293b
+    ];
+
+    const emeraldGreenColors = [
+      0x059669, 0x10b981, 0x064e3b, 0x065f46,
+      0x34d399, 0x6ee7b7, 0x0891b2, 0x0e7490,
+      0x022c22, 0x134e4a, 0x15803d, 0x16a34a,
+      0x047857, 0x0f766e, 0x14b8a6, 0x0f172a
+    ];
+
+    const palette = (theme === 'emerald_space') ? emeraldGreenColors : violetRoseColors;
+
+    if (this.nebulaClouds) {
+      for (let i = 0; i < this.nebulaClouds.length; i++) {
+        const sprite = this.nebulaClouds[i];
+        if (sprite && sprite.material) {
+          sprite.material.color.setHex(palette[i % palette.length]);
+        }
+      }
+    }
+
+    if (this.flareStars) {
+      const flareColors = (theme === 'emerald_space')
+        ? [0xffffff, 0xd1fae5, 0xa7f3d0, 0x6ee7b7, 0x34d399, 0x5eead4, 0xecfdf5]
+        : [0xffffff, 0xfce7f3, 0xf472b6, 0xfbcfe8, 0xe0e7ff, 0xddd6fe, 0xfef3c7];
+
+      for (let i = 0; i < this.flareStars.length; i++) {
+        const star = this.flareStars[i];
+        if (star && star.material) {
+          star.material.color.setHex(flareColors[i % flareColors.length]);
+        }
+      }
     }
   }
 }

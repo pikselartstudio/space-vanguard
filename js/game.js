@@ -89,7 +89,7 @@ class StarblastGame {
     this.cameraZoomFactor = 1.0;
     this.targetCameraZoomFactor = 1.0;
     this.minZoomFactor = 0.50; // Zoom in close to ship
-    this.maxZoomFactor = 1.65; // Zoom out far for wide tactical view
+    this.maxZoomFactor = 1.0;  // Zoom out clamped to normal 1.0 per user request
 
     // Setup Systems
     if (window.SpaceUniverse) {
@@ -323,8 +323,10 @@ class StarblastGame {
         this.donateToHomeBase();
       }
 
-      // RCS toggle (Ctrl or Shift)
-      if (e.code === 'ControlLeft' || e.code === 'ShiftLeft') {
+      // RCS & DFRT Drift toggle (Ctrl tuşu ile uzayda sürtünmesiz süzülme)
+      if (e.code === 'ControlLeft' || e.code === 'ControlRight') {
+        this.toggleDriftMode();
+      } else if (e.code === 'ShiftLeft') {
         if (this.player) {
           this.player.rcsEnabled = !this.player.rcsEnabled;
         }
@@ -366,11 +368,19 @@ class StarblastGame {
         return;
       }
 
-      // User request: "oyunda fare ile yetenek, skil verilirken gemi ateş etmemeli yada radar paneli chat paneline tıklama durumlarında da ateş etmesin."
+      // User request: "radar üzerinde tıklama oluncada ateş etmemeli gemimiz."
+      if (this.ui && this.ui.radarCanvas) {
+        const rRect = this.ui.radarCanvas.getBoundingClientRect();
+        if (e.clientX >= rRect.left && e.clientX <= rRect.right && e.clientY >= rRect.top && e.clientY <= rRect.bottom) {
+          return;
+        }
+      }
+
+      // User request: UI / paneller / butonlara tıklanırken asla ateş etme
       const isUI = e.target.closest(
         '#upgrade-dock, #upgrade-tree-modal, #radar-container, #top-right-hud, ' +
         '#game-chat-box, #top-left-hud, #tactical-action-bar, #leaderboard, ' +
-        '#ship-evaluator-bar, .interactive, button, input, select, .tactical-slot, ' +
+        '#ship-evaluator-bar, #drift-mode-indicator, #base-dock-status, .interactive, button, input, select, .tactical-slot, ' +
         '.stat-upgrade-slot, .eval-btn, .lb-tab, .upgrade-card, .upg-icon-card, .upg-add-btn'
       );
       if (isUI) {
@@ -557,6 +567,7 @@ class StarblastGame {
       this.player.score = this.lastPlayerScore;
     }
     this.player.crystals = 0; // User request: öldükten sonra dirilmede envanter 0a inecek
+    this.player.mined = 0;    // User request: pvpde yada çarpmada ölürsede sıfırlanacak
     this.lastRetainedCrystals = 0;
     if (this.lastUnlockedWeapons) {
       this.player.unlockedWeapons = { ...this.lastUnlockedWeapons };
@@ -648,6 +659,19 @@ class StarblastGame {
           this.asteroids.push(ast);
           this.scene.add(ast.mesh);
         }
+      }
+      // User request: uzayın boş alanlarında da asteroit ekle (soteye farm alanları)
+      for (let i = 0; i < 40; i++) {
+        const tier = (i % 7) + 1;
+        const dist = 3200 + Math.random() * 1900;
+        const angle = Math.random() * Math.PI * 2;
+        const x = Math.cos(angle) * dist;
+        const y = Math.sin(angle) * dist;
+        const ast = new Asteroid(x, y, tier);
+        const roll = Math.random();
+        ast.element = roll < 0.35 ? 'ice' : (roll < 0.70 ? 'fire' : 'dark');
+        this.asteroids.push(ast);
+        this.scene.add(ast.mesh);
       }
     }
   }
@@ -765,6 +789,101 @@ class StarblastGame {
     if (this.ui) {
       this.ui.showAnnouncement(`🏛️ Üsse ${amount} Kredi bağışlandı! Kalkanınız yenilendi.`, 2500);
       this.ui.updateHUD(this.player, this.stations);
+    }
+  }
+
+  // User request: "sol panelin altına DFRT + CTRL ON/OFF olan bir küçük kısmı da ekle oynayanlar ctrl tuşunun süzülme işlevini oradan görebilsin"
+  toggleDriftMode(forceState = null) {
+    if (!this.player || this.player.isDead) return;
+    const newState = (forceState !== null) ? forceState : !this.player.isDriftActive;
+    this.player.isDriftActive = newState;
+    this.player.rcsEnabled = !newState;
+    if (this.ui) {
+      this.ui.updateDriftIndicator(newState);
+      const msg = newState
+        ? '🚀 DFRT Modu AÇIK: Uzayda sürtünmesiz süzülme aktif! (İvmeniz korunur)'
+        : '🛑 DFRT Modu KAPALI: Otomatik frenleme devrede.';
+      this.ui.showAnnouncement(msg, 2000);
+    }
+  }
+
+  // User request: Üs Marketi Satın Alma / Kuşanma (şuanlık ödeme sistemi yok)
+  // 1: Saldırı Dronu, 2: Savunma Dronu, 3: Maden Dronu, 4: S1, 5: S2, 6: S3 Fulleme
+  // Dron Kapasitesi: Seviye 1 için 2, Seviye 2 için 3... (tier + 1)
+  purchaseBaseItem(action) {
+    if (!this.player || this.player.isDead) return;
+    const homeBase = this.stations[this.player.nation];
+    if (!homeBase) return;
+
+    const basePerimeter = (homeBase.radius || 420) + 180;
+    const dist = Math.hypot(this.player.x - homeBase.x, this.player.y - homeBase.y);
+    if (dist > basePerimeter) {
+      if (this.ui) this.ui.showAnnouncement('⚠️ İkmal pazarını kullanmak için kendi üssünüzde olmalısınız!', 2500);
+      return;
+    }
+
+    if (action.startsWith('drone_')) {
+      const droneType = action.replace('drone_', ''); // 'attack', 'defense', 'mining'
+      const maxDrones = (this.player.tier || 1) + 1;
+      if (!this.player.drones) this.player.drones = [];
+
+      if (this.player.drones.length >= maxDrones) {
+        // Replace oldest drone
+        const old = this.player.drones.shift();
+        if (old) old.destroy(this.scene);
+      }
+
+      const drone = new Drone(droneType, this.player.nation, this.scene);
+      drone.x = this.player.x;
+      drone.y = this.player.y;
+      this.player.drones.push(drone);
+
+      window.soundSystem.playUpgrade();
+      const names = { attack: 'Saldırı Dronu', defense: 'Savunma Dronu', mining: 'Maden Dronu' };
+      if (this.ui) {
+        this.ui.showAnnouncement(`🛸 ${names[droneType] || 'Dron'} konuşlandırıldı! (Kapasite: ${this.player.drones.length}/${maxDrones})`, 2500);
+        this.ui.updateHUD(this.player, this.stations);
+      }
+      return;
+    }
+
+    if (action === 'refill_s1') {
+      if (!this.player.elementalAmmo) this.player.elementalAmmo = { ice: 0, fire: 0, dark: 0 };
+      if (!this.player.unlockedWeapons) this.player.unlockedWeapons = {};
+      this.player.unlockedWeapons['ice'] = true;
+      this.player.elementalAmmo.ice = 999;
+      window.soundSystem.playUpgrade();
+      if (this.ui) {
+        this.ui.showAnnouncement('❄️ S1 Cryo Buz Lazeri cephanesi fullendi! (999 Adet)', 2500);
+        this.ui.updateHUD(this.player, this.stations);
+      }
+      return;
+    }
+
+    if (action === 'refill_s2') {
+      if (!this.player.elementalAmmo) this.player.elementalAmmo = { ice: 0, fire: 0, dark: 0 };
+      if (!this.player.unlockedWeapons) this.player.unlockedWeapons = {};
+      this.player.unlockedWeapons['fire'] = true;
+      this.player.elementalAmmo.fire = 999;
+      window.soundSystem.playUpgrade();
+      if (this.ui) {
+        this.ui.showAnnouncement('🔥 S2 Termal Alev Lazeri cephanesi fullendi! (999 Adet)', 2500);
+        this.ui.updateHUD(this.player, this.stations);
+      }
+      return;
+    }
+
+    if (action === 'refill_s3') {
+      if (!this.player.elementalAmmo) this.player.elementalAmmo = { ice: 0, fire: 0, dark: 0 };
+      if (!this.player.unlockedWeapons) this.player.unlockedWeapons = {};
+      this.player.unlockedWeapons['dark'] = true;
+      this.player.elementalAmmo.dark = 999;
+      window.soundSystem.playUpgrade();
+      if (this.ui) {
+        this.ui.showAnnouncement('🌑 S3 Void Karanlık Lazeri cephanesi fullendi! (999 Adet)', 2500);
+        this.ui.updateHUD(this.player, this.stations);
+      }
+      return;
     }
   }
 
@@ -1184,6 +1303,7 @@ class StarblastGame {
           // User request: öldükten sonra dirilmede envanter 0a inecek
           const totalCrystals = this.player.crystals || 0;
           this.lastRetainedCrystals = 0;
+          this.player.mined = 0; // User request: pvpde yada çarpmada ölürsede sıfırlanacak
           this.dropShipCrystals(this.player.x, this.player.y, totalCrystals);
 
           this.player.destroy(this.scene);
@@ -2414,6 +2534,7 @@ class StarblastGame {
 
     if (this.network && data.victimId === this.network.myId && this.player) {
       this.player.isDead = true;
+      this.player.mined = 0; // User request: pvpde yada çarpmada ölürsede sıfırlanacak
       this.player.shield = 0;
       this.lastPlayerShipKey = this.player.shipKey;
       this.lastPlayerUpgrades = { ...this.player.upgrades };

@@ -2791,5 +2791,138 @@ const ModelBuilder = {
     }
 
     return stationRoot;
+  },
+
+  // User request: "base gelince kalkan hologramı çıksın geminin üzerinde nefes alış verişi gibi yanıp sönsün overlay %70 oranında kullan"
+  createDockShieldHologram(shipRadius = 24, nation = 'blue') {
+    const nationColor = (nation === 'red') ? 0xff3b5c : (nation === 'gold' ? 0xffd044 : 0x00f0ff);
+    const r = Math.max(30, shipRadius * 1.55);
+
+    const group = new THREE.Group();
+
+    // 1. Faceted translucent glowing dome
+    const sphereGeo = new THREE.IcosahedronGeometry(r, 2);
+    const sphereMat = new THREE.MeshBasicMaterial({
+      color: nationColor,
+      transparent: true,
+      opacity: 0.70,
+      wireframe: false,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
+    group.add(sphereMesh);
+
+    // 2. Wireframe hex lattice for holographic sci-fi structure
+    const wireMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.60,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const wireMesh = new THREE.Mesh(sphereGeo, wireMat);
+    group.add(wireMesh);
+
+    // 3. Equatorial pulsing ring
+    const ringGeo = new THREE.RingGeometry(r * 0.94, r * 1.08, 32);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: nationColor,
+      transparent: true,
+      opacity: 0.75,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    group.add(ringMesh);
+
+    group.pulseMat = sphereMat; // reference for opacity pulse
+    group.wireMat = wireMat;
+    return group;
+  },
+
+  // User request: "1.2.3. olanlar için minik arkadan gelecek dronlar oluştur gemilere uyumlu olacak"
+  createDroneMesh(type = 'attack', nation = 'blue') {
+    const nationColor = (nation === 'red') ? 0xff3b5c : (nation === 'gold' ? 0xffd044 : 0x00f0ff);
+    const root = new THREE.Group();
+
+    const hullMat = new THREE.MeshStandardMaterial({
+      color: 0xd0d8e2,
+      roughness: 0.3,
+      metalness: 0.5,
+      flatShading: true
+    });
+    const nationMat = new THREE.MeshStandardMaterial({
+      color: nationColor,
+      roughness: 0.25,
+      metalness: 0.6,
+      flatShading: true
+    });
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: nationColor
+    });
+
+    if (type === 'attack') {
+      // Sleek mini fighter with twin blasters
+      const body = new THREE.Mesh(new THREE.ConeGeometry(3.5, 9, 5), hullMat);
+      body.rotation.x = Math.PI / 2;
+      root.add(body);
+
+      const wingL = new THREE.Mesh(new THREE.BoxGeometry(7, 0.8, 3), nationMat);
+      wingL.position.set(0, 0, -1);
+      root.add(wingL);
+
+      const barrelL = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 5, 4), nationMat);
+      barrelL.rotation.x = Math.PI / 2;
+      barrelL.position.set(-3.2, 0, 1.5);
+      root.add(barrelL);
+
+      const barrelR = barrelL.clone();
+      barrelR.position.x = 3.2;
+      root.add(barrelR);
+
+      const thruster = new THREE.Mesh(new THREE.SphereGeometry(1.4, 6, 6), glowMat);
+      thruster.position.set(0, 0, -4.5);
+      root.add(thruster);
+
+    } else if (type === 'defense') {
+      // Hexagonal guardian orb with energy rings
+      const core = new THREE.Mesh(new THREE.IcosahedronGeometry(4.2, 1), hullMat);
+      root.add(core);
+
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(5.8, 0.7, 6, 18), nationMat);
+      root.add(ring);
+
+      const glowSphere = new THREE.Mesh(new THREE.SphereGeometry(2.2, 8, 8), glowMat);
+      root.add(glowSphere);
+
+    } else {
+      // Mining Drone: extractor pod with drill emitter
+      const pod = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 7, 6), hullMat);
+      pod.rotation.x = Math.PI / 2;
+      root.add(pod);
+
+      const noseCone = new THREE.Mesh(new THREE.ConeGeometry(2.8, 4, 6), nationMat);
+      noseCone.rotation.x = -Math.PI / 2;
+      noseCone.position.set(0, 0, 4.5);
+      root.add(noseCone);
+
+      const tipGlow = new THREE.Mesh(new THREE.SphereGeometry(1.6, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffaa00 }));
+      tipGlow.position.set(0, 0, 6.5);
+      root.add(tipGlow);
+
+      const solarL = new THREE.Mesh(new THREE.BoxGeometry(6, 0.5, 2.5), nationMat);
+      solarL.position.set(-3.5, 0, 0);
+      root.add(solarL);
+
+      const solarR = solarL.clone();
+      solarR.position.x = 3.5;
+      root.add(solarR);
+    }
+
+    root.scale.set(1.15, 1.15, 1.15);
+    return root;
   }
 };

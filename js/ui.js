@@ -16,6 +16,8 @@ class UIManager {
     this.tierBadge = document.getElementById('tier-badge');
     this.nationBadge = document.getElementById('nation-badge');
     this.baseDockStatus = document.getElementById('base-dock-status');
+    this.driftIndicator = document.getElementById('drift-mode-indicator');
+    this.driftStateText = document.getElementById('dfrt-state-text');
 
     this.upgradeDock = document.getElementById('upgrade-dock');
     this.upgradeGrid = document.getElementById('upgrade-cards-grid');
@@ -510,19 +512,29 @@ class UIManager {
       });
     });
 
-    // Leaderboard Tabs (3 Tabs: PvP Kills, Mining Farm, Base Donations)
-    this.activeLeaderboardMetric = 'kills';
+    // Leaderboard Tabs (3 Tabs: PvP Kills, Mining Farm, Base Donations) - Default to 'mined' per user request
+    this.activeLeaderboardMetric = 'mined';
     const lbTabs = document.querySelectorAll('.lb-tab');
     lbTabs.forEach(tab => {
       tab.addEventListener('click', (e) => {
         e.stopPropagation();
         lbTabs.forEach(t => t.classList.toggle('active', t === tab));
-        this.activeLeaderboardMetric = tab.dataset.metric || 'kills';
+        this.activeLeaderboardMetric = tab.dataset.metric || 'mined';
         if (this.game && this.game.player) {
           this.updateLeaderboard(this.game.player, this.game.remotePlayers);
         }
       });
     });
+
+    // DFRT + CTRL Drift Mode Indicator click handler
+    if (this.driftIndicator) {
+      this.driftIndicator.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.game) {
+          this.game.toggleDriftMode();
+        }
+      });
+    }
 
     if (this.chatForm) {
       this.chatForm.addEventListener('submit', (e) => {
@@ -945,6 +957,11 @@ class UIManager {
       this.nationBadge.style.boxShadow = `0 0 10px ${nationCfg.hex}44`;
     }
 
+    // Sync Drift Indicator
+    if (player && this.driftIndicator) {
+      this.updateDriftIndicator(player.isDriftActive);
+    }
+
     // Base docking & donation prompt OR enemy base siege alert
     let nearStation = false;
     const homeBase = stations ? stations[player.nation] : null;
@@ -953,17 +970,18 @@ class UIManager {
       const dockPerimeter = (homeBase.radius || 420) + 180;
       if (dist <= dockPerimeter) {
         nearStation = true;
+        player.isDockedAtBase = true;
         this.baseDockStatus.style.display = 'block';
-        const pct = Math.round((homeBase.crystalsDonated / homeBase.crystalsRequired) * 100);
-        this.baseDockStatus.innerHTML = `
-          <div style="font-weight: bold; color: #ffdd44; letter-spacing: 1px;">★ ${nationCfg.name.toUpperCase()} ÜSSÜNDESİNİZ ★</div>
-          <div style="font-size: 0.8rem; margin-top: 3px;">Kalkan/Can Yenileniyor • <b>[B]</b> Tuşuyla Anında Bağış Yap</div>
-          <div style="font-size: 0.75rem; color: #9eccdf; margin-top: 2px;">Üs Seviyesi: <b>${homeBase.level}/5</b> | Can: <b>${Math.round(homeBase.hp).toLocaleString()} / ${homeBase.maxHp.toLocaleString()}</b> | Gelişim: <b>${homeBase.crystalsDonated}/${homeBase.crystalsRequired} (%${pct})</b></div>
-        `;
+        const marketKey = `${homeBase.level}_${homeBase.crystalsDonated}_${homeBase.hp}_${player.tier}_${player.drones ? player.drones.length : 0}_${(player.elementalAmmo && player.elementalAmmo.ice) || 0}_${(player.elementalAmmo && player.elementalAmmo.fire) || 0}_${(player.elementalAmmo && player.elementalAmmo.dark) || 0}`;
+        if (this.lastRenderedBaseDockKey !== marketKey) {
+          this.lastRenderedBaseDockKey = marketKey;
+          this.renderBaseMarket(homeBase, player);
+        }
       }
     }
 
     if (!nearStation && stations && this.baseDockStatus) {
+      if (player) player.isDockedAtBase = false;
       // Check if near any hostile station (siege alert)
       let hostileStation = null;
       let minHostileDist = 1350;
@@ -982,6 +1000,7 @@ class UIManager {
         this.baseDockStatus.style.display = 'block';
         const hostileNationCfg = NATIONS[hostileStation.nation] || NATIONS['red'];
         const hpPct = Math.round((hostileStation.hp / hostileStation.maxHp) * 100);
+        this.lastRenderedBaseDockKey = `hostile_${hostileStation.nation}_${hpPct}`;
         this.baseDockStatus.innerHTML = `
           <div style="font-weight: bold; color: #ff3355; letter-spacing: 1px;">⚔️ DÜŞMAN ÜS HEDEFTE: ${hostileNationCfg.name.toUpperCase()} ⚔️</div>
           <div style="font-size: 0.8rem; margin-top: 3px; color: #fff;">Üs Canı: <b>${Math.round(hostileStation.hp).toLocaleString()} / ${hostileStation.maxHp.toLocaleString()} (%${hpPct})</b> | Seviye: <b>${hostileStation.level}/5</b></div>
@@ -991,6 +1010,8 @@ class UIManager {
     }
 
     if (!nearStation && this.baseDockStatus) {
+      if (player) player.isDockedAtBase = false;
+      this.lastRenderedBaseDockKey = null;
       this.baseDockStatus.style.display = 'none';
     }
 
@@ -1065,6 +1086,122 @@ class UIManager {
     if (player.crystals >= player.stats.cargoCapacity && hasNextTier) {
       this.showTierUpDropBanner(player);
     }
+  }
+
+  updateDriftIndicator(isActive) {
+    if (this.driftIndicator) {
+      this.driftIndicator.classList.toggle('active', !!isActive);
+      if (isActive) {
+        this.driftIndicator.setAttribute('title', 'Süzülme Modu AÇIK: Uzayda sürtünmesiz akarsınız, ivmeniz korunur. Kapatmak için tıklayın veya CTRL tuşuna basın.');
+      } else {
+        this.driftIndicator.setAttribute('title', 'Süzülme Modu KAPALI: Otomatik frenleme devrede. Açmak için tıklayın veya CTRL tuşuna basın.');
+      }
+    }
+    if (this.driftStateText) {
+      this.driftStateText.textContent = isActive ? 'ON' : 'OFF';
+    }
+  }
+
+  // User request: Üs Pazarı 6 kutulu 2x3 ızgara (Saldırı Dronu, Savunma Dronu, Maden Dronu, S1, S2, S3 Lazer Fulleme)
+  renderBaseMarket(homeBase, player) {
+    if (!this.baseDockStatus) return;
+    const maxDrones = (player.tier || 1) + 1;
+    const currentDrones = player.drones ? player.drones.length : 0;
+    const s1Ammo = (player.elementalAmmo && player.elementalAmmo.ice) || 0;
+    const s2Ammo = (player.elementalAmmo && player.elementalAmmo.fire) || 0;
+    const s3Ammo = (player.elementalAmmo && player.elementalAmmo.dark) || 0;
+    const pct = Math.round((homeBase.crystalsDonated / homeBase.crystalsRequired) * 100);
+
+    this.baseDockStatus.innerHTML = `
+      <div class="base-market-header">
+        <div class="base-market-title">🏪 ÜS İKMAL PAZARI</div>
+        <div class="base-market-sub"><b>[B]</b> Bağış Yap | Sv: <b>${homeBase.level}/5</b> (%${pct})</div>
+      </div>
+      <div class="base-market-grid">
+        <!-- 1. Saldırı Dronu -->
+        <div class="base-market-card" data-action="drone_attack" title="Çift plazma taretli refakatçi avcı dronu (Dron Kapasitesi: ${currentDrones}/${maxDrones})">
+          <div class="base-market-card-top">
+            <div class="base-market-card-icon">⚔️</div>
+            <div>
+              <div class="base-market-card-name">Saldırı Dronu</div>
+              <div class="base-market-card-desc">Hedefleri otomatik vurur</div>
+            </div>
+          </div>
+          <button type="button" class="base-market-btn">KUŞAN (${currentDrones}/${maxDrones})</button>
+        </div>
+
+        <!-- 2. Savunma Dronu -->
+        <div class="base-market-card" data-action="drone_defense" title="Sürekli kalkan yenileyici koruyucu dron (Dron Kapasitesi: ${currentDrones}/${maxDrones})">
+          <div class="base-market-card-top">
+            <div class="base-market-card-icon">🛡️</div>
+            <div>
+              <div class="base-market-card-name">Savunma Dronu</div>
+              <div class="base-market-card-desc">+6 Kalkan/sn yeniler</div>
+            </div>
+          </div>
+          <button type="button" class="base-market-btn">KUŞAN (${currentDrones}/${maxDrones})</button>
+        </div>
+
+        <!-- 3. Maden Dronu -->
+        <div class="base-market-card" data-action="drone_mining" title="Yakındaki asteroitleri otomatik parçalayan madenci dron (Dron Kapasitesi: ${currentDrones}/${maxDrones})">
+          <div class="base-market-card-top">
+            <div class="base-market-card-icon">⛏️</div>
+            <div>
+              <div class="base-market-card-name">Maden Dronu</div>
+              <div class="base-market-card-desc">Asteroitleri kazır</div>
+            </div>
+          </div>
+          <button type="button" class="base-market-btn">KUŞAN (${currentDrones}/${maxDrones})</button>
+        </div>
+
+        <!-- 4. S1 Lazer Fulleme -->
+        <div class="base-market-card" data-action="refill_s1" title="S1 Cryo Buz Lazeri cephanesini maksimuma doldur">
+          <div class="base-market-card-top">
+            <div class="base-market-card-icon" style="color: #00f0ff;">❄️</div>
+            <div>
+              <div class="base-market-card-name">S1 Lazer Fulle</div>
+              <div class="base-market-card-desc">Cryo Buz (Mevcut: ${s1Ammo})</div>
+            </div>
+          </div>
+          <button type="button" class="base-market-btn">DOLDUR</button>
+        </div>
+
+        <!-- 5. S2 Lazer Fulleme -->
+        <div class="base-market-card" data-action="refill_s2" title="S2 Termal Alev Lazeri cephanesini maksimuma doldur">
+          <div class="base-market-card-top">
+            <div class="base-market-card-icon" style="color: #ff5533;">🔥</div>
+            <div>
+              <div class="base-market-card-name">S2 Lazer Fulle</div>
+              <div class="base-market-card-desc">Alev (Mevcut: ${s2Ammo})</div>
+            </div>
+          </div>
+          <button type="button" class="base-market-btn">DOLDUR</button>
+        </div>
+
+        <!-- 6. S3 Lazer Fulleme -->
+        <div class="base-market-card" data-action="refill_s3" title="S3 Void Karanlık Lazeri cephanesini maksimuma doldur">
+          <div class="base-market-card-top">
+            <div class="base-market-card-icon" style="color: #c084fc;">🌑</div>
+            <div>
+              <div class="base-market-card-name">S3 Lazer Fulle</div>
+              <div class="base-market-card-desc">Void (Mevcut: ${s3Ammo})</div>
+            </div>
+          </div>
+          <button type="button" class="base-market-btn">DOLDUR</button>
+        </div>
+      </div>
+    `;
+
+    const cards = this.baseDockStatus.querySelectorAll('.base-market-card');
+    cards.forEach(card => {
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = card.dataset.action;
+        if (this.game && action) {
+          this.game.purchaseBaseItem(action);
+        }
+      });
+    });
   }
 
   showTierUpDropBanner(player) {

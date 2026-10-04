@@ -411,21 +411,177 @@ body, html {
 }
 
 #base-dock-status {
-  background: rgba(8, 24, 48, 0.94);
-  border: 1.5px solid #ffcc00;
-  border-radius: 8px;
-  padding: 10px 14px;
-  box-shadow: 0 0 20px rgba(255, 200, 0, 0.4);
+  background: rgba(6, 18, 36, 0.96);
+  border: 1.5px solid rgba(0, 220, 255, 0.55);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 0 24px rgba(0, 180, 255, 0.35);
   font-size: 0.85rem;
-  line-height: 1.45;
-  backdrop-filter: blur(8px);
-  animation: pulseDock 2s infinite alternate;
-  max-width: 320px;
+  line-height: 1.4;
+  backdrop-filter: blur(10px);
+  width: 360px;
+  max-width: 90vw;
+  user-select: none;
 }
 
-@keyframes pulseDock {
-  from { border-color: rgba(255, 200, 0, 0.6); box-shadow: 0 0 12px rgba(255, 200, 0, 0.25); }
-  to { border-color: rgba(255, 235, 0, 1); box-shadow: 0 0 24px rgba(255, 220, 0, 0.6); }
+.base-market-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 7px;
+  margin-bottom: 9px;
+}
+
+.base-market-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #00f0ff;
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+.base-market-sub {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.base-market-sub b {
+  color: #38bdf8;
+}
+
+.base-market-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(3, auto);
+  gap: 8px;
+}
+
+.base-market-card {
+  background: rgba(14, 28, 52, 0.85);
+  border: 1px solid rgba(80, 180, 255, 0.25);
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.base-market-card:hover {
+  background: rgba(20, 42, 78, 0.95);
+  border-color: #00f0ff;
+  transform: translateY(-1px);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+}
+
+.base-market-card-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.base-market-card-icon {
+  font-size: 1.15rem;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+}
+
+.base-market-card-name {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #e0f2fe;
+}
+
+.base-market-card-desc {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  line-height: 1.25;
+}
+
+.base-market-btn {
+  background: rgba(0, 200, 255, 0.18);
+  border: 1px solid rgba(0, 240, 255, 0.55);
+  border-radius: 4px;
+  color: #00f0ff;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 4px 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.base-market-card:hover .base-market-btn {
+  background: #00f0ff;
+  color: #031220;
+  box-shadow: 0 0 8px #00f0ff;
+}
+
+/* DFRT + CTRL Drift Mode HUD Indicator */
+#drift-mode-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(8, 20, 36, 0.88);
+  border: 1px solid rgba(0, 200, 255, 0.35);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.76rem;
+  letter-spacing: 1px;
+  color: #8ec5fc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px rgba(0, 150, 255, 0.15);
+  width: fit-content;
+  user-select: none;
+  pointer-events: auto;
+}
+
+#drift-mode-indicator:hover {
+  border-color: #00f0ff;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.35);
+}
+
+#drift-mode-indicator .dfrt-tag {
+  color: #7dd3fc;
+  font-weight: 700;
+}
+
+#drift-mode-indicator .dfrt-state {
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  transition: all 0.2s ease;
+}
+
+#drift-mode-indicator.active {
+  border-color: #00ffaa;
+  box-shadow: 0 0 16px rgba(0, 255, 170, 0.45);
+  background: rgba(6, 36, 30, 0.92);
+}
+
+#drift-mode-indicator.active .dfrt-tag {
+  color: #00ffcc;
+}
+
+#drift-mode-indicator.active .dfrt-state {
+  background: rgba(0, 255, 170, 0.25);
+  color: #00ffaa;
+  text-shadow: 0 0 8px #00ffaa;
 }
 
 /* Top Right: Radar / Minimap & Leaderboard */
@@ -449,11 +605,13 @@ body, html {
   overflow: hidden;
   position: relative;
   backdrop-filter: blur(4px);
+  pointer-events: auto;
 }
 
 #radar-canvas {
   width: 100%;
   height: 100%;
+  pointer-events: auto;
 }
 
 .radar-sweep {
