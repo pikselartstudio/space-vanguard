@@ -140,8 +140,8 @@ class SpaceUniverse {
     sctx.fillRect(0, 0, 64, 64);
     this.starTexture = new THREE.CanvasTexture(starCanvas);
 
-    // TIER 1: Major Brilliant Radiant Stars (size: 13.5 - 15.0)
-    const majorCount = 4500;
+    // TIER 1: Major Brilliant Radiant Stars (size: 13.5 - 15.0) - DENSE STELLAR CANOPY
+    const majorCount = 9000;
     const majorGeo = new THREE.BufferGeometry();
     const majorPos = new Float32Array(majorCount * 3);
     const majorCol = new Float32Array(majorCount * 3);
@@ -193,8 +193,8 @@ class SpaceUniverse {
     this.majorStarfield = new THREE.Points(majorGeo, majorMat);
     this.starfieldGroup.add(this.majorStarfield);
 
-    // TIER 2: Dense Background Radiant Starfield (size: 8.8)
-    const bgCount = 20000;
+    // TIER 2: Dense Background Radiant Starfield (size: 8.8) - 45K STARS
+    const bgCount = 45000;
     const bgGeo = new THREE.BufferGeometry();
     const bgPos = new Float32Array(bgCount * 3);
     const bgCol = new Float32Array(bgCount * 3);

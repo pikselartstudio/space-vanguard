@@ -148,12 +148,10 @@ class Gem extends Entity {
     this.id = id || `gem-${Date.now()}-${Math.floor(Math.random() * 10000000)}`;
     this.value = value;
     this.element = element || 'green';
-    // Gentle radial dispersal burst
-    const angle = Math.random() * Math.PI * 2;
-    const burstSpeed = 35 + Math.random() * 45;
-    this.vx = Math.cos(angle) * burstSpeed;
-    this.vy = Math.sin(angle) * burstSpeed;
-    this.drag = 0.95;
+    // Compact gentle hover - stays in place without scattering across the area
+    this.vx = (Math.random() - 0.5) * 6;
+    this.vy = (Math.random() - 0.5) * 6;
+    this.drag = 0.90;
     this.mesh = ModelBuilder.createGemMesh(value, this.element);
     this.mesh.position.set(x, -y, 0);
     this.rotSpeedX = (Math.random() - 0.5) * 3;

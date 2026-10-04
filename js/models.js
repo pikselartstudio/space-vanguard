@@ -2067,71 +2067,77 @@ const ModelBuilder = {
   // Gem / Crystal 3D Mesh (User request: "malzemeler biraz daha büyült ve farklı bir 5gen 6-gen tasarım yap etrafında çembere gerek yok")
   createGemMesh(value = 1, element = 'green') {
     const group = new THREE.Group();
-    // Enlarge crystal scale significantly
-    const size = value >= 60 ? 17.5 : (value > 8 ? 11.5 : 7.6);
-    const isBig = value > 8;
+    const size = value >= 60 ? 18.0 : (value > 8 ? 12.0 : 8.2);
 
-    // User request: "asteroitlerden nadir s1,s2,s3 malzemesi çıksın genel olarak yeşil taşlar çıksın lvl için"
-    let outerColor = 0x00ff66;
-    let emissiveColor = 0x00cc44;
+    let outerColor = 0x00ff88;
+    let emissiveColor = 0x00dd66;
+    let coreColor = 0xaaffdd;
 
     if (element === 'ice') {
       outerColor = 0x00f0ff;
-      emissiveColor = 0x00b4d8;
+      emissiveColor = 0x00a8e8;
+      coreColor = 0xd0f4ff;
     } else if (element === 'fire') {
-      outerColor = 0xff3b11;
-      emissiveColor = 0xff5500;
+      outerColor = 0xff4500;
+      emissiveColor = 0xff2200;
+      coreColor = 0xffe0b2;
     } else if (element === 'dark') {
-      outerColor = 0xa855f7;
-      emissiveColor = 0x7e22ce;
+      outerColor = 0xb5179e;
+      emissiveColor = 0x7209b7;
+      coreColor = 0xf3c4fb;
     } else {
-      // General Level-Up Green Power Crystals
-      outerColor = 0x00ff66;
-      emissiveColor = 0x00cc44;
+      // General Level-up Green Power Crystal
+      outerColor = 0x00ff88;
+      emissiveColor = 0x00cc55;
+      coreColor = 0xccffdd;
     }
 
-    const outerMat = new THREE.MeshStandardMaterial({
+    // 1. Faceted Diamond Prism Hull (Distinct geometric crystal design)
+    const hullGeo = new THREE.OctahedronGeometry(size, 0);
+    // Non-uniform scaling gives it an elegant elongated crystal prism silhouette
+    hullGeo.scale(0.85, 1.45, 0.85);
+
+    const hullMat = new THREE.MeshStandardMaterial({
       color: outerColor,
       emissive: emissiveColor,
-      emissiveIntensity: 0.90,
-      roughness: 0.12,
-      metalness: 0.28,
-      transparent: true,
-      opacity: 0.92,
-      flatShading: true
-    });
-
-    // 6-sided (hexagonal) faceted double-pyramid power crystal
-    // Upper pyramid cap
-    const topGeo = new THREE.CylinderGeometry(0.1, size, size * 1.1, 6);
-    const topMesh = new THREE.Mesh(topGeo, outerMat);
-    topMesh.position.y = size * 0.55;
-    group.add(topMesh);
-
-    // Lower pyramid cap
-    const bottomGeo = new THREE.CylinderGeometry(size, 0.1, size * 1.1, 6);
-    const bottomMesh = new THREE.Mesh(bottomGeo, outerMat);
-    bottomMesh.position.y = -size * 0.55;
-    group.add(bottomMesh);
-
-    // Inner radiant glowing core (6-sided)
-    const coreMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
+      emissiveIntensity: 0.95,
+      roughness: 0.08,
+      metalness: 0.25,
       transparent: true,
       opacity: 0.88,
+      flatShading: true
+    });
+    const hullMesh = new THREE.Mesh(hullGeo, hullMat);
+    group.add(hullMesh);
+
+    // 2. Inner Glowing Hyper-Core Nucleus (Pulsating pure energy core)
+    const nucleusGeo = new THREE.SphereGeometry(size * 0.42, 10, 8);
+    const nucleusMat = new THREE.MeshBasicMaterial({
+      color: coreColor,
+      transparent: true,
+      opacity: 0.95,
       blending: THREE.AdditiveBlending
     });
-    const coreTop = new THREE.CylinderGeometry(0.05, size * 0.52, size * 0.58, 6);
-    const coreTopMesh = new THREE.Mesh(coreTop, coreMat);
-    coreTopMesh.position.y = size * 0.29;
-    group.add(coreTopMesh);
+    const nucleus = new THREE.Mesh(nucleusGeo, nucleusMat);
+    group.add(nucleus);
 
-    const coreBottom = new THREE.CylinderGeometry(size * 0.52, 0.05, size * 0.58, 6);
-    const coreBottomMesh = new THREE.Mesh(coreBottom, coreMat);
-    coreBottomMesh.position.y = -size * 0.29;
-    group.add(coreBottomMesh);
+    // 3. Dual Floating Vertex Emitters (Top & Bottom energy caps)
+    const capGeo = new THREE.ConeGeometry(size * 0.35, size * 0.5, 4);
+    const capMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
+    });
 
-    // Per user request: "etrafında çembere gerek yok" - ring has been removed!
+    const topCap = new THREE.Mesh(capGeo, capMat);
+    topCap.position.y = size * 1.05;
+    group.add(topCap);
+
+    const bottomCap = new THREE.Mesh(capGeo, capMat);
+    bottomCap.rotation.x = Math.PI;
+    bottomCap.position.y = -size * 1.05;
+    group.add(bottomCap);
 
     return group;
   },

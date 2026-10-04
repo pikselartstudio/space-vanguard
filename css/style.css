@@ -618,14 +618,17 @@ body, html {
 .hud-icon-exp { color: #c084fc; }
 
 .meter-val {
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: #e2e8f0;
-  width: 66px;
+  color: #f1f5f9;
+  width: 76px;
   flex-shrink: 0;
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  font-family: 'Share Tech Mono', monospace;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.5px;
 }
 
 .meter-track {

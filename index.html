@@ -33,7 +33,7 @@
       <div id="top-left-hud">
         <div id="top-vitals" class="cockpit-hud-panel">
           <div class="hud-meters-container">
-            <!-- Shield Meter (Icon + Value + Bar) -->
+            <!-- Shield Meter (Icon + Bar + Value) -->
             <div class="hud-meter-row hud-shd">
               <div class="hud-meter-icon hud-icon-shd" title="Kalkan">
                 <svg viewBox="0 0 24 24" class="hud-svg-icon" fill="none" stroke="#00f0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -41,26 +41,26 @@
                   <path d="M12 7v10M8 11h8" stroke="#38bdf8" stroke-width="1.6" opacity="0.8"/>
                 </svg>
               </div>
-              <div class="meter-val bar-label" id="shield-text">100 / 100</div>
               <div class="meter-track">
                 <div class="meter-bar bar-fill shield-fill" id="shield-fill" style="width: 100%;"></div>
                 <div class="meter-grid-overlay"></div>
               </div>
+              <div class="meter-val" id="shield-text">100 / 100</div>
             </div>
-            <!-- Energy Meter (Icon + Value + Bar) -->
+            <!-- Energy Meter (Icon + Bar + Value) -->
             <div class="hud-meter-row hud-eng">
               <div class="hud-meter-icon hud-icon-eng" title="Lazer Enerjisi">
                 <svg viewBox="0 0 24 24" class="hud-svg-icon" fill="none" stroke="#ffdd33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="#ffdd33" fill-opacity="0.25"/>
                 </svg>
               </div>
-              <div class="meter-val bar-label" id="energy-text">100 / 100</div>
               <div class="meter-track">
                 <div class="meter-bar bar-fill energy-fill" id="energy-fill" style="width: 100%;"></div>
                 <div class="meter-grid-overlay"></div>
               </div>
+              <div class="meter-val" id="energy-text">100 / 100</div>
             </div>
-            <!-- Cargo / Ore Meter (Icon + Value + Bar) -->
+            <!-- Cargo / Ore Meter (Icon + Bar + Value) -->
             <div class="hud-meter-row hud-crg">
               <div class="hud-meter-icon hud-icon-crg" title="Kargo & Maden">
                 <svg viewBox="0 0 24 24" class="hud-svg-icon" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -70,24 +70,24 @@
                   <line x1="12" y1="22" x2="16" y2="9"/>
                 </svg>
               </div>
-              <div class="meter-val bar-label" id="cargo-text">0 / 60</div>
               <div class="meter-track">
                 <div class="meter-bar bar-fill cargo-fill" id="cargo-fill" style="width: 0%;"></div>
                 <div class="meter-grid-overlay"></div>
               </div>
+              <div class="meter-val" id="cargo-text">0 / 60</div>
             </div>
-            <!-- EXP / Level Progress Meter (Icon + Value + Bar) -->
+            <!-- EXP / Level Progress Meter (Icon + Bar + Value) -->
             <div class="hud-meter-row hud-exp">
               <div class="hud-meter-icon hud-icon-exp" title="Seviye & Gelişim">
                 <svg viewBox="0 0 24 24" class="hud-svg-icon" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="#c084fc" fill-opacity="0.25"/>
                 </svg>
               </div>
-              <div class="meter-val bar-label" id="exp-text">Lv.1</div>
               <div class="meter-track">
                 <div class="meter-bar bar-fill exp-fill" id="exp-fill" style="width: 0%;"></div>
                 <div class="meter-grid-overlay"></div>
               </div>
+              <div class="meter-val" id="exp-text">Lv.1</div>
             </div>
           </div>
         </div>

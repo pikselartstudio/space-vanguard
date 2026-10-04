@@ -513,7 +513,7 @@ io.on('connection', (socket) => {
     if (!ast && data) {
       const hitX = (data.x !== undefined) ? Number(data.x) : p.x;
       const hitY = (data.y !== undefined) ? Number(data.y) : p.y;
-      let minD = 220;
+      let minD = 350;
       for (const [id, a] of asteroids) {
         if (a.isDead) continue;
         const d = Math.hypot(a.x - hitX, a.y - hitY);
@@ -535,24 +535,29 @@ io.on('connection', (socket) => {
 
       // Spawn crystal drops (85% green for level-up, rare S1/S2/S3 ammo)
       const droppedGems = [];
-      const valEach = Math.max(1, Math.round(ast.crystalTotalValue / ast.crystalCount));
-      for (let i = 0; i < ast.crystalCount; i++) {
+      const dropCount = Math.max(1, ast.crystalCount || 1);
+      const totalVal = Math.max(dropCount, ast.crystalTotalValue || (dropCount * 2));
+      const valEach = Math.max(1, Math.round(totalVal / dropCount));
+      for (let i = 0; i < dropCount; i++) {
         const gemId = `gem-${nextCrystalId++}`;
         const roll = Math.random();
         let gemElem = 'green';
-        if (roll < 0.07) {
+        if (roll < 0.08) {
           gemElem = 'ice';    // Rare Laser - S1
-        } else if (roll < 0.12) {
-          gemElem = 'fire';   // Rare Laser - S2
         } else if (roll < 0.15) {
+          gemElem = 'fire';   // Rare Laser - S2
+        } else if (roll < 0.20) {
           gemElem = 'dark';   // Ultra-rare Laser - S3
         } else {
           gemElem = 'green';  // EXP / Level-up
         }
+        // Compact cluster right at break point (no scattering across the screen)
+        const offsetAngle = (i / dropCount) * Math.PI * 2;
+        const offsetDist = 5 + Math.random() * 8;
         const gem = {
           id: gemId,
-          x: ast.x + (Math.random() - 0.5) * 35,
-          y: ast.y + (Math.random() - 0.5) * 35,
+          x: ast.x + Math.cos(offsetAngle) * offsetDist,
+          y: ast.y + Math.sin(offsetAngle) * offsetDist,
           value: valEach,
           element: gemElem,
           targetId: socket.id,

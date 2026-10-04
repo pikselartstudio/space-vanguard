@@ -80,6 +80,8 @@ class StarblastGame {
     // Inputs
     this.keys = {};
     this.mouseWorld = { x: 0, y: 0 };
+    this.mouseScreenX = window.innerWidth / 2;
+    this.mouseScreenY = window.innerHeight / 2;
     this.donateTimer = 0;
     this.cameraShakeTimer = 0;
 
@@ -329,6 +331,9 @@ class StarblastGame {
     });
 
     window.addEventListener('mousemove', (e) => {
+      this.mouseScreenX = e.clientX;
+      this.mouseScreenY = e.clientY;
+
       // Convert screen mouse to 3D world coordinates
       const ndcX = (e.clientX / window.innerWidth) * 2 - 1;
       const ndcY = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -815,6 +820,55 @@ class StarblastGame {
     }
   }
 
+  // User request: "asteorit alevli ateşli bir patlama olarak patlasın."
+  createFieryAsteroidExplosion(x, y, radius = 30) {
+    // 1. Expanding Fiery Shockwave Blast Ring
+    const ringGeo = new THREE.RingGeometry(Math.max(4, radius * 0.25), Math.max(12, radius * 0.85), 32);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xff6600,
+      transparent: true,
+      opacity: 0.95,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.position.set(x, -y, 3);
+    this.scene.add(ringMesh);
+
+    const startTime = performance.now();
+    const blastDuration = 480;
+    const animateBlast = () => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(1.0, elapsed / blastDuration);
+      const scale = 1.0 + progress * 3.8;
+      ringMesh.scale.set(scale, scale, 1);
+      ringMat.opacity = (1 - progress) * 0.95;
+      if (progress < 1.0) {
+        requestAnimationFrame(animateBlast);
+      } else {
+        this.scene.remove(ringMesh);
+        ringGeo.dispose();
+        ringMat.dispose();
+      }
+    };
+    requestAnimationFrame(animateBlast);
+
+    // 2. Fiery Flame, Blazing Ember & Smoke Particles (Vivid fiery palette)
+    const fireColors = [0xff2200, 0xff5500, 0xff9900, 0xffcc00, 0xffffff, 0x4a1805];
+    const particleCount = 42;
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 35 + Math.random() * 230;
+      const col = fireColors[Math.floor(Math.random() * fireColors.length)];
+      const size = 3.6 + Math.random() * 7.2;
+      const life = 0.45 + Math.random() * 0.60;
+      const p = new Particle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, col, size, life);
+      this.particles.push(p);
+      this.scene.add(p.mesh);
+    }
+  }
+
   // Sparkling pickup flash on gem collection
   createGemPickupFlash(x, y, value = 1) {
     const isBig = value > 5;
@@ -953,10 +1007,17 @@ class StarblastGame {
   handlePlayerInput(dt) {
     if (!this.player || this.player.isDead) return;
 
-    // Rotate player ship towards mouse pointer
-    const dx = this.mouseWorld.x - this.player.x;
-    const dy = this.mouseWorld.y - this.player.y;
-    this.player.targetRotation = Math.atan2(dy, dx);
+    // Direct, stable mouse steering relative to screen center (player is always at screen center)
+    const screenCenterX = window.innerWidth / 2;
+    const screenCenterY = window.innerHeight / 2;
+    const screenDx = this.mouseScreenX - screenCenterX;
+    const screenDy = this.mouseScreenY - screenCenterY;
+    const screenDist = Math.hypot(screenDx, screenDy);
+
+    // Smooth deadzone around player ship (22px): hovering over ship prevents involuntary 180 flips/spins
+    if (screenDist > 22) {
+      this.player.targetRotation = Math.atan2(screenDy, screenDx);
+    }
 
     // Thrust control: Right click or Up Arrow (KeyW reserved for tactical weapon skill)
     this.player.isThrusting = (
@@ -1641,10 +1702,9 @@ class StarblastGame {
       topShip.score += asteroid.sizeTier * 50;
     }
 
-    // Restrained, clean explosion particles ("patlayan asteroitten parçalanmış bir çok parça çıkmasın")
-    this.createExplosionParticles(asteroid.x, asteroid.y, 0x8a7f72, Math.min(22, asteroid.sizeTier * 3));
-    // Moderate soft explosion sound: "asteoritler patlayınca patlama sesi olsun çok yüksek değil tabi"
-    const expVol = ((topShip === this.player) ? 0.35 : this.getPositionalVolume(asteroid.x, asteroid.y, 850) * 0.35);
+    // Fiery flaming explosion: "asteorit alevli ateşli bir patlama olarak patlasın."
+    this.createFieryAsteroidExplosion(asteroid.x, asteroid.y, asteroid.radius || 28);
+    const expVol = ((topShip === this.player) ? 0.40 : this.getPositionalVolume(asteroid.x, asteroid.y, 850) * 0.40);
     if (expVol > 0.02 && window.soundSystem) {
       window.soundSystem.playExplosion(false, expVol);
     }
@@ -1693,11 +1753,8 @@ class StarblastGame {
       }
     }
 
-    // If not within 15 units, drop all crystals as floating gems in space!
-    // Ships must fly close (within 15 units) to pick them up.
-    if (!collectedDirectly) {
-      this.spawnCrystalsFromEntity(asteroid.x, asteroid.y, count, totalVal, null, asteroid.element || 'ice');
-    }
+    // Always drop crystals into space as floating gems
+    this.spawnCrystalsFromEntity(asteroid.x, asteroid.y, Math.max(1, count), totalVal, null, asteroid.element || 'green');
 
     // Immediately spawn a new random asteroid at a random location
     this.spawnRandomAsteroid();
@@ -2209,28 +2266,38 @@ class StarblastGame {
 
   onServerAsteroidDestroyed(data) {
     const idx = this.asteroids.findIndex(a => a.id === data.asteroidId);
+    let astRadius = 26;
     if (idx !== -1) {
       const ast = this.asteroids[idx];
-      this.createCrystalBurstEffect(data.x, data.y, (data.crystals ? data.crystals.length : 14));
+      astRadius = ast.radius || 26;
       ast.destroy(this.scene);
       this.asteroids.splice(idx, 1);
     }
 
+    // Fiery flaming explosion: "asteorit alevli ateşli bir patlama olarak patlasın."
+    this.createFieryAsteroidExplosion(data.x, data.y, astRadius);
+
     // Moderate soft explosion sound for asteroid destruction
-    const expVol = this.getPositionalVolume(data.x, data.y, 850) * 0.35;
+    const expVol = this.getPositionalVolume(data.x, data.y, 850) * 0.40;
     if (expVol > 0.02 && window.soundSystem) {
       window.soundSystem.playExplosion(false, expVol);
     }
 
-    if (Array.isArray(data.crystals)) {
-      data.crystals.forEach(c => {
-        if (this.gems.some(g => g.id === c.id)) return;
-        const gem = new Gem(c.x, c.y, c.value, c.element || 'ice');
-        gem.id = c.id;
-        this.gems.push(gem);
-        this.scene.add(gem.mesh);
-      });
-    }
+    // User request: "her asteroitten içerik düşmeli bazılarından nedense düşmüyor."
+    const crystalsToSpawn = (Array.isArray(data.crystals) && data.crystals.length > 0)
+      ? data.crystals
+      : [
+          { id: `gem-fb-${Date.now()}-1`, x: data.x - 6, y: data.y - 6, value: 4, element: 'green' },
+          { id: `gem-fb-${Date.now()}-2`, x: data.x + 6, y: data.y + 6, value: 4, element: 'green' }
+        ];
+
+    crystalsToSpawn.forEach(c => {
+      if (this.gems.some(g => g.id === c.id)) return;
+      const gem = new Gem(c.x, c.y, c.value, c.element || 'green');
+      gem.id = c.id;
+      this.gems.push(gem);
+      this.scene.add(gem.mesh);
+    });
   }
 
   onServerAsteroidSpawned(astData) {
