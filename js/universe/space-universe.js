@@ -688,36 +688,30 @@ class SpaceUniverse {
     const camX = camera.position.x;
     const camY = camera.position.y;
 
-    // Single unified starfield in game mode with CALM, STABLE parallax (0.965 factor)
+    // Single unified starfield in game mode - smoothly follows camera with zero chunk-boundary hitches
     if (this.starfield2) this.starfield2.visible = false;
     if (this.majorStarfield2) this.majorStarfield2.visible = false;
 
-    const starfieldTileSize = 18000;
-    const parallaxFactor = 0.965; // Serene deep space
-    const targetX = camX * parallaxFactor;
-    const targetY = camY * parallaxFactor;
+    if (this.starfield) this.starfield.visible = true;
+    if (this.majorStarfield) this.majorStarfield.visible = true;
 
-    const offsetX = Math.floor((camX * (1 - parallaxFactor) + starfieldTileSize * 0.5) / starfieldTileSize) * starfieldTileSize;
-    const offsetY = Math.floor((camY * (1 - parallaxFactor) + starfieldTileSize * 0.5) / starfieldTileSize) * starfieldTileSize;
-
+    // Centered smoothly on camera view - completely eliminates "sanki bir alanı geçer gibi takılmalı geçişler"
+    if (this.starfieldGroup) {
+      this.starfieldGroup.position.set(camX, camY, 0);
+    }
     if (this.starfield) {
-      this.starfield.visible = true;
-      this.starfield.position.x = targetX + offsetX;
-      this.starfield.position.y = targetY + offsetY;
+      this.starfield.position.set(0, 0, 0);
     }
     if (this.majorStarfield) {
-      this.majorStarfield.visible = true;
-      this.majorStarfield.position.x = targetX + offsetX;
-      this.majorStarfield.position.y = targetY + offsetY;
+      this.majorStarfield.position.set(0, 0, 0);
     }
 
-    // Nebulae follow with ultra-deep slow parallax (0.975 ratio)
+    // Nebulae follow with ultra-deep slow parallax
     if (this.nebulaGroup) {
-      this.nebulaGroup.position.x = camX * 0.975;
-      this.nebulaGroup.position.y = camY * 0.975;
+      this.nebulaGroup.position.set(camX * 0.985, camY * 0.985, 0);
     }
 
-    // Deep-Space Background Asteroids: 3D tumble, space drift, and infinite wrapping
+    // Deep-Space Background Asteroids: 3D tumble, space drift, and clean continuous wrapping
     if (this.bgAsteroids) {
       const fieldSize = 18000;
       const halfField = fieldSize * 0.5;
@@ -734,14 +728,14 @@ class SpaceUniverse {
         ast.baseX += ast.driftVx * dt;
         ast.baseY += ast.driftVy * dt;
 
-        // Infinite wrapping relative to player camera
-        let relX = (ast.baseX - camX) % fieldSize;
-        if (relX > halfField) relX -= fieldSize;
-        else if (relX < -halfField) relX += fieldSize;
+        // Infinite wrapping relative to player camera without modulo jump
+        let relX = ast.baseX - camX;
+        while (relX > halfField) relX -= fieldSize;
+        while (relX < -halfField) relX += fieldSize;
 
-        let relY = (ast.baseY - camY) % fieldSize;
-        if (relY > halfField) relY -= fieldSize;
-        else if (relY < -halfField) relY += fieldSize;
+        let relY = ast.baseY - camY;
+        while (relY > halfField) relY -= fieldSize;
+        while (relY < -halfField) relY += fieldSize;
 
         ast.mesh.position.x = camX + relX;
         ast.mesh.position.y = camY + relY;

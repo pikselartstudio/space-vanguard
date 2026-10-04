@@ -182,12 +182,12 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null) {
   return ast;
 }
 
-// Populate galaxy: 320 persistent deep-space asteroids (scaled 2x smaller) + 36 beginner asteroids per home base
-for (let i = 0; i < 320; i++) {
+// Populate galaxy: 160 persistent deep-space asteroids (halved per user request) + 18 beginner asteroids per home base
+for (let i = 0; i < 160; i++) {
   generateAsteroid((i % 7) + 1);
 }
-// Each base gets 36 beginner asteroids
-const baseTiers = [1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3, 1, 1, 2, 2, 1, 2, 3, 1, 2, 3, 1, 1, 2, 2, 3, 1, 2, 2];
+// Each base gets 18 beginner asteroids
+const baseTiers = [1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3, 1, 2, 2, 1, 2, 3];
 for (const n of ['blue', 'red', 'gold']) {
   const b = BASE_LOCATIONS[n];
   for (const tier of baseTiers) {
@@ -283,10 +283,10 @@ function resetGalaxyServer(prevWinner = null) {
   // 2. Clear and regenerate full asteroid fields
   asteroids.clear();
   nextAsteroidId = 1;
-  for (let i = 0; i < 320; i++) {
+  for (let i = 0; i < 160; i++) {
     generateAsteroid((i % 7) + 1);
   }
-  const baseTiers = [1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3, 1, 1, 2, 2, 1, 2, 3, 1, 2, 3, 1, 1, 2, 2, 3, 1, 2, 2];
+  const baseTiers = [1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3, 1, 2, 2, 1, 2, 3];
   for (const n of ['blue', 'red', 'gold']) {
     const b = BASE_LOCATIONS[n];
     for (const tier of baseTiers) {
@@ -475,11 +475,14 @@ io.on('connection', (socket) => {
 
     p.x = state.x;
     p.y = state.y;
-    const half = WORLD_SIZE / 2;
-    while (p.x < -half) p.x += WORLD_SIZE;
-    while (p.x > half) p.x -= WORLD_SIZE;
-    while (p.y < -half) p.y += WORLD_SIZE;
-    while (p.y > half) p.y -= WORLD_SIZE;
+    // 1:1 Spherical map horizon: seamless continuous loop across spherical arena
+    const radiusLimit = WORLD_SIZE * 0.48;
+    const d = Math.hypot(p.x, p.y);
+    if (d > radiusLimit) {
+      const ang = Math.atan2(p.y, p.x);
+      p.x = -Math.cos(ang) * (radiusLimit - 14);
+      p.y = -Math.sin(ang) * (radiusLimit - 14);
+    }
 
     p.vx = state.vx || 0;
     p.vy = state.vy || 0;
@@ -541,8 +544,8 @@ io.on('connection', (socket) => {
 
       // Spawn crystal drops (85% green for level-up, rare S1/S2/S3 ammo)
       const droppedGems = [];
-      const dropCount = Math.max(1, ast.crystalCount || 1);
-      const totalVal = Math.max(dropCount, ast.crystalTotalValue || (dropCount * 2));
+      const dropCount = Math.max(2, Math.min(6, ast.crystalCount || (ast.tier + 1)));
+      const totalVal = Math.max(dropCount * 2, ast.crystalTotalValue || (dropCount * 3));
       const valEach = Math.max(1, Math.round(totalVal / dropCount));
       for (let i = 0; i < dropCount; i++) {
         const gemId = `gem-${nextCrystalId++}`;
@@ -559,7 +562,7 @@ io.on('connection', (socket) => {
         }
         // Compact cluster right at break point (no scattering across the screen)
         const offsetAngle = (i / dropCount) * Math.PI * 2;
-        const offsetDist = 5 + Math.random() * 8;
+        const offsetDist = 8 + Math.random() * 12;
         const gem = {
           id: gemId,
           x: ast.x + Math.cos(offsetAngle) * offsetDist,
@@ -583,16 +586,11 @@ io.on('connection', (socket) => {
         killerId: socket.id
       });
 
-      // Schedule rapid asteroid respawn in 3s and keep galaxy crowded
+      // Schedule 1:1 asteroid respawn in 3s (keep population stable)
       setTimeout(() => {
         const baseLoc = ast.nearNation ? BASE_LOCATIONS[ast.nearNation] : null;
         const newAst = generateAsteroid(ast.tier, baseLoc, ast.nearNation);
         io.emit('asteroid_spawned', newAst);
-        // Also spawn an extra asteroid 35% of the time so universe feels densely populated
-        if (Math.random() < 0.35) {
-          const extraAst = generateAsteroid();
-          io.emit('asteroid_spawned', extraAst);
-        }
       }, 3000);
 
     } else {

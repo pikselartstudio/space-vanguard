@@ -16,13 +16,15 @@ class Entity {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
-    // Toroidal / spherical map wraparound: continuous loop in every direction
+    // 1:1 Spherical map horizon: seamless continuous loop across spherical arena
     if (worldSize) {
-      const half = worldSize / 2;
-      while (this.x < -half) this.x += worldSize;
-      while (this.x > half) this.x -= worldSize;
-      while (this.y < -half) this.y += worldSize;
-      while (this.y > half) this.y -= worldSize;
+      const radiusLimit = worldSize * 0.48;
+      const d = Math.hypot(this.x, this.y);
+      if (d > radiusLimit) {
+        const ang = Math.atan2(this.y, this.x);
+        this.x = -Math.cos(ang) * (radiusLimit - 14);
+        this.y = -Math.sin(ang) * (radiusLimit - 14);
+      }
     }
 
     if (this.mesh) {
@@ -145,21 +147,21 @@ class Laser extends Entity {
   }
 }
 
-// Gem / Crystal dropped from asteroids & destroyed ships
+// Gem / Incandescent Asteroid Chunk dropped from asteroids & destroyed ships
 class Gem extends Entity {
-  constructor(x, y, value = 1, element = 'green', id = null) {
+  constructor(x, y, value = 1, element = 'green', id = null, burstVx = 0, burstVy = 0) {
     super(x, y, value >= 60 ? 16 : (value > 8 ? 10 : 7), 0.5);
     this.id = id || `gem-${Date.now()}-${Math.floor(Math.random() * 10000000)}`;
     this.value = value;
     this.element = element || 'green';
-    // Compact gentle hover - stays in place without scattering across the area
-    this.vx = (Math.random() - 0.5) * 6;
-    this.vy = (Math.random() - 0.5) * 6;
-    this.drag = 0.90;
+    this.collectDelay = 0.35; // Guarantee incandescent fragments burst out visibly before collection
+    this.vx = burstVx || (Math.random() - 0.5) * 45;
+    this.vy = burstVy || (Math.random() - 0.5) * 45;
+    this.drag = 0.88;
     this.mesh = ModelBuilder.createGemMesh(value, this.element);
     this.mesh.position.set(x, -y, 0);
-    this.rotSpeedX = (Math.random() - 0.5) * 3;
-    this.rotSpeedY = (Math.random() - 0.5) * 3;
+    this.rotSpeedX = (Math.random() - 0.5) * 4;
+    this.rotSpeedY = (Math.random() - 0.5) * 4;
     this.life = 35.0;
     this.isExpired = false;
   }
@@ -178,6 +180,9 @@ class Gem extends Entity {
       return;
     }
     this.life -= dt;
+    if (this.collectDelay > 0) {
+      this.collectDelay -= dt;
+    }
     if (this.life <= 0) {
       this.isExpired = true;
       if (this.mesh) this.mesh.visible = false;
@@ -188,22 +193,24 @@ class Gem extends Entity {
       this.mesh.visible = Math.floor(this.life * 6) % 2 === 0;
     }
 
-    // Local proximity magnet: only activates if a ship is very close (within 18 units of ship hull)
+    // Local proximity magnet: only activates AFTER collectDelay has finished
     let magnetShip = null;
     let minHullDist = 18;
 
-    for (const ship of ships) {
-      if (ship.isDead) continue;
-      // User request: "son seviye ve kargo full dolunca daha toplama yapılmasın"
-      const shipCfg = SHIP_TREE[ship.shipKey];
-      if (shipCfg && shipCfg.tier >= 4 && ship.crystals >= shipCfg.cargoCapacity) {
-        continue;
-      }
-      const centerDist = Math.hypot(ship.x - this.x, ship.y - this.y);
-      const hullDist = centerDist - ship.radius;
-      if (hullDist < minHullDist) {
-        minHullDist = hullDist;
-        magnetShip = ship;
+    if (this.collectDelay <= 0 && Array.isArray(ships)) {
+      for (const ship of ships) {
+        if (ship.isDead) continue;
+        // User request: "son seviye ve kargo full dolunca daha toplama yapılmasın"
+        const shipCfg = SHIP_TREE[ship.shipKey];
+        if (shipCfg && shipCfg.tier >= 4 && ship.crystals >= shipCfg.cargoCapacity) {
+          continue;
+        }
+        const centerDist = Math.hypot(ship.x - this.x, ship.y - this.y);
+        const hullDist = centerDist - ship.radius;
+        if (hullDist < minHullDist) {
+          minHullDist = hullDist;
+          magnetShip = ship;
+        }
       }
     }
 
@@ -520,6 +527,7 @@ class Ship extends Entity {
     }
     if (activeScene) {
       activeScene.add(this.mesh);
+      this.createPlayerNameTag(activeScene);
     }
   }
 
@@ -738,6 +746,48 @@ class Ship extends Entity {
 
     super.update(dt, worldSize);
     this.updateHealthBar();
+    if (this.nameSprite) {
+      this.nameSprite.position.set(this.x, -this.y + this.radius + 24, 6);
+    }
+  }
+
+  // User request: "karakterin nicknami ulusun rengine özel çok az glowla net bir yazı ile gemi üzerinde görülsün."
+  createPlayerNameTag(scene) {
+    const activeScene = scene || this.scene;
+    if (!activeScene) return;
+    if (this.nameSprite) {
+      activeScene.remove(this.nameSprite);
+      this.nameSprite = null;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.clearRect(0, 0, 512, 128);
+
+    const nationColor = (this.nation === 'red') ? '#ff3b5c' : (this.nation === 'gold' ? '#ffd044' : '#00f0ff');
+    ctx.font = 'bold 36px "Share Tech Mono", "Orbitron", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Dark solid outline for maximum clarity against deep space & bright stars
+    ctx.strokeStyle = 'rgba(0, 5, 12, 0.95)';
+    ctx.lineWidth = 6;
+    ctx.strokeText(this.name || 'PILOT', 256, 64);
+
+    // Subtle nation glow
+    ctx.shadowColor = nationColor;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(this.name || 'PILOT', 256, 64);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+    this.nameSprite = new THREE.Sprite(spriteMat);
+    this.nameSprite.scale.set(65, 16.25, 1);
+    this.nameSprite.position.set(this.x, -this.y + this.radius + 24, 6);
+    activeScene.add(this.nameSprite);
   }
 
   createHealthBar(scene) {
@@ -844,6 +894,10 @@ class Ship extends Entity {
     if (this.healthBarGroup && activeScene) {
       activeScene.remove(this.healthBarGroup);
       this.healthBarGroup = null;
+    }
+    if (this.nameSprite && activeScene) {
+      activeScene.remove(this.nameSprite);
+      this.nameSprite = null;
     }
     super.destroy(activeScene);
   }
@@ -1063,26 +1117,6 @@ class RemotePlayer extends Ship {
     this.targetRotation = 0;
     this.isRemote = true;
     this.createPlayerNameTag(scene);
-  }
-
-  createPlayerNameTag(scene) {
-    if (!scene) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 256, 64);
-    ctx.font = 'bold 24px Orbitron, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = (this.nation === 'red') ? '#ff5577' : (this.nation === 'blue') ? '#00d0ff' : '#ffd044';
-    ctx.fillText(this.name, 128, 42);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
-    this.nameSprite = new THREE.Sprite(spriteMat);
-    this.nameSprite.scale.set(65, 16.25, 1);
-    this.nameSprite.position.set(this.x, -this.y + this.radius + 30, 5);
-    scene.add(this.nameSprite);
   }
 
   updateInterpolation(dt, worldSize) {

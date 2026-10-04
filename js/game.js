@@ -69,6 +69,7 @@ class StarblastGame {
     this.bots = [];
     this.remotePlayers = new Map();
     this.stations = {};
+    this.locallyDestroyedAsteroidIds = new Set();
 
     // 3 Nation Base Locations (120-degree balanced layout across 8250x8250 galaxy, scaled 2x smaller)
     this.baseLocations = {
@@ -473,6 +474,7 @@ class StarblastGame {
     this.player = new Ship(myId, playerName, 'fly', spawn.x, spawn.y, true, chosenNation, this.scene);
     this.player.spawnShieldTimer = 3.5;
     this.playerDeadHandled = false;
+    this.player.createPlayerNameTag(this.scene);
     this.scene.add(this.player.mesh);
 
     // Snap camera directly to base spawn location and look straight down at player
@@ -530,6 +532,7 @@ class StarblastGame {
     // Respawn with the SAME tier ship, keeping 50% crystals and tactical loadout
     this.player = new Ship(myId, name, shipKey, spawn.x, spawn.y, true, nation, this.scene);
     this.player.isDead = false;
+    this.player.createPlayerNameTag(this.scene);
     if (this.lastPlayerUpgrades) {
       this.player.upgrades = { ...this.lastPlayerUpgrades };
       this.player.recomputeStats();
@@ -608,14 +611,14 @@ class StarblastGame {
   }
 
   spawnInitialWorld() {
-    // Only spawn offline asteroids if not populated by server (scaled 2x smaller: 320 asteroids)
+    // Only spawn offline asteroids if not populated by server (scaled 2x smaller: 160 asteroids)
     if (this.asteroids.length === 0) {
-      for (let i = 0; i < 320; i++) {
+      for (let i = 0; i < 160; i++) {
         const tier = (i % 7) + 1;
         this.spawnRandomAsteroid(tier);
       }
-      // Base surroundings (18 small/medium beginner asteroids per base)
-      const baseTiers = [1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3];
+      // Base surroundings (9 small/medium beginner asteroids per base)
+      const baseTiers = [1, 1, 2, 1, 2, 2, 3, 1, 2];
       for (const n of ['blue', 'red', 'gold']) {
         const b = this.baseLocations[n];
         for (const tier of baseTiers) {
@@ -831,17 +834,17 @@ class StarblastGame {
     }
   }
 
-  // User request: "asteroit patlamalarındaki circle olan bir turuncu materyal var onu kaldıralım."
+  // User request: "asteoritlerin patlaması aşırı yayılmasın çok büyük bir patlama hacmi var 1 kat düşür."
   createFieryAsteroidExplosion(x, y, radius = 30) {
-    // Fiery Flame, Blazing Ember & Smoke Particles (Rich volumetric fire without flat 2D circle ring)
+    // Fiery Flame, Blazing Ember & Smoke Particles (Compact volume, halved spread and particle count)
     const fireColors = [0xff2200, 0xff5500, 0xff9900, 0xffcc00, 0xffffff, 0x4a1805, 0xff7700];
-    const particleCount = 48;
+    const particleCount = 24;
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 40 + Math.random() * 260;
+      const speed = 20 + Math.random() * 95;
       const col = fireColors[Math.floor(Math.random() * fireColors.length)];
-      const size = 3.8 + Math.random() * 7.5;
-      const life = 0.45 + Math.random() * 0.65;
+      const size = 2.4 + Math.random() * 4.2;
+      const life = 0.35 + Math.random() * 0.45;
       const p = new Particle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, col, size, life);
       this.particles.push(p);
       this.scene.add(p.mesh);
@@ -947,7 +950,11 @@ class StarblastGame {
       } else {
         crystalElement = 'green'; // General Level-Up Green Power Crystals (~85%)
       }
-      const gem = new Gem(x + (Math.random() - 0.5) * 20, y + (Math.random() - 0.5) * 20, valEach, crystalElement);
+      const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+      const speed = 40 + Math.random() * 60;
+      const bVx = Math.cos(angle) * speed;
+      const bVy = Math.sin(angle) * speed;
+      const gem = new Gem(x + Math.cos(angle) * 10, y + Math.sin(angle) * 10, valEach, crystalElement, null, bVx, bVy);
       this.gems.push(gem);
       this.scene.add(gem.mesh);
     }
@@ -1215,21 +1222,16 @@ class StarblastGame {
         // Instant local damage prediction & visual flash feedback
         const destroyedLocally = ast.takeDamage(laser.damage, laser.ownerId);
 
-        if (this.network && this.network.isConnected) {
+        if (destroyedLocally) {
+          if (this.locallyDestroyedAsteroidIds) {
+            this.locallyDestroyedAsteroidIds.add(ast.id);
+          }
+          this.handleAsteroidDestroyed(ast, laser.ownerId);
+          if (this.network && this.network.isConnected) {
+            this.network.emitHitAsteroid(ast.id, laser.damage, ast.x, ast.y);
+          }
+        } else if (this.network && this.network.isConnected) {
           this.network.emitHitAsteroid(ast.id, laser.damage, ast.x, ast.y);
-          if (destroyedLocally) {
-            if (ast.mesh) ast.mesh.visible = false;
-            // Immediate fallback: if server event doesn't arrive within 250ms, spawn drops locally so none are lost
-            setTimeout(() => {
-              if (this.asteroids.includes(ast)) {
-                this.handleAsteroidDestroyed(ast, laser.ownerId);
-              }
-            }, 250);
-          }
-        } else {
-          if (destroyedLocally) {
-            this.handleAsteroidDestroyed(ast, laser.ownerId);
-          }
         }
 
         // Healer life regeneration on hit: "şifacı vurduğu zaman can yeniler"
@@ -1414,6 +1416,7 @@ class StarblastGame {
 
       for (const ship of allShips) {
         if (ship.isDead) continue;
+        if (gem.collectDelay > 0) continue;
         // User request: "son seviye ve kargo full dolunca daha toplama yapılmasın"
         if (ship.tier >= 4 && ship.crystals >= ship.stats.cargoCapacity) {
           continue;
@@ -1526,11 +1529,12 @@ class StarblastGame {
 
               const astDead = ast.takeDamage(impactForce * 0.10, ship.id);
               if (astDead) {
+                if (this.locallyDestroyedAsteroidIds) {
+                  this.locallyDestroyedAsteroidIds.add(ast.id);
+                }
+                this.handleAsteroidDestroyed(ast, ship.id);
                 if (this.network && this.network.isConnected) {
                   this.network.emitHitAsteroid(ast.id, impactForce * 0.10, ast.x, ast.y);
-                  if (ast.mesh) ast.mesh.visible = false;
-                } else {
-                  this.handleAsteroidDestroyed(ast, ship.id);
                 }
               }
             }
@@ -1655,9 +1659,9 @@ class StarblastGame {
       }
     }
 
-    // Replenish asteroids to 500 across the arena (x3 increase per user request)
-    if (this.isPlaying && !this.isMenuBattle) {
-      while (this.asteroids.length < 500) {
+    // Replenish offline asteroids if not connected to server (halved to 180 cap)
+    if (this.isPlaying && !this.isMenuBattle && (!this.network || !this.network.isConnected)) {
+      while (this.asteroids.length < 180) {
         this.spawnRandomAsteroid();
       }
     }
@@ -1705,15 +1709,17 @@ class StarblastGame {
       window.soundSystem.playExplosion(false, expVol);
     }
 
-    const count = Math.max(1, asteroid.crystalCount || (Math.floor(Math.random() * 3) + 1));
-    const totalVal = Math.max(count, asteroid.crystalTotalValue || (count * 2));
+    const count = Math.max(2, asteroid.crystalCount || (Math.floor(Math.random() * 3) + 2));
+    const totalVal = Math.max(count * 2, asteroid.crystalTotalValue || (count * 3));
 
     // User request: "her asteroitten içerik düşmeli bazılarından nedense düşmüyor."
     // Always spawn incandescent mini-asteroid chunks directly into space for pickup
     this.spawnCrystalsFromEntity(asteroid.x, asteroid.y, count, totalVal, null, asteroid.element || 'green');
 
-    // Immediately spawn a new random asteroid at a random location
-    this.spawnRandomAsteroid();
+    // Only replenish local asteroid if running offline
+    if (!this.network || !this.network.isConnected) {
+      this.spawnRandomAsteroid();
+    }
   }
 
   dropShipCrystals(x, y, totalCrystals) {
@@ -2236,6 +2242,22 @@ class StarblastGame {
   }
 
   onServerAsteroidDestroyed(data) {
+    // If destroyed locally by this client, explosion and drops already occurred instantly
+    const wasLocal = this.locallyDestroyedAsteroidIds && this.locallyDestroyedAsteroidIds.has(data.asteroidId);
+    if (wasLocal) {
+      this.locallyDestroyedAsteroidIds.delete(data.asteroidId);
+      // Map server crystal IDs onto local gems if any
+      if (Array.isArray(data.crystals)) {
+        data.crystals.forEach((c, idx) => {
+          if (this.gems[idx] && !this.gems[idx].serverRegistered) {
+            this.gems[idx].id = c.id;
+            this.gems[idx].serverRegistered = true;
+          }
+        });
+      }
+      return;
+    }
+
     const idx = this.asteroids.findIndex(a => a.id === data.asteroidId);
     let astRadius = 26;
     if (idx !== -1) {
@@ -2262,10 +2284,13 @@ class StarblastGame {
           { id: `gem-fb-${Date.now()}-2`, x: data.x + 6, y: data.y + 6, value: 4, element: 'green' }
         ];
 
-    crystalsToSpawn.forEach(c => {
+    crystalsToSpawn.forEach((c, i) => {
       if (this.gems.some(g => g.id === c.id)) return;
-      const gem = new Gem(c.x, c.y, c.value, c.element || 'green');
-      gem.id = c.id;
+      const angle = (i / crystalsToSpawn.length) * Math.PI * 2 + Math.random() * 0.5;
+      const speed = 40 + Math.random() * 60;
+      const bVx = Math.cos(angle) * speed;
+      const bVy = Math.sin(angle) * speed;
+      const gem = new Gem(c.x, c.y, c.value, c.element || 'green', c.id, bVx, bVy);
       this.gems.push(gem);
       this.scene.add(gem.mesh);
     });

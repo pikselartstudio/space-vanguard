@@ -483,6 +483,7 @@ body, html {
   box-shadow: 0 0 15px rgba(0, 150, 255, 0.15);
   backdrop-filter: blur(5px);
   font-size: 0.85rem;
+  pointer-events: auto;
 }
 
 /* Leaderboard 3-Tab Bar (Icons Only per user request) */
@@ -494,6 +495,7 @@ body, html {
   border-bottom: 1px solid rgba(80, 200, 255, 0.25);
   padding-bottom: 6px;
   margin-bottom: 8px;
+  pointer-events: auto;
 }
 
 .lb-tab {
@@ -509,6 +511,7 @@ body, html {
   color: #64748b;
   transition: all 0.18s ease;
   padding: 0;
+  pointer-events: auto;
 }
 
 .lb-tab:hover {
@@ -524,10 +527,12 @@ body, html {
   box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
 }
 
-.lb-tab-icon {
+.lb-tab-icon,
+.lb-tab svg {
   width: 16px;
   height: 16px;
   display: block;
+  pointer-events: none;
 }
 
 #lb-tab-kills.active { color: #f43f5e; border-color: #f43f5e; box-shadow: 0 0 10px rgba(244, 63, 94, 0.4); }
