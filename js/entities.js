@@ -16,12 +16,14 @@ class Entity {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
-    // World boundary bounce
-    const limit = worldSize / 2 - this.radius;
-    if (this.x < -limit) { this.x = -limit; this.vx *= -0.7; }
-    if (this.x > limit) { this.x = limit; this.vx *= -0.7; }
-    if (this.y < -limit) { this.y = -limit; this.vy *= -0.7; }
-    if (this.y > limit) { this.y = limit; this.vy *= -0.7; }
+    // Toroidal / spherical map wraparound: continuous loop in every direction
+    if (worldSize) {
+      const half = worldSize / 2;
+      while (this.x < -half) this.x += worldSize;
+      while (this.x > half) this.x -= worldSize;
+      while (this.y < -half) this.y += worldSize;
+      while (this.y > half) this.y -= worldSize;
+    }
 
     if (this.mesh) {
       this.mesh.position.set(this.x, -this.y, 0); // Y inverted for intuitive 2D plane
@@ -124,14 +126,16 @@ class Laser extends Entity {
     this.y += this.vy * dt;
     this.lifetime -= dt;
 
-    const distTravelled = Math.hypot(this.x - this.startX, this.y - this.startY);
-    if (this.lifetime <= 0 || distTravelled >= this.maxRange) {
-      this.isDead = true;
+    if (worldSize) {
+      const half = worldSize / 2;
+      while (this.x < -half) this.x += worldSize;
+      while (this.x > half) this.x -= worldSize;
+      while (this.y < -half) this.y += worldSize;
+      while (this.y > half) this.y -= worldSize;
     }
 
-    // Border check
-    const limit = worldSize / 2;
-    if (Math.abs(this.x) > limit || Math.abs(this.y) > limit) {
+    const distTravelled = Math.hypot(this.x - this.startX, this.y - this.startY);
+    if (this.lifetime <= 0) {
       this.isDead = true;
     }
 
@@ -224,6 +228,14 @@ class Gem extends Entity {
 
     this.x += this.vx * dt;
     this.y += this.vy * dt;
+
+    if (worldSize) {
+      const half = worldSize / 2;
+      while (this.x < -half) this.x += worldSize;
+      while (this.x > half) this.x -= worldSize;
+      while (this.y < -half) this.y += worldSize;
+      while (this.y > half) this.y -= worldSize;
+    }
 
     if (this.mesh) {
       this.mesh.position.set(this.x, -this.y, 0);
@@ -1073,7 +1085,7 @@ class RemotePlayer extends Ship {
     scene.add(this.nameSprite);
   }
 
-  updateInterpolation(dt) {
+  updateInterpolation(dt, worldSize) {
     if (this.isDead) {
       if (this.mesh) this.mesh.visible = false;
       if (this.healthBarGroup) this.healthBarGroup.visible = false;
@@ -1084,10 +1096,29 @@ class RemotePlayer extends Ship {
     if (this.mesh) this.mesh.visible = true;
     if (this.nameSprite) this.nameSprite.visible = true;
 
+    // Shortest toroidal path delta
+    let dx = this.targetX - this.x;
+    let dy = this.targetY - this.y;
+    if (worldSize) {
+      const half = worldSize / 2;
+      while (dx < -half) dx += worldSize;
+      while (dx > half) dx -= worldSize;
+      while (dy < -half) dy += worldSize;
+      while (dy > half) dy -= worldSize;
+    }
+
     // Smooth position interpolation
     const lerpFactor = Math.min(1.0, dt * 18);
-    this.x += (this.targetX - this.x) * lerpFactor;
-    this.y += (this.targetY - this.y) * lerpFactor;
+    this.x += dx * lerpFactor;
+    this.y += dy * lerpFactor;
+
+    if (worldSize) {
+      const half = worldSize / 2;
+      while (this.x < -half) this.x += worldSize;
+      while (this.x > half) this.x -= worldSize;
+      while (this.y < -half) this.y += worldSize;
+      while (this.y > half) this.y -= worldSize;
+    }
 
     // Angle interpolation (shortest path)
     let diff = (this.targetRotation - this.rotation);

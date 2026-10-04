@@ -140,8 +140,8 @@ class SpaceUniverse {
     sctx.fillRect(0, 0, 64, 64);
     this.starTexture = new THREE.CanvasTexture(starCanvas);
 
-    // TIER 1: Major Brilliant Radiant Stars (size: 13.5 - 15.0) - DENSE STELLAR CANOPY
-    const majorCount = 9000;
+    // TIER 1: Major Brilliant Radiant Stars (size: 13.5 - 15.0) - 3X INCREASE (27K STARS)
+    const majorCount = 27000;
     const majorGeo = new THREE.BufferGeometry();
     const majorPos = new Float32Array(majorCount * 3);
     const majorCol = new Float32Array(majorCount * 3);
@@ -288,7 +288,8 @@ class SpaceUniverse {
 
     this.flareStars = [];
     const flareColors = [0xffffff, 0xfce7f3, 0xf472b6, 0xfbcfe8, 0xe0e7ff, 0xddd6fe, 0xfef3c7];
-    for (let i = 0; i < 48; i++) {
+    // 3X Increase in large sparkling radiant diamond stars (48 -> 150)
+    for (let i = 0; i < 150; i++) {
       const color = flareColors[i % flareColors.length];
       const fMat = new THREE.SpriteMaterial({
         map: flareTexture,
@@ -298,11 +299,11 @@ class SpaceUniverse {
         depthWrite: false
       });
       const sprite = new THREE.Sprite(fMat);
-      const fx = (Math.random() - 0.5) * 6500;
-      const fy = (Math.random() - 0.5) * 4500;
-      const fz = -120 - Math.random() * 750;
+      const fx = (Math.random() - 0.5) * 16000;
+      const fy = (Math.random() - 0.5) * 16000;
+      const fz = -100 - Math.random() * 850;
       sprite.position.set(fx, fy, fz);
-      const baseSize = 52 + Math.random() * 58; // Noticeably larger diffraction spikes
+      const baseSize = 58 + Math.random() * 64; // Noticeably larger radiant diffraction spikes
       sprite.scale.set(baseSize, baseSize, 1);
       sprite.baseSize = baseSize;
       sprite.twinkleSpeed = 1.0 + Math.random() * 1.8;

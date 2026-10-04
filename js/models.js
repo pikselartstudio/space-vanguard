@@ -2064,80 +2064,91 @@ const ModelBuilder = {
     return mesh;
   },
 
-  // Gem / Crystal 3D Mesh (User request: "malzemeler biraz daha büyült ve farklı bir 5gen 6-gen tasarım yap etrafında çembere gerek yok")
+  // Incandescent Mini-Asteroid Ore Fragment (User request: "asteroit içinden çıkan kristaller artık kristal değil. asteorite benzer akkor bir nesne olsun. s1,s2,s3 için yanında aynı asteoritten fakat ilgili renkle yansın.")
   createGemMesh(value = 1, element = 'green') {
     const group = new THREE.Group();
-    const size = value >= 60 ? 18.0 : (value > 8 ? 12.0 : 8.2);
+    const size = value >= 60 ? 11.8 : (value > 8 ? 8.4 : 5.8);
 
-    let outerColor = 0x00ff88;
-    let emissiveColor = 0x00dd66;
-    let coreColor = 0xaaffdd;
+    let emissiveColor = 0x10b981;
+    let coreColor = 0xa7f3d0;
+    let auraColor = 0x059669;
 
     if (element === 'ice') {
-      outerColor = 0x00f0ff;
-      emissiveColor = 0x00a8e8;
-      coreColor = 0xd0f4ff;
+      // S1: Cryo Cyan Incandescent Ore
+      emissiveColor = 0x00e5ff;
+      coreColor = 0xd0f8ff;
+      auraColor = 0x0099cc;
     } else if (element === 'fire') {
-      outerColor = 0xff4500;
-      emissiveColor = 0xff2200;
-      coreColor = 0xffe0b2;
+      // S2: Magma Fire Incandescent Ore
+      emissiveColor = 0xff4d00;
+      coreColor = 0xffdf70;
+      auraColor = 0xd92600;
     } else if (element === 'dark') {
-      outerColor = 0xb5179e;
-      emissiveColor = 0x7209b7;
-      coreColor = 0xf3c4fb;
+      // S3: Void Violet Incandescent Ore
+      emissiveColor = 0xaa3bff;
+      coreColor = 0xf5d0fe;
+      auraColor = 0x6b21a8;
     } else {
-      // General Level-up Green Power Crystal
-      outerColor = 0x00ff88;
-      emissiveColor = 0x00cc55;
-      coreColor = 0xccffdd;
+      // Standard EXP: Radiant Emerald Incandescent Ore
+      emissiveColor = 0x10b981;
+      coreColor = 0xa7f3d0;
+      auraColor = 0x059669;
     }
 
-    // 1. Faceted Diamond Prism Hull (Distinct geometric crystal design)
-    const hullGeo = new THREE.OctahedronGeometry(size, 0);
-    // Non-uniform scaling gives it an elegant elongated crystal prism silhouette
-    hullGeo.scale(0.85, 1.45, 0.85);
+    // 1. Procedural Craggy Asteroid Boulder Geometry
+    const rockGeo = new THREE.IcosahedronGeometry(size, 2);
+    const pos = rockGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      let vx = pos.getX(i);
+      let vy = pos.getY(i);
+      let vz = pos.getZ(i);
+      const len = Math.hypot(vx, vy, vz) || 1;
+      const nx = vx / len;
+      const ny = vy / len;
+      const nz = vz / len;
 
-    const hullMat = new THREE.MeshStandardMaterial({
-      color: outerColor,
+      // Rocky irregular ridges and craters matching asteroid topology
+      const noise = 1.0 + (Math.sin(nx * 4.6) * Math.cos(ny * 3.8) * Math.sin(nz * 4.2)) * 0.32
+                        + (Math.sin(nx * 9.2 + ny * 6.0) * Math.cos(nz * 8.4)) * 0.14;
+      pos.setXYZ(i, vx * noise, vy * noise, vz * noise);
+    }
+    rockGeo.computeVertexNormals();
+
+    // 2. Basalt Crust Material with Glowing Incandescent Fissures
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: 0x181c20, // Dark obsidian meteorite crust
       emissive: emissiveColor,
       emissiveIntensity: 0.95,
-      roughness: 0.08,
-      metalness: 0.25,
-      transparent: true,
-      opacity: 0.88,
+      roughness: 0.58,
+      metalness: 0.28,
       flatShading: true
     });
-    const hullMesh = new THREE.Mesh(hullGeo, hullMat);
-    group.add(hullMesh);
+    const rockMesh = new THREE.Mesh(rockGeo, rockMat);
+    group.add(rockMesh);
 
-    // 2. Inner Glowing Hyper-Core Nucleus (Pulsating pure energy core)
-    const nucleusGeo = new THREE.SphereGeometry(size * 0.42, 10, 8);
-    const nucleusMat = new THREE.MeshBasicMaterial({
+    // 3. Glowing Incandescent Core (Intense light bleeding through crevices)
+    const coreGeo = new THREE.IcosahedronGeometry(size * 0.62, 1);
+    const coreMat = new THREE.MeshBasicMaterial({
       color: coreColor,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.88,
       blending: THREE.AdditiveBlending
     });
-    const nucleus = new THREE.Mesh(nucleusGeo, nucleusMat);
-    group.add(nucleus);
+    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+    group.add(coreMesh);
 
-    // 3. Dual Floating Vertex Emitters (Top & Bottom energy caps)
-    const capGeo = new THREE.ConeGeometry(size * 0.35, size * 0.5, 4);
-    const capMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
+    // 4. Subtle Radiant Elemental Aura
+    const auraGeo = new THREE.SphereGeometry(size * 1.22, 12, 10);
+    const auraMat = new THREE.MeshBasicMaterial({
+      color: auraColor,
       transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending
+      opacity: 0.30,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      depthWrite: false
     });
-
-    const topCap = new THREE.Mesh(capGeo, capMat);
-    topCap.position.y = size * 1.05;
-    group.add(topCap);
-
-    const bottomCap = new THREE.Mesh(capGeo, capMat);
-    bottomCap.rotation.x = Math.PI;
-    bottomCap.position.y = -size * 1.05;
-    group.add(bottomCap);
+    const auraMesh = new THREE.Mesh(auraGeo, auraMat);
+    group.add(auraMesh);
 
     return group;
   },

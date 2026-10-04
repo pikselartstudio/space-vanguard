@@ -863,6 +863,18 @@ class UIManager {
     this.closeChat();
   }
 
+  formatMeterVal(current, max, extra = '') {
+    return `<span class="val-cur">${current}</span><span class="val-sep">/</span><span class="val-max">${max}</span>${extra ? `<span class="val-extra">${extra}</span>` : ''}`;
+  }
+
+  wrapDelta(d, worldSize) {
+    if (!worldSize) return d;
+    const half = worldSize / 2;
+    while (d < -half) d += worldSize;
+    while (d > half) d -= worldSize;
+    return d;
+  }
+
   updateHUD(player, stations) {
     if (!player) return;
 
@@ -872,23 +884,23 @@ class UIManager {
     // Shield (Numbers only per user request)
     const shieldPct = Math.max(0, Math.min(100, (player.shield / player.stats.shieldCap) * 100));
     this.shieldFill.style.width = `${shieldPct}%`;
-    this.shieldText.textContent = `${Math.round(player.shield)} / ${Math.round(player.stats.shieldCap)}`;
+    this.shieldText.innerHTML = this.formatMeterVal(Math.round(player.shield), Math.round(player.stats.shieldCap));
 
     // Lazer / Energy (Numbers only per user request)
     const energyPct = Math.max(0, Math.min(100, (player.energy / player.stats.energyCap) * 100));
     this.energyFill.style.width = `${energyPct}%`;
     if (player.isEnergyStarved) {
       this.energyFill.classList.add('starved');
-      this.energyText.textContent = `${Math.round(player.energy)} / ${Math.round(player.stats.energyCap)} (0.6s)`;
+      this.energyText.innerHTML = this.formatMeterVal(Math.round(player.energy), Math.round(player.stats.energyCap), '!');
     } else {
       this.energyFill.classList.remove('starved');
-      this.energyText.textContent = `${Math.round(player.energy)} / ${Math.round(player.stats.energyCap)}`;
+      this.energyText.innerHTML = this.formatMeterVal(Math.round(player.energy), Math.round(player.stats.energyCap));
     }
 
     // Cargo / Crystals (Numbers only per user request)
     const cargoPct = Math.max(0, Math.min(100, (player.crystals / player.stats.cargoCapacity) * 100));
     this.cargoFill.style.width = `${cargoPct}%`;
-    this.cargoText.textContent = `${player.crystals} / ${player.stats.cargoCapacity}`;
+    this.cargoText.innerHTML = this.formatMeterVal(player.crystals, player.stats.cargoCapacity);
 
     if (this.crystalCount) {
       this.crystalCount.textContent = player.crystals;
@@ -907,7 +919,7 @@ class UIManager {
       }
     }
     if (this.expText) {
-      this.expText.textContent = `Lvl ${shipCfg.tier || 1}`;
+      this.expText.innerHTML = this.formatMeterVal(expCurrent, expCap);
     }
 
     // Highlight Active Tier in Ship Evaluator Bar
@@ -1207,8 +1219,8 @@ class UIManager {
       for (const key of ['blue', 'red', 'gold']) {
         const st = stations[key];
         if (!st) continue;
-        const dx = st.x - player.x;
-        const dy = st.y - player.y;
+        const dx = this.wrapDelta(st.x - player.x, worldSize);
+        const dy = this.wrapDelta(st.y - player.y, worldSize);
         const dist = Math.hypot(dx, dy);
         const nCfg = NATIONS[key] || NATIONS['blue'];
         const isOwnBase = (player.nation === key);
@@ -1299,8 +1311,8 @@ class UIManager {
     if (asteroids) {
       for (const a of asteroids) {
         if (a.isDead) continue;
-        const dx = a.x - player.x;
-        const dy = a.y - player.y;
+        const dx = this.wrapDelta(a.x - player.x, worldSize);
+        const dy = this.wrapDelta(a.y - player.y, worldSize);
         const dist = Math.hypot(dx, dy);
 
         // Exclude distant background asteroids (> 3600 units)
@@ -1338,8 +1350,8 @@ class UIManager {
     const otherShips = Array.isArray(bots) ? bots : (bots instanceof Map ? Array.from(bots.values()) : []);
     for (const b of otherShips) {
       if (b.isDead) continue;
-      const dx = b.x - player.x;
-      const dy = b.y - player.y;
+      const dx = this.wrapDelta(b.x - player.x, worldSize);
+      const dy = this.wrapDelta(b.y - player.y, worldSize);
       const dist = Math.hypot(dx, dy);
 
       if (dist <= tacticalRange) {

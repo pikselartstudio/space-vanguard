@@ -360,6 +360,17 @@ class StarblastGame {
         return;
       }
 
+      // User request: "oyunda fare ile yetenek, skil verilirken gemi ateş etmemeli yada radar paneli chat paneline tıklama durumlarında da ateş etmesin."
+      const isUI = e.target.closest(
+        '#upgrade-dock, #upgrade-tree-modal, #radar-container, #top-right-hud, ' +
+        '#game-chat-box, #top-left-hud, #tactical-action-bar, #leaderboard, ' +
+        '#ship-evaluator-bar, .interactive, button, input, select, .tactical-slot, ' +
+        '.stat-upgrade-slot, .eval-btn, .lb-tab, .upgrade-card, .upg-icon-card, .upg-add-btn'
+      );
+      if (isUI) {
+        return;
+      }
+
       if (e.button === 0) {
         this.keys['MouseLeft'] = true;
       } else if (e.button === 2) {
@@ -820,49 +831,17 @@ class StarblastGame {
     }
   }
 
-  // User request: "asteorit alevli ateşli bir patlama olarak patlasın."
+  // User request: "asteroit patlamalarındaki circle olan bir turuncu materyal var onu kaldıralım."
   createFieryAsteroidExplosion(x, y, radius = 30) {
-    // 1. Expanding Fiery Shockwave Blast Ring
-    const ringGeo = new THREE.RingGeometry(Math.max(4, radius * 0.25), Math.max(12, radius * 0.85), 32);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0xff6600,
-      transparent: true,
-      opacity: 0.95,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    ringMesh.position.set(x, -y, 3);
-    this.scene.add(ringMesh);
-
-    const startTime = performance.now();
-    const blastDuration = 480;
-    const animateBlast = () => {
-      const elapsed = performance.now() - startTime;
-      const progress = Math.min(1.0, elapsed / blastDuration);
-      const scale = 1.0 + progress * 3.8;
-      ringMesh.scale.set(scale, scale, 1);
-      ringMat.opacity = (1 - progress) * 0.95;
-      if (progress < 1.0) {
-        requestAnimationFrame(animateBlast);
-      } else {
-        this.scene.remove(ringMesh);
-        ringGeo.dispose();
-        ringMat.dispose();
-      }
-    };
-    requestAnimationFrame(animateBlast);
-
-    // 2. Fiery Flame, Blazing Ember & Smoke Particles (Vivid fiery palette)
-    const fireColors = [0xff2200, 0xff5500, 0xff9900, 0xffcc00, 0xffffff, 0x4a1805];
-    const particleCount = 42;
+    // Fiery Flame, Blazing Ember & Smoke Particles (Rich volumetric fire without flat 2D circle ring)
+    const fireColors = [0xff2200, 0xff5500, 0xff9900, 0xffcc00, 0xffffff, 0x4a1805, 0xff7700];
+    const particleCount = 48;
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 35 + Math.random() * 230;
+      const speed = 40 + Math.random() * 260;
       const col = fireColors[Math.floor(Math.random() * fireColors.length)];
-      const size = 3.6 + Math.random() * 7.2;
-      const life = 0.45 + Math.random() * 0.60;
+      const size = 3.8 + Math.random() * 7.5;
+      const life = 0.45 + Math.random() * 0.65;
       const p = new Particle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, col, size, life);
       this.particles.push(p);
       this.scene.add(p.mesh);
@@ -1105,7 +1084,7 @@ class StarblastGame {
 
     // Update Remote Players Smooth Interpolation
     for (const rp of this.remotePlayers.values()) {
-      rp.updateInterpolation(dt);
+      rp.updateInterpolation(dt, this.worldSize);
     }
 
     // 1. Update 3 Nation Home Bases
@@ -1205,45 +1184,62 @@ class StarblastGame {
         continue;
       }
 
-      // Laser vs Asteroids
+      // Laser vs Asteroids: Pick the CLOSEST intersecting asteroid along the laser trajectory (never penetrate to background)
       let hit = false;
-      for (let j = this.asteroids.length - 1; j >= 0; j--) {
+      let closestAst = null;
+      let minHitDist = Infinity;
+
+      for (let j = 0; j < this.asteroids.length; j++) {
         const ast = this.asteroids[j];
         if (ast.isDead || ast.health <= 0) continue;
 
         const dist = Math.hypot(laser.x - ast.x, laser.y - ast.y);
         if (dist < ast.radius + laser.radius) {
-          hit = true;
-          // Match particle color to laser bolt per user request: "lazer ile ateş ettiğimizde hangi renkse çarptığı yerde partiküllerine ayrılsın"
-          const hitCol = (typeof laser.getHitColor === 'function') ? laser.getHitColor() : (laser.color || 0x00ff44);
-          this.createLaserHitParticles(laser.x, laser.y, hitCol, 22);
-          const hitVol = (laser.ownerId === 'player' || (this.network && laser.ownerId === this.network.myId)) ? 1.0 : this.getPositionalVolume(laser.x, laser.y, 650);
-          if (hitVol > 0.04) window.soundSystem.playHit(hitVol);
-
-          // Instant local damage prediction & visual flash feedback
-          const destroyedLocally = ast.takeDamage(laser.damage, laser.ownerId);
-
-          if (this.network && this.network.isConnected) {
-            this.network.emitHitAsteroid(ast.id, laser.damage, ast.x, ast.y);
-            if (destroyedLocally) {
-              if (ast.mesh) ast.mesh.visible = false;
-            }
-          } else {
-            if (destroyedLocally) {
-              this.handleAsteroidDestroyed(ast, laser.ownerId);
-            }
+          const fromOriginDist = Math.hypot(laser.startX - ast.x, laser.startY - ast.y);
+          if (fromOriginDist < minHitDist) {
+            minHitDist = fromOriginDist;
+            closestAst = ast;
           }
+        }
+      }
 
-          // Healer life regeneration on hit: "şifacı vurduğu zaman can yeniler"
-          if (laser.isHealBeam) {
-            const shooter = allShips.find(s => s.id === laser.ownerId);
-            if (shooter && !shooter.isDead && shooter.shield < shooter.stats.shieldCap) {
-              const selfHeal = Math.max(2, laser.damage * 0.35);
-              shooter.shield = Math.min(shooter.stats.shieldCap, shooter.shield + selfHeal);
-              this.createHealingParticle(shooter.x, shooter.y);
-            }
+      if (closestAst) {
+        hit = true;
+        const ast = closestAst;
+        // Match particle color to laser bolt per user request: "lazer ile ateş ettiğimizde hangi renkse çarptığı yerde partiküllerine ayrılsın"
+        const hitCol = (typeof laser.getHitColor === 'function') ? laser.getHitColor() : (laser.color || 0x00ff44);
+        this.createLaserHitParticles(laser.x, laser.y, hitCol, 22);
+        const hitVol = (laser.ownerId === 'player' || (this.network && laser.ownerId === this.network.myId)) ? 1.0 : this.getPositionalVolume(laser.x, laser.y, 650);
+        if (hitVol > 0.04) window.soundSystem.playHit(hitVol);
+
+        // Instant local damage prediction & visual flash feedback
+        const destroyedLocally = ast.takeDamage(laser.damage, laser.ownerId);
+
+        if (this.network && this.network.isConnected) {
+          this.network.emitHitAsteroid(ast.id, laser.damage, ast.x, ast.y);
+          if (destroyedLocally) {
+            if (ast.mesh) ast.mesh.visible = false;
+            // Immediate fallback: if server event doesn't arrive within 250ms, spawn drops locally so none are lost
+            setTimeout(() => {
+              if (this.asteroids.includes(ast)) {
+                this.handleAsteroidDestroyed(ast, laser.ownerId);
+              }
+            }, 250);
           }
-          break;
+        } else {
+          if (destroyedLocally) {
+            this.handleAsteroidDestroyed(ast, laser.ownerId);
+          }
+        }
+
+        // Healer life regeneration on hit: "şifacı vurduğu zaman can yeniler"
+        if (laser.isHealBeam) {
+          const shooter = allShips.find(s => s.id === laser.ownerId);
+          if (shooter && !shooter.isDead && shooter.shield < shooter.stats.shieldCap) {
+            const selfHeal = Math.max(2, laser.damage * 0.35);
+            shooter.shield = Math.min(shooter.stats.shieldCap, shooter.shield + selfHeal);
+            this.createHealingParticle(shooter.x, shooter.y);
+          }
         }
       }
 
@@ -1709,52 +1705,12 @@ class StarblastGame {
       window.soundSystem.playExplosion(false, expVol);
     }
 
-    const count = asteroid.crystalCount || (Math.floor(Math.random() * 3) + 1);
-    const totalVal = asteroid.crystalTotalValue || count;
+    const count = Math.max(1, asteroid.crystalCount || (Math.floor(Math.random() * 3) + 1));
+    const totalVal = Math.max(count, asteroid.crystalTotalValue || (count * 2));
 
-    // Check if the top damager (or killer) is right beside the asteroid (within 15 units of hull)
-    let collectedDirectly = false;
-    if (topShip) {
-      const centerDist = Math.hypot(topShip.x - asteroid.x, topShip.y - asteroid.y);
-      const hullDist = centerDist - topShip.radius - asteroid.radius;
-      if (hullDist <= 15) {
-        // User request: "son seviye ve kargo full dolunca daha toplama yapılmasın"
-        if (topShip.tier >= 4 && topShip.crystals >= topShip.stats.cargoCapacity) {
-          // Do not directly collect crystals if max tier and full cargo
-        } else {
-          // Player/bot is right next to the asteroid (<= 15 units)
-          const spaceLeft = Math.max(0, topShip.stats.cargoCapacity - topShip.crystals);
-          const added = Math.min(totalVal, spaceLeft);
-          topShip.crystals += added;
-          if (topShip.elementalAmmo) {
-            const elem = asteroid.element || 'ice';
-            if (topShip.elementalAmmo[elem] !== undefined) {
-              const ammoGain = Math.min(2, Math.max(1, Math.round(totalVal || 1)));
-              const maxCap = (topShip.maxElementalAmmo && topShip.maxElementalAmmo[elem]) || 150;
-              topShip.elementalAmmo[elem] = Math.min(maxCap, topShip.elementalAmmo[elem] + ammoGain);
-            }
-          }
-          collectedDirectly = true;
-
-          const leftover = totalVal - added;
-          if (leftover > 0) {
-            const leftoverCount = Math.max(1, Math.min(count, Math.round(count * (leftover / totalVal))));
-            this.spawnCrystalsFromEntity(asteroid.x, asteroid.y, leftoverCount, leftover, null, asteroid.element || 'ice');
-          }
-
-          if (topShip.isPlayer) {
-            window.soundSystem.playGemPickup();
-            const currentCfg = SHIP_TREE[topShip.shipKey];
-            if (topShip.crystals >= currentCfg.cargoCapacity && currentCfg.evolvesTo && currentCfg.evolvesTo.length > 0) {
-              this.ui.showTierUpDropBanner(topShip);
-            }
-          }
-        }
-      }
-    }
-
-    // Always drop crystals into space as floating gems
-    this.spawnCrystalsFromEntity(asteroid.x, asteroid.y, Math.max(1, count), totalVal, null, asteroid.element || 'green');
+    // User request: "her asteroitten içerik düşmeli bazılarından nedense düşmüyor."
+    // Always spawn incandescent mini-asteroid chunks directly into space for pickup
+    this.spawnCrystalsFromEntity(asteroid.x, asteroid.y, count, totalVal, null, asteroid.element || 'green');
 
     // Immediately spawn a new random asteroid at a random location
     this.spawnRandomAsteroid();
@@ -1904,6 +1860,21 @@ class StarblastGame {
         }
         const targetCamX = this.player.x + this.player.vx * 0.3 + shakeX;
         const targetCamY = -this.player.y - this.player.vy * 0.3 + shakeY;
+
+        // Toroidal camera wrap handling: prevent camera from sweeping across entire arena when player wraps
+        if (this.worldSize) {
+          if (targetCamX - this.camera.position.x > this.worldSize * 0.5) {
+            this.camera.position.x += this.worldSize;
+          } else if (targetCamX - this.camera.position.x < -this.worldSize * 0.5) {
+            this.camera.position.x -= this.worldSize;
+          }
+          if (targetCamY - this.camera.position.y > this.worldSize * 0.5) {
+            this.camera.position.y += this.worldSize;
+          } else if (targetCamY - this.camera.position.y < -this.worldSize * 0.5) {
+            this.camera.position.y -= this.worldSize;
+          }
+        }
+
         this.camera.position.x += (targetCamX - this.camera.position.x) * 0.08;
         this.camera.position.y += (targetCamY - this.camera.position.y) * 0.08;
         const targetCamZ = Math.max(750, 600 + (this.player.radius || 18) * 6.5);

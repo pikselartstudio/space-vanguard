@@ -475,6 +475,12 @@ io.on('connection', (socket) => {
 
     p.x = state.x;
     p.y = state.y;
+    const half = WORLD_SIZE / 2;
+    while (p.x < -half) p.x += WORLD_SIZE;
+    while (p.x > half) p.x -= WORLD_SIZE;
+    while (p.y < -half) p.y += WORLD_SIZE;
+    while (p.y > half) p.y -= WORLD_SIZE;
+
     p.vx = state.vx || 0;
     p.vy = state.vy || 0;
     p.rotation = state.rotation || 0;
@@ -509,11 +515,11 @@ io.on('connection', (socket) => {
 
     let ast = (data && data.asteroidId) ? asteroids.get(data.asteroidId) : null;
 
-    // Proximity fallback if asteroidId wasn't found (prevents dropped hits from race conditions or local IDs)
+    // Tight proximity fallback (65 units) if asteroidId wasn't found (prevents jumping to back asteroids)
     if (!ast && data) {
       const hitX = (data.x !== undefined) ? Number(data.x) : p.x;
       const hitY = (data.y !== undefined) ? Number(data.y) : p.y;
-      let minD = 350;
+      let minD = 65;
       for (const [id, a] of asteroids) {
         if (a.isDead) continue;
         const d = Math.hypot(a.x - hitX, a.y - hitY);

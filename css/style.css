@@ -575,7 +575,7 @@ body, html {
   padding: 8px 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.65), inset 0 0 16px rgba(0, 200, 255, 0.08);
   backdrop-filter: blur(10px);
-  width: 265px;
+  width: 295px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -590,7 +590,8 @@ body, html {
 }
 
 .hud-meter-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 20px 1fr 92px;
   align-items: center;
   gap: 8px;
   height: 20px;
@@ -621,14 +622,41 @@ body, html {
   font-size: 0.72rem;
   font-weight: 700;
   color: #f1f5f9;
-  width: 76px;
-  flex-shrink: 0;
-  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   font-family: 'Share Tech Mono', monospace;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
   letter-spacing: 0.5px;
+}
+
+.meter-val .val-cur {
+  display: inline-block;
+  width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.meter-val .val-sep {
+  display: inline-block;
+  width: 10px;
+  text-align: center;
+  opacity: 0.6;
+}
+
+.meter-val .val-max {
+  display: inline-block;
+  width: 38px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.meter-val .val-extra {
+  font-size: 0.62rem;
+  color: #f87171;
+  margin-left: 2px;
 }
 
 .meter-track {
