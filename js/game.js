@@ -1804,11 +1804,14 @@ class StarblastGame {
     }
   }
 
-  handleGameWon(winningNation) {
+  handleGameWon(winningNation, countdownSeconds = 8) {
     this.isPlaying = false;
+    if (this.player) {
+      this.player.isDead = true;
+    }
     const isPlayerWin = (winningNation === this.playerNation);
     window.soundSystem.playTierUp();
-    this.ui.showVictory(winningNation, isPlayerWin, this.player);
+    this.ui.showVictory(winningNation, isPlayerWin, this.player, countdownSeconds);
   }
 
   animate(currentTime) {
@@ -2005,13 +2008,21 @@ class StarblastGame {
     if (!serverStations) return;
     for (const key of ['red', 'blue', 'gold']) {
       const stData = serverStations[key];
-      if (stData && this.stations[key]) {
+      if (stData) {
+        if (!this.stations[key] || !this.stations[key].mesh || !this.stations[key].mesh.parent) {
+          const loc = this.baseLocations[key];
+          this.stations[key] = new SpaceStation(key, loc.x, loc.y, this.scene);
+        }
         this.stations[key].hp = stData.hp;
         this.stations[key].maxHp = stData.maxHp;
         this.stations[key].level = stData.level;
         this.stations[key].crystalsDonated = stData.crystalsDonated;
         this.stations[key].crystalsRequired = stData.crystalsRequired;
         this.stations[key].isDead = !!stData.isDead;
+        this.stations[key].isDeadHandled = !!stData.isDead;
+        if (this.stations[key].mesh) {
+          this.stations[key].mesh.visible = !stData.isDead;
+        }
       }
     }
   }
@@ -2357,6 +2368,34 @@ class StarblastGame {
     const base = this.stations[data.nation];
     if (base) {
       this.handleStationDestroyed(base, data.killerId || data.killerName);
+    }
+  }
+
+  onServerRoundConcluded(data) {
+    console.log('[GAME] Raunt sona erdi, kazanan ulus:', data.winnerNation);
+    this.handleGameWon(data.winnerNation, data.countdownSeconds || 8);
+  }
+
+  onServerGalaxyReset(data) {
+    console.log('[GAME] Sunucu evreni sıfırladı, yeni raunt hazır.');
+    if (data.stations) {
+      this.syncServerStations(data.stations);
+    }
+    if (data.asteroids) {
+      this.syncServerAsteroids(data.asteroids);
+    }
+    for (const g of this.gems) g.destroy(this.scene);
+    this.gems = [];
+    for (const l of this.lasers) l.destroy(this.scene);
+    this.lasers = [];
+    for (const p of this.particles) p.destroy(this.scene);
+    this.particles = [];
+
+    // Ensure player drops from old match and returns to fresh main menu
+    this.returnToMenu();
+
+    if (this.ui && data.teamStatus) {
+      this.ui.updateTeamStatus(data.teamStatus);
     }
   }
 

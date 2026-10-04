@@ -1539,14 +1539,20 @@ class UIManager {
     }, duration);
   }
 
-  showVictory(winningNation, isPlayerWin, player) {
+  showVictory(winningNation, isPlayerWin, player, countdownSeconds = 8) {
     this.hideTierUpDropBanner();
     this.hideGameOver();
+
+    if (this.victoryCountdownInterval) {
+      clearInterval(this.victoryCountdownInterval);
+      this.victoryCountdownInterval = null;
+    }
 
     const victoryScreen = document.getElementById('victory-screen');
     const title = document.getElementById('victory-title');
     const subtitle = document.getElementById('victory-subtitle');
     const banner = document.getElementById('victory-nation-banner');
+    const countdownSecEl = document.getElementById('victory-countdown-sec');
     const nCfg = NATIONS[winningNation] || NATIONS['blue'];
 
     if (isPlayerWin) {
@@ -1566,12 +1572,36 @@ class UIManager {
     const shipName = player ? SHIP_TREE[player.shipKey].name : 'Fly';
     document.getElementById('victory-tier').textContent = shipName;
 
-    const restartBtn = document.getElementById('victory-restart-btn');
-    restartBtn.onclick = () => {
+    let timeLeft = countdownSeconds;
+    if (countdownSecEl) {
+      countdownSecEl.textContent = timeLeft;
+    }
+
+    const returnAction = () => {
+      if (this.victoryCountdownInterval) {
+        clearInterval(this.victoryCountdownInterval);
+        this.victoryCountdownInterval = null;
+      }
       victoryScreen.style.display = 'none';
-      const name = player ? player.name : 'KOMUTAN';
-      this.game.startGame(name, this.selectedNation);
+      if (this.game && typeof this.game.returnToMenu === 'function') {
+        this.game.returnToMenu();
+      }
     };
+
+    const restartBtn = document.getElementById('victory-restart-btn');
+    if (restartBtn) {
+      restartBtn.onclick = returnAction;
+    }
+
+    this.victoryCountdownInterval = setInterval(() => {
+      timeLeft--;
+      if (countdownSecEl) {
+        countdownSecEl.textContent = Math.max(0, timeLeft);
+      }
+      if (timeLeft <= 0) {
+        returnAction();
+      }
+    }, 1000);
 
     victoryScreen.style.display = 'flex';
   }
@@ -1628,6 +1658,10 @@ class UIManager {
   }
 
   showMainMenu() {
+    if (this.victoryCountdownInterval) {
+      clearInterval(this.victoryCountdownInterval);
+      this.victoryCountdownInterval = null;
+    }
     this.hideGameOver();
     this.hideTierUpDropBanner();
     this.hideNationEliminated();
@@ -1664,6 +1698,13 @@ class UIManager {
               <span class="lock-icon" style="font-size:1.15rem;margin-bottom:3px;">💥</span>
               <span class="lock-text" style="color:#ef4444;font-size:0.7rem;line-height:1.2;text-align:center;">ÜS YOK EDİLDİ<br><small style="font-size:0.6rem;opacity:0.85;">(SEÇİLEMEZ)</small></span>
             `;
+          }
+        } else {
+          if (card) {
+            card.classList.remove('destroyed');
+          }
+          if (lockOverlay && !card.classList.contains('locked')) {
+            lockOverlay.style.display = 'none';
           }
         }
       }

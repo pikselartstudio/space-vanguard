@@ -275,6 +275,20 @@ class NetworkManager {
       }
     });
 
+    // Round Concluded (Victory & Countdown)
+    this.socket.on('round_concluded', (data) => {
+      if (this.game) {
+        this.game.onServerRoundConcluded(data);
+      }
+    });
+
+    // Galaxy Reset (New Round Initialized on Server)
+    this.socket.on('galaxy_reset', (data) => {
+      if (this.game) {
+        this.game.onServerGalaxyReset(data);
+      }
+    });
+
     // Tactical Chat
     this.socket.on('chat_message', (data) => {
       if (this.game && this.game.ui) {

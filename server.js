@@ -237,6 +237,92 @@ function broadcastTeamStatus() {
   io.emit('team_status', dist);
 }
 
+let roundResetTimer = null;
+let isRoundEnding = false;
+
+function handleRoundVictory(winnerNation, lastAttacker = null) {
+  if (isRoundEnding) return;
+  isRoundEnding = true;
+
+  const winnerName = (winnerNation === 'red') ? 'KRYOS' : ((winnerNation === 'gold') ? 'AETHELON' : 'VEYLARIAN');
+
+  io.emit('round_concluded', {
+    winnerNation,
+    winnerName,
+    countdownSeconds: 8
+  });
+
+  io.emit('chat_message', {
+    id: `victory-${Date.now()}`,
+    senderName: 'ŞAMPİYON',
+    nation: winnerNation,
+    text: `🏆 ${winnerName} ULUSU GALAKSİYİ FETHETTİ! 8 saniye içinde tüm filolar ana üsse dönecek ve yeni savaş başlayacak!`,
+    isSystem: true,
+    timestamp: Date.now()
+  });
+
+  if (roundResetTimer) clearTimeout(roundResetTimer);
+  roundResetTimer = setTimeout(() => {
+    resetGalaxyServer(winnerNation);
+  }, 8000);
+}
+
+function resetGalaxyServer(prevWinner = null) {
+  isRoundEnding = false;
+
+  // 1. Reset all 3 stations to full health, level 1 and active state
+  for (const n of ['red', 'blue', 'gold']) {
+    stations[n].hp = 25000;
+    stations[n].maxHp = 25000;
+    stations[n].level = 1;
+    stations[n].crystalsDonated = 0;
+    stations[n].crystalsRequired = 100;
+    stations[n].isDead = false;
+  }
+
+  // 2. Clear and regenerate full asteroid fields
+  asteroids.clear();
+  nextAsteroidId = 1;
+  for (let i = 0; i < 580; i++) {
+    generateAsteroid((i % 7) + 1);
+  }
+  const baseTiers = [1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3, 1, 1, 2, 2, 1, 2, 3, 1, 2, 3, 1, 1, 2, 2, 3, 1, 2, 2];
+  for (const n of ['blue', 'red', 'gold']) {
+    const b = BASE_LOCATIONS[n];
+    for (const tier of baseTiers) {
+      generateAsteroid(tier, b, n);
+    }
+  }
+
+  // 3. Clear loose floating crystals
+  activeCrystals.clear();
+  nextCrystalId = 1;
+
+  // 4. Reset all active player battle states
+  players.clear();
+
+  // 5. Broadcast reset galaxy data & team distribution to all clients
+  const teamDist = getTeamDistribution();
+  io.emit('galaxy_reset', {
+    stations,
+    asteroids: Array.from(asteroids.values()),
+    teamStatus: teamDist
+  });
+
+  io.emit('team_status', teamDist);
+
+  io.emit('chat_message', {
+    id: `newround-${Date.now()}`,
+    senderName: 'SİSTEM',
+    nation: 'blue',
+    text: `🚀 YENİ SAVAŞ BAŞLADI! Tüm uzay üsleri onarıldı, ulusunuzu seçip savaşa katılabilirsiniz!`,
+    isSystem: true,
+    timestamp: Date.now()
+  });
+
+  console.log('[GALAXY] Evren sıfırlandı, tüm üsler ve asteroitler yenilendi. Yeni raunt hazır!');
+}
+
 function getNationSpawn(nation) {
   const baseLoc = BASE_LOCATIONS[nation] || BASE_LOCATIONS['blue'];
   const offsetAngle = Math.random() * Math.PI * 2;
@@ -644,6 +730,13 @@ io.on('connection', (socket) => {
         isSystem: true,
         timestamp: Date.now()
       });
+
+      // User request: sarı ve kırmızı ulus yok olunca zafer ve sunucunun 0'dan tekrar başlaması
+      const livingBases = Object.keys(stations).filter(k => stations[k] && !stations[k].isDead);
+      if (livingBases.length <= 1) {
+        const winnerNation = (livingBases.length === 1) ? livingBases[0] : attacker.nation;
+        handleRoundVictory(winnerNation, attacker);
+      }
     } else {
       io.emit('base_damaged', {
         nation: base.nation,
