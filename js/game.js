@@ -19,7 +19,7 @@ const NATION_BOT_NAMES = {
 
 class StarblastGame {
   constructor() {
-    this.worldSize = 8250; // Scaled down 2x per user request: "haritamızı 2x daha küçültelim"
+    this.worldSize = 12000; // Balanced universe arena size, giving bases ample clearance
     this.isPlaying = false;
     this.playerNation = 'blue';
     this.playerDeadHandled = false;
@@ -85,6 +85,11 @@ class StarblastGame {
     this.mouseScreenY = window.innerHeight / 2;
     this.donateTimer = 0;
     this.cameraShakeTimer = 0;
+    // Camera Zoom Controls (Mouse wheel roll in/out per user request)
+    this.cameraZoomFactor = 1.0;
+    this.targetCameraZoomFactor = 1.0;
+    this.minZoomFactor = 0.50; // Zoom in close to ship
+    this.maxZoomFactor = 1.65; // Zoom out far for wide tactical view
 
     // Setup Systems
     if (window.SpaceUniverse) {
@@ -388,6 +393,17 @@ class StarblastGame {
     });
 
     window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // User request: "farenin roll tuşu gemiye yanaşa bilsin uzaklaşabilsin."
+    window.addEventListener('wheel', (e) => {
+      if (!this.isPlaying || this.isMenuBattle) return;
+      if (e.target && (e.target.closest('#chat-messages') || e.target.closest('#upgrade-cards-grid'))) {
+        return;
+      }
+      e.preventDefault();
+      const zoomStep = (e.deltaY > 0 ? 0.08 : -0.08);
+      this.targetCameraZoomFactor = Math.max(this.minZoomFactor, Math.min(this.maxZoomFactor, this.targetCameraZoomFactor + zoomStep));
+    }, { passive: false });
   }
 
   onWindowResize() {
@@ -1869,22 +1885,33 @@ class StarblastGame {
 
         // Toroidal camera wrap handling: prevent camera from sweeping across entire arena when player wraps
         if (this.worldSize) {
-          if (targetCamX - this.camera.position.x > this.worldSize * 0.5) {
+          const half = this.worldSize * 0.5;
+          if (targetCamX - this.camera.position.x > half) {
             this.camera.position.x += this.worldSize;
-          } else if (targetCamX - this.camera.position.x < -this.worldSize * 0.5) {
+          } else if (targetCamX - this.camera.position.x < -half) {
             this.camera.position.x -= this.worldSize;
           }
-          if (targetCamY - this.camera.position.y > this.worldSize * 0.5) {
+          if (targetCamY - this.camera.position.y > half) {
             this.camera.position.y += this.worldSize;
-          } else if (targetCamY - this.camera.position.y < -this.worldSize * 0.5) {
+          } else if (targetCamY - this.camera.position.y < -half) {
             this.camera.position.y -= this.worldSize;
           }
         }
 
-        this.camera.position.x += (targetCamX - this.camera.position.x) * 0.08;
-        this.camera.position.y += (targetCamY - this.camera.position.y) * 0.08;
-        const targetCamZ = Math.max(750, 600 + (this.player.radius || 18) * 6.5);
-        this.camera.position.z += (targetCamZ - this.camera.position.z) * 0.08;
+        const distToCam = Math.hypot(targetCamX - this.camera.position.x, targetCamY - this.camera.position.y);
+        if (distToCam > 1200) {
+          this.camera.position.x = targetCamX;
+          this.camera.position.y = targetCamY;
+        } else {
+          this.camera.position.x += (targetCamX - this.camera.position.x) * 0.12;
+          this.camera.position.y += (targetCamY - this.camera.position.y) * 0.12;
+        }
+
+        // Smooth Mouse Wheel Zoom (Roll tuşu ile gemiye yanaşma/uzaklaşma)
+        this.cameraZoomFactor += (this.targetCameraZoomFactor - this.cameraZoomFactor) * 0.12;
+        const baseCamZ = Math.max(750, 600 + (this.player.radius || 18) * 6.5);
+        const targetCamZ = baseCamZ * this.cameraZoomFactor;
+        this.camera.position.z += (targetCamZ - this.camera.position.z) * 0.12;
         this.camera.up.set(0, 1, 0);
         this.camera.lookAt(this.camera.position.x, this.camera.position.y, 0);
       }

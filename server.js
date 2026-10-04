@@ -83,7 +83,7 @@ const io = new Server(server, {
 // ==========================================
 // PERSISTENT GALAXY WORLD STATE
 // ==========================================
-const WORLD_SIZE = 8250;
+const WORLD_SIZE = 12000;
 
 const BASE_LOCATIONS = {
   blue: { x: 0, y: -3150 },
@@ -92,9 +92,9 @@ const BASE_LOCATIONS = {
 };
 
 const stations = {
-  blue: { nation: 'blue', x: BASE_LOCATIONS.blue.x, y: BASE_LOCATIONS.blue.y, hp: 25000, maxHp: 25000, level: 1, crystalsDonated: 0, crystalsRequired: 100, isDead: false },
-  red:  { nation: 'red',  x: BASE_LOCATIONS.red.x,  y: BASE_LOCATIONS.red.y,  hp: 25000, maxHp: 25000, level: 1, crystalsDonated: 0, crystalsRequired: 100, isDead: false },
-  gold: { nation: 'gold', x: BASE_LOCATIONS.gold.x, y: BASE_LOCATIONS.gold.y, hp: 25000, maxHp: 25000, level: 1, crystalsDonated: 0, crystalsRequired: 100, isDead: false }
+  blue: { nation: 'blue', x: BASE_LOCATIONS.blue.x, y: BASE_LOCATIONS.blue.y, hp: 100000, maxHp: 100000, level: 1, crystalsDonated: 0, crystalsRequired: 100, isDead: false },
+  red:  { nation: 'red',  x: BASE_LOCATIONS.red.x,  y: BASE_LOCATIONS.red.y,  hp: 100000, maxHp: 100000, level: 1, crystalsDonated: 0, crystalsRequired: 100, isDead: false },
+  gold: { nation: 'gold', x: BASE_LOCATIONS.gold.x, y: BASE_LOCATIONS.gold.y, hp: 100000, maxHp: 100000, level: 1, crystalsDonated: 0, crystalsRequired: 100, isDead: false }
 };
 
 // Asteroid Yields Configuration (Max 1-4 Pieces per user request)
@@ -272,8 +272,8 @@ function resetGalaxyServer(prevWinner = null) {
 
   // 1. Reset all 3 stations to full health, level 1 and active state
   for (const n of ['red', 'blue', 'gold']) {
-    stations[n].hp = 25000;
-    stations[n].maxHp = 25000;
+    stations[n].hp = 100000;
+    stations[n].maxHp = 100000;
     stations[n].level = 1;
     stations[n].crystalsDonated = 0;
     stations[n].crystalsRequired = 100;
@@ -475,14 +475,12 @@ io.on('connection', (socket) => {
 
     p.x = state.x;
     p.y = state.y;
-    // 1:1 Spherical map horizon: seamless continuous loop across spherical arena
-    const radiusLimit = WORLD_SIZE * 0.48;
-    const d = Math.hypot(p.x, p.y);
-    if (d > radiusLimit) {
-      const ang = Math.atan2(p.y, p.x);
-      p.x = -Math.cos(ang) * (radiusLimit - 14);
-      p.y = -Math.sin(ang) * (radiusLimit - 14);
-    }
+    // Toroidal continuous wrap: seamlessly loop across arena in any direction
+    const half = WORLD_SIZE / 2;
+    while (p.x < -half) p.x += WORLD_SIZE;
+    while (p.x > half) p.x -= WORLD_SIZE;
+    while (p.y < -half) p.y += WORLD_SIZE;
+    while (p.y > half) p.y -= WORLD_SIZE;
 
     p.vx = state.vx || 0;
     p.vy = state.vy || 0;
@@ -829,7 +827,7 @@ io.on('connection', (socket) => {
     let leveledUp = false;
     if (base.crystalsDonated >= base.crystalsRequired && base.level < 5) {
       base.level++;
-      base.maxHp += 15000;
+      base.maxHp = base.level * 100000;
       base.hp = base.maxHp;
       base.crystalsDonated = 0;
       base.crystalsRequired = Math.round(base.crystalsRequired * 2.2);

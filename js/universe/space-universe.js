@@ -193,8 +193,8 @@ class SpaceUniverse {
     this.majorStarfield = new THREE.Points(majorGeo, majorMat);
     this.starfieldGroup.add(this.majorStarfield);
 
-    // TIER 2: Dense Background Radiant Starfield (size: 8.8) - 45K STARS
-    const bgCount = 45000;
+    // TIER 2: Dense Background Radiant Starfield (size: 8.8) - 37.5K STARS (reduced 1.2x per user request)
+    const bgCount = 37500;
     const bgGeo = new THREE.BufferGeometry();
     const bgPos = new Float32Array(bgCount * 3);
     const bgCol = new Float32Array(bgCount * 3);

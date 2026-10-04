@@ -958,7 +958,7 @@ class UIManager {
         this.baseDockStatus.innerHTML = `
           <div style="font-weight: bold; color: #ffdd44; letter-spacing: 1px;">★ ${nationCfg.name.toUpperCase()} ÜSSÜNDESİNİZ ★</div>
           <div style="font-size: 0.8rem; margin-top: 3px;">Kalkan/Can Yenileniyor • <b>[B]</b> Tuşuyla Anında Bağış Yap</div>
-          <div style="font-size: 0.75rem; color: #9eccdf; margin-top: 2px;">Üs Seviyesi: <b>${homeBase.level}</b> | Can: <b>${Math.round(homeBase.hp)}/${homeBase.maxHp}</b> | Gelişim: <b>${homeBase.crystalsDonated}/${homeBase.crystalsRequired} (%${pct})</b></div>
+          <div style="font-size: 0.75rem; color: #9eccdf; margin-top: 2px;">Üs Seviyesi: <b>${homeBase.level}/5</b> | Can: <b>${Math.round(homeBase.hp).toLocaleString()} / ${homeBase.maxHp.toLocaleString()}</b> | Gelişim: <b>${homeBase.crystalsDonated}/${homeBase.crystalsRequired} (%${pct})</b></div>
         `;
       }
     }
@@ -984,7 +984,7 @@ class UIManager {
         const hpPct = Math.round((hostileStation.hp / hostileStation.maxHp) * 100);
         this.baseDockStatus.innerHTML = `
           <div style="font-weight: bold; color: #ff3355; letter-spacing: 1px;">⚔️ DÜŞMAN ÜS HEDEFTE: ${hostileNationCfg.name.toUpperCase()} ⚔️</div>
-          <div style="font-size: 0.8rem; margin-top: 3px; color: #fff;">Üs Canı: <b>${Math.round(hostileStation.hp)} / ${hostileStation.maxHp} (%${hpPct})</b> | Seviye: <b>${hostileStation.level}</b></div>
+          <div style="font-size: 0.8rem; margin-top: 3px; color: #fff;">Üs Canı: <b>${Math.round(hostileStation.hp).toLocaleString()} / ${hostileStation.maxHp.toLocaleString()} (%${hpPct})</b> | Seviye: <b>${hostileStation.level}/5</b></div>
           <div style="font-size: 0.75rem; color: #ff8899; margin-top: 2px;">Düşman üssü yok etmek için ateş açın! Dikkat: Savunma taretleri ateş ediyor!</div>
         `;
       }

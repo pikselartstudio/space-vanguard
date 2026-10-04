@@ -16,15 +16,13 @@ class Entity {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
-    // 1:1 Spherical map horizon: seamless continuous loop across spherical arena
+    // Toroidal continuous wrap: seamlessly loop across arena in any direction
     if (worldSize) {
-      const radiusLimit = worldSize * 0.48;
-      const d = Math.hypot(this.x, this.y);
-      if (d > radiusLimit) {
-        const ang = Math.atan2(this.y, this.x);
-        this.x = -Math.cos(ang) * (radiusLimit - 14);
-        this.y = -Math.sin(ang) * (radiusLimit - 14);
-      }
+      const half = worldSize / 2;
+      while (this.x < -half) this.x += worldSize;
+      while (this.x > half) this.x -= worldSize;
+      while (this.y < -half) this.y += worldSize;
+      while (this.y > half) this.y -= worldSize;
     }
 
     if (this.mesh) {
@@ -1704,8 +1702,8 @@ class SpaceStation extends Entity {
     this.radius = 450; // Perimeter for docking and healing
     this.hullRadius = 230; // Physical structure collision radius ("rakibin istasyonuna vurunca istasyon objesine vuruşu hissettirmeli")
     this.shudder = 0; // Visual impact shudder timer
-    this.maxHp = 25000; // Heavily fortified base
-    this.hp = 25000;
+    this.maxHp = 100000; // Level 1 HP: 100k
+    this.hp = 100000;
     this.shieldRegenRate = 45; // 45 HP/sec passive shield repair
     this.crystalsDonated = 0;
     this.crystalsRequired = 100;
@@ -1732,7 +1730,7 @@ class SpaceStation extends Entity {
     let leveledUp = false;
     if (this.crystalsDonated >= this.crystalsRequired && this.level < 5) {
       this.level++;
-      this.maxHp += 15000;
+      this.maxHp = this.level * 100000; // Each level increases HP by 100k (Lv1=100k up to Lv5=500k)
       this.hp = this.maxHp;
       this.crystalsDonated = 0;
       this.crystalsRequired = Math.round(this.crystalsRequired * 2.2);
