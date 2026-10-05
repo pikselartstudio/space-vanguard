@@ -1337,25 +1337,23 @@ class StarblastGame {
       rp.updateInterpolation(dt, this.worldSize);
     }
 
-    // 1. Update 3 Nation Home Bases
+    // 1. Update 3 Nation Home Bases (Rotation, Shudder, Passive Shield Regen - no turret shooting per user request)
     for (const key in this.stations) {
       const st = this.stations[key];
-      st.update(dt, allShips, (laser) => {
-        this.lasers.push(laser);
-        this.scene.add(laser.mesh);
-        // Play turret laser sound ONLY if near player
-        const vol = this.getPositionalVolume(laser.x, laser.y, 800);
-        if (vol > 0.04) {
-          window.soundSystem.playLaser(true, vol * 0.7);
-        }
-      });
+      st.update(dt);
     }
 
     // Base interaction for player: heal shield and auto-donate in perimeter
     if (this.player && !this.player.isDead) {
       const homeBase = this.stations[this.player.nation];
       if (homeBase) {
-        const d = Math.hypot(this.player.x - homeBase.x, this.player.y - homeBase.y);
+        const worldSpan = this.worldSize || 8250;
+        const halfWorld = worldSpan * 0.5;
+        let dx = Math.abs(this.player.x - homeBase.x);
+        if (dx > halfWorld) dx = worldSpan - dx;
+        let dy = Math.abs(this.player.y - homeBase.y);
+        if (dy > halfWorld) dy = worldSpan - dy;
+        const d = Math.hypot(dx, dy);
         const healPerimeter = (homeBase.radius || 420) + 180;
         if (d <= healPerimeter) {
           // Heal friendly ship shield

@@ -2085,45 +2085,5 @@ class SpaceStation extends Entity {
         this.shieldMesh.material.opacity = 0.14;
       }
     }
-
-    // Auto-turret defense: shoot at nearest enemy within perimeter (range 2200 for 4x base)
-    this.turretTimer -= dt;
-    if (this.turretTimer <= 0) {
-      let target = null;
-      let minDist = 2200;
-      for (const s of enemyShips) {
-        if (s.isDead || s.nation === this.nation) continue;
-        if (Math.abs(s.x - this.x) > minDist || Math.abs(s.y - this.y) > minDist) continue;
-        const d = Math.hypot(s.x - this.x, s.y - this.y);
-        if (d < minDist) {
-          minDist = d;
-          target = s;
-        }
-      }
-
-      if (target) {
-        this.turretTimer = 0.42;
-        const dx = target.x - this.x;
-        const dy = target.y - this.y;
-        const angle = Math.atan2(dy, dx);
-        const vx = Math.cos(angle) * 850;
-        const vy = Math.sin(angle) * 850;
-
-        const laserColor = NATIONS[this.nation] ? NATIONS[this.nation].laserColor : 0x00f0ff;
-        const laser = new Laser(
-          this.x,
-          this.y,
-          vx,
-          vy,
-          20 + this.level * 8,
-          true,
-          `base-${this.nation}`,
-          laserColor,
-          this.nation,
-          1800
-        );
-        if (onFireTurret) onFireTurret(laser);
-      }
-    }
   }
 }

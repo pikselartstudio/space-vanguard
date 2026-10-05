@@ -20,6 +20,7 @@ class UIManager {
     this.driftStateText = document.getElementById('dfrt-state-text');
     this.shopHudBtn = document.getElementById('shop-hud-btn');
     this.isShopOpen = false;
+    this.wasInStationPerimeter = false;
 
     this.upgradeDock = document.getElementById('upgrade-dock');
     this.upgradeGrid = document.getElementById('upgrade-cards-grid');
@@ -974,10 +975,10 @@ class UIManager {
       this.updateDriftIndicator(player.isStabilizerActive !== false);
     }
 
-    // Base docking & donation prompt OR enemy base siege alert OR shop opened via [M]
-    let nearStation = false;
+    // Base docking & perimeter calculation
+    let insideHomeBase = false;
     const homeBase = stations ? stations[player.nation] : null;
-    if (homeBase && !homeBase.isDead && this.baseDockStatus) {
+    if (homeBase && !homeBase.isDead && player) {
       const worldSpan = (this.game && this.game.worldSize) ? this.game.worldSize : 8250;
       const halfWorld = worldSpan * 0.5;
       let dx = Math.abs(player.x - homeBase.x);
@@ -987,20 +988,30 @@ class UIManager {
       const dist = Math.hypot(dx, dy);
       const dockPerimeter = (homeBase.radius || 420) + 180;
       if (dist <= dockPerimeter) {
-        nearStation = true;
-        player.isDockedAtBase = true;
-        this.baseDockStatus.style.display = 'block';
-        const isDonating = this.game && this.game.isAutoDonating ? 1 : 0;
-        const marketKey = `${homeBase.level}_${homeBase.crystalsDonated}_${homeBase.hp}_${player.tier}_${player.drones ? player.drones.length : 0}_${(player.elementalAmmo && player.elementalAmmo.ice) || 0}_${(player.elementalAmmo && player.elementalAmmo.fire) || 0}_${(player.elementalAmmo && player.elementalAmmo.dark) || 0}_${isDonating}`;
-        if (this.lastRenderedBaseDockKey !== marketKey) {
-          this.lastRenderedBaseDockKey = marketKey;
-          this.renderBaseMarket(homeBase, player);
-        }
+        insideHomeBase = true;
       }
     }
 
-    // Shop opened anywhere in space via [M] key or HUD button
-    if (!nearStation && this.isShopOpen && homeBase && this.baseDockStatus) {
+    if (player) {
+      player.isDockedAtBase = insideHomeBase;
+    }
+
+    // User request: "istasyon içine girince açılmalı oradan ayrılınca kendi otomatik kapanmalı"
+    if (insideHomeBase && !this.wasInStationPerimeter) {
+      // Just entered station: automatically open shop
+      this.isShopOpen = true;
+    } else if (!insideHomeBase && this.wasInStationPerimeter) {
+      // Just left station: automatically close shop
+      this.isShopOpen = false;
+      if (this.game && this.game.isAutoDonating) {
+        this.game.isAutoDonating = false;
+      }
+    }
+    this.wasInStationPerimeter = insideHomeBase;
+
+    // Display Base Market IF this.isShopOpen is true
+    let nearStation = false;
+    if (this.isShopOpen && homeBase && !homeBase.isDead && this.baseDockStatus) {
       nearStation = true;
       this.baseDockStatus.style.display = 'block';
       const isDonating = this.game && this.game.isAutoDonating ? 1 : 0;
@@ -1011,9 +1022,8 @@ class UIManager {
       }
     }
 
-    if (!nearStation && !this.isShopOpen && stations && this.baseDockStatus) {
-      if (player) player.isDockedAtBase = false;
-      // Check if near any hostile station (siege alert)
+    // Hostile station siege alert (only when shop is NOT open)
+    if (!this.isShopOpen && stations && this.baseDockStatus) {
       let hostileStation = null;
       let minHostileDist = 1350;
       const worldSpan = (this.game && this.game.worldSize) ? this.game.worldSize : 8250;
@@ -1041,19 +1051,18 @@ class UIManager {
         this.baseDockStatus.innerHTML = `
           <div style="font-weight: bold; color: #ff3355; letter-spacing: 1px;">⚔️ DÜŞMAN ÜS HEDEFTE: ${hostileNationCfg.name.toUpperCase()} ⚔️</div>
           <div style="font-size: 0.8rem; margin-top: 3px; color: #fff;">Üs Canı: <b>${Math.round(hostileStation.hp).toLocaleString()} / ${hostileStation.maxHp.toLocaleString()} (%${hpPct})</b> | Seviye: <b>${hostileStation.level}/5</b></div>
-          <div style="font-size: 0.75rem; color: #ff8899; margin-top: 2px;">Düşman üssü yok etmek için ateş açın! Dikkat: Savunma taretleri ateş ediyor!</div>
+          <div style="font-size: 0.75rem; color: #ff8899; margin-top: 2px;">Düşman üssü yok etmek için ateş açın!</div>
         `;
       }
     }
 
-    if (!nearStation && !this.isShopOpen && this.baseDockStatus) {
-      if (player) player.isDockedAtBase = false;
+    if (!nearStation && this.baseDockStatus) {
       this.lastRenderedBaseDockKey = null;
       this.baseDockStatus.style.display = 'none';
     }
 
     if (this.shopHudBtn) {
-      this.shopHudBtn.classList.toggle('active', !!(this.isShopOpen || (player && player.isDockedAtBase)));
+      this.shopHudBtn.classList.toggle('active', !!this.isShopOpen);
     }
 
     // Check if any stat can still be upgraded
@@ -1160,14 +1169,9 @@ class UIManager {
           this.renderBaseMarket(homeBase, this.game.player);
         }
       } else {
-        const homeBase = (this.game && this.game.stations && this.game.player)
-          ? this.game.stations[this.game.player.nation]
-          : null;
-        const isDocked = (this.game && this.game.player && this.game.player.isDockedAtBase);
-        if (!isDocked) {
-          this.baseDockStatus.style.display = 'none';
-          this.lastRenderedBaseDockKey = null;
-        }
+        // Kullanıcı M, ESC veya [✕] ile kapattığında koşulsuz olarak gizle
+        this.baseDockStatus.style.display = 'none';
+        this.lastRenderedBaseDockKey = null;
       }
     }
   }
