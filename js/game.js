@@ -347,16 +347,18 @@ class StarblastGame {
       const ndcX = (e.clientX / window.innerWidth) * 2 - 1;
       const ndcY = -(e.clientY / window.innerHeight) * 2 + 1;
 
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
-      const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-      const intersection = new THREE.Vector3();
-      raycaster.ray.intersectPlane(plane, intersection);
-
-      if (intersection) {
-        this.mouseWorld.x = intersection.x;
-        this.mouseWorld.y = -intersection.y;
+      if (!this._mouseRaycaster) {
+        this._mouseRaycaster = new THREE.Raycaster();
+        this._mouseNdc = new THREE.Vector2();
+        this._mousePlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        this._mouseIntersection = new THREE.Vector3();
       }
+      this._mouseNdc.set(ndcX, ndcY);
+      this._mouseRaycaster.setFromCamera(this._mouseNdc, this.camera);
+      this._mouseRaycaster.ray.intersectPlane(this._mousePlane, this._mouseIntersection);
+
+      this.mouseWorld.x = this._mouseIntersection.x;
+      this.mouseWorld.y = -this._mouseIntersection.y;
     });
 
     window.addEventListener('mousedown', (e) => {
@@ -944,12 +946,21 @@ class StarblastGame {
     }
   }
 
-  createLaserHitParticles(x, y, color = 0x00ff44, count = 16) {
-    for (let i = 0; i < count; i++) {
+  createLaserHitParticles(x, y, color = 0x00ff44, count = 8) {
+    const finalCount = Math.min(count, 10);
+    // Safety cap to prevent particle accumulation during sustained combat
+    if (this.particles.length > 180) {
+      const excess = this.particles.length - 180;
+      for (let i = 0; i < excess; i++) {
+        const oldP = this.particles.shift();
+        if (oldP) oldP.destroy(this.scene);
+      }
+    }
+    for (let i = 0; i < finalCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 80 + Math.random() * 230;
-      const size = 2.2 + Math.random() * 2.8;
-      const p = new Particle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, color, size, 0.28);
+      const speed = 70 + Math.random() * 180;
+      const size = 2.0 + Math.random() * 2.5;
+      const p = new Particle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, color, size, 0.22);
       this.particles.push(p);
       this.scene.add(p.mesh);
     }
@@ -1222,16 +1233,23 @@ class StarblastGame {
     }
 
     // Fire laser: Left click or Space (when warp is not active/unlocked)
-    if (this.keys['MouseLeft'] || (this.keys['Space'] && !this.player.warpUnlocked)) {
+    const isWantsFire = !!(this.keys['MouseLeft'] || (this.keys['Space'] && !this.player.warpUnlocked));
+    this.player.isShooting = isWantsFire;
+    if (isWantsFire) {
       const newLasers = this.player.tryFire();
       if (newLasers && newLasers.length > 0) {
         // Track targeted asteroid for mining drone
         let targetedAst = null;
         let minAimDist = 180;
+        const mx = this.mouseWorld.x;
+        const my = this.mouseWorld.y;
         for (let ai = 0; ai < this.asteroids.length; ai++) {
           const a = this.asteroids[ai];
           if (a && !a.isDead) {
-            const d = Math.hypot(a.x - this.mouseWorld.x, a.y - this.mouseWorld.y);
+            const dx = Math.abs(a.x - mx);
+            const dy = Math.abs(a.y - my);
+            if (dx > minAimDist || dy > minAimDist) continue;
+            const d = Math.hypot(dx, dy);
             if (d < (a.radius + 70) && d < minAimDist) {
               minAimDist = d;
               targetedAst = a;
@@ -1259,7 +1277,7 @@ class StarblastGame {
             isHeavy: !!l.isHeavy,
             isHealBeam: !!l.isHealBeam,
             element: l.element || 'standard',
-            color: l.element === 'ice' ? 0x00f0ff : (l.element === 'fire' ? 0xff4500 : (l.element === 'dark' ? 0xa855f7 : (l.mesh ? (l.nation === 'red' ? 0xff3b5c : (l.nation === 'blue' ? 0x00f0ff : 0xffcc00)) : 0x00f0ff))),
+            color: l.color,
             maxRange: l.maxRange
           })));
         }
@@ -1402,7 +1420,7 @@ class StarblastGame {
       // Laser vs Asteroids: Pick the CLOSEST intersecting asteroid along the laser trajectory (never penetrate to background)
       let hit = false;
       let closestAst = null;
-      let minHitDist = Infinity;
+      let minHitDistSq = Infinity;
 
       for (let j = 0; j < this.asteroids.length; j++) {
         const ast = this.asteroids[j];
@@ -1414,8 +1432,12 @@ class StarblastGame {
           ldx -= Math.round(ldx / this.worldSize) * this.worldSize;
           ldy -= Math.round(ldy / this.worldSize) * this.worldSize;
         }
-        const dist = Math.hypot(ldx, ldy);
-        if (dist < ast.radius + laser.radius) {
+        const checkR = ast.radius + laser.radius;
+        // Fast AABB rejection before distance check
+        if (Math.abs(ldx) > checkR || Math.abs(ldy) > checkR) continue;
+
+        const distSq = ldx * ldx + ldy * ldy;
+        if (distSq < checkR * checkR) {
           const startX = (laser.startX !== undefined) ? laser.startX : laser.x;
           const startY = (laser.startY !== undefined) ? laser.startY : laser.y;
           let odx = startX - ast.x;
@@ -1424,9 +1446,9 @@ class StarblastGame {
             odx -= Math.round(odx / this.worldSize) * this.worldSize;
             ody -= Math.round(ody / this.worldSize) * this.worldSize;
           }
-          const fromOriginDist = Math.hypot(odx, ody);
-          if (fromOriginDist < minHitDist) {
-            minHitDist = fromOriginDist;
+          const fromOriginDistSq = odx * odx + ody * ody;
+          if (fromOriginDistSq < minHitDistSq) {
+            minHitDistSq = fromOriginDistSq;
             closestAst = ast;
           }
         }
@@ -1437,7 +1459,7 @@ class StarblastGame {
         const ast = closestAst;
         // Match particle color to laser bolt per user request: "lazer ile ateş ettiğimizde hangi renkse çarptığı yerde partiküllerine ayrılsın"
         const hitCol = (typeof laser.getHitColor === 'function') ? laser.getHitColor() : (laser.color || 0x00ff44);
-        this.createLaserHitParticles(laser.x, laser.y, hitCol, 22);
+        this.createLaserHitParticles(laser.x, laser.y, hitCol, 8);
         const hitVol = (laser.ownerId === 'player' || (this.network && laser.ownerId === this.network.myId)) ? 1.0 : this.getPositionalVolume(laser.x, laser.y, 650);
         if (hitVol > 0.04) window.soundSystem.playHit(hitVol);
 
@@ -1484,8 +1506,10 @@ class StarblastGame {
             sdx -= Math.round(sdx / this.worldSize) * this.worldSize;
             sdy -= Math.round(sdy / this.worldSize) * this.worldSize;
           }
-          const dist = Math.hypot(sdx, sdy);
-          if (dist < ship.radius + laser.radius) {
+          const checkR = ship.radius + laser.radius;
+          if (Math.abs(sdx) > checkR || Math.abs(sdy) > checkR) continue;
+          const distSq = sdx * sdx + sdy * sdy;
+          if (distSq < checkR * checkR) {
             // Case 1: Healer shooting own friendly player/ship -> RESTORE HEALTH / SHIELD!
             if (laser.isHealBeam && ship.nation === laser.nation) {
               hit = true;
@@ -1522,7 +1546,7 @@ class StarblastGame {
             hit = true;
             // Exact laser bolt color disintegration particles
             const hitCol = (typeof laser.getHitColor === 'function') ? laser.getHitColor() : (laser.color || 0x00ff44);
-            this.createLaserHitParticles(laser.x, laser.y, hitCol, 10);
+            this.createLaserHitParticles(laser.x, laser.y, hitCol, 8);
             const hitVol = (ship === this.player || laser.ownerId === 'player') ? 1.0 : this.getPositionalVolume(ship.x, ship.y, 650);
             if (hitVol > 0.04) window.soundSystem.playHit(hitVol);
 
@@ -1573,9 +1597,17 @@ class StarblastGame {
           const station = this.stations[key];
           if (!station || station.isDead) continue;
 
-          const dist = Math.hypot(laser.x - station.x, laser.y - station.y);
-          const stationHitRadius = station.hullRadius || 230; // Physical structure collision radius ("istasyon objesine vuruşu hissettirmeli")
-          if (dist < stationHitRadius + laser.radius) {
+          let bdx = laser.x - station.x;
+          let bdy = laser.y - station.y;
+          if (this.worldSize > 0) {
+            bdx -= Math.round(bdx / this.worldSize) * this.worldSize;
+            bdy -= Math.round(bdy / this.worldSize) * this.worldSize;
+          }
+          const stationHitRadius = station.hullRadius || 230; // Physical structure collision radius
+          const checkR = stationHitRadius + laser.radius;
+          if (Math.abs(bdx) > checkR || Math.abs(bdy) > checkR) continue;
+          const distSq = bdx * bdx + bdy * bdy;
+          if (distSq < checkR * checkR) {
             // Healer shooting friendly home base -> repair base!
             if (laser.isHealBeam && laser.nation === station.nation) {
               hit = true;
@@ -1721,8 +1753,9 @@ class StarblastGame {
           dx -= Math.round(dx / this.worldSize) * this.worldSize;
           dy -= Math.round(dy / this.worldSize) * this.worldSize;
         }
-        const dist = Math.hypot(dx, dy);
         const minDist = ship.radius + ast.radius;
+        if (Math.abs(dx) > minDist || Math.abs(dy) > minDist) continue;
+        const dist = Math.hypot(dx, dy);
 
         if (dist < minDist && dist > 0.001) {
           const nx = dx / dist;
@@ -2490,9 +2523,13 @@ class StarblastGame {
     if (ast) {
       ast.health = data.health;
       ast.flashDamage();
-      this.createLaserHitParticles(ast.x, ast.y, 0xffbb44);
-      const hitVol = this.getPositionalVolume(ast.x, ast.y, 650);
-      if (hitVol > 0.04) window.soundSystem.playHit(hitVol);
+      // If attacker is local player, hit effects and sound were already predicted locally with 0 latency
+      const isSelf = this.network && data.attackerId === this.network.myId;
+      if (!isSelf) {
+        this.createLaserHitParticles(ast.x, ast.y, 0xffbb44, 6);
+        const hitVol = this.getPositionalVolume(ast.x, ast.y, 650);
+        if (hitVol > 0.04) window.soundSystem.playHit(hitVol);
+      }
     }
   }
 

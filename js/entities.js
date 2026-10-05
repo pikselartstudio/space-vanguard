@@ -41,6 +41,13 @@ class Entity {
 
 // Particle Effect
 class Particle {
+  static getSharedGeometry() {
+    if (!Particle._sharedGeo) {
+      Particle._sharedGeo = new THREE.PlaneGeometry(1, 1);
+    }
+    return Particle._sharedGeo;
+  }
+
   constructor(x, y, vx, vy, color, size, lifetime) {
     this.x = x;
     this.y = y;
@@ -52,14 +59,14 @@ class Particle {
     this.color = color;
     this.isDead = false;
 
-    const geo = new THREE.PlaneGeometry(size, size);
     const mat = new THREE.MeshBasicMaterial({
       color: color,
       transparent: true,
       opacity: 1.0,
       depthWrite: false
     });
-    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh = new THREE.Mesh(Particle.getSharedGeometry(), mat);
+    this.mesh.scale.set(size, size, 1);
     this.mesh.position.set(x, -y, 2);
   }
 
@@ -73,15 +80,24 @@ class Particle {
       return;
     }
 
-    const lifeRatio = this.lifetime / this.maxLife;
+    const lifeRatio = Math.max(0, this.lifetime / this.maxLife);
     this.mesh.position.set(this.x, -this.y, 2);
-    this.mesh.material.opacity = lifeRatio;
-    this.mesh.scale.set(lifeRatio, lifeRatio, 1);
+    if (this.mesh.material) {
+      this.mesh.material.opacity = lifeRatio;
+    }
+    const currentScale = this.size * lifeRatio;
+    this.mesh.scale.set(currentScale, currentScale, 1);
   }
 
   destroy(scene) {
     this.isDead = true;
-    if (this.mesh && scene) scene.remove(this.mesh);
+    if (this.mesh) {
+      if (scene) scene.remove(this.mesh);
+      if (this.mesh.material) {
+        this.mesh.material.dispose();
+      }
+      this.mesh = null;
+    }
   }
 }
 
@@ -126,21 +142,28 @@ class Laser extends Entity {
     this.y += this.vy * dt;
     this.lifetime -= dt;
 
-    if (worldSize) {
-      const half = worldSize / 2;
-      while (this.x < -half) this.x += worldSize;
-      while (this.x > half) this.x -= worldSize;
-      while (this.y < -half) this.y += worldSize;
-      while (this.y > half) this.y -= worldSize;
+    if (worldSize && worldSize > 0) {
+      const half = worldSize * 0.5;
+      if (this.x < -half) this.x += worldSize;
+      else if (this.x > half) this.x -= worldSize;
+      if (this.y < -half) this.y += worldSize;
+      else if (this.y > half) this.y -= worldSize;
     }
 
-    const distTravelled = Math.hypot(this.x - this.startX, this.y - this.startY);
     if (this.lifetime <= 0) {
       this.isDead = true;
     }
 
     if (this.mesh) {
       this.mesh.position.set(this.x, -this.y, 1);
+    }
+  }
+
+  destroy(scene) {
+    this.isDead = true;
+    if (this.mesh) {
+      if (scene) scene.remove(this.mesh);
+      this.mesh = null;
     }
   }
 }
@@ -474,6 +497,7 @@ class Drone {
         if (game.remotePlayers) {
           for (const rp of game.remotePlayers.values()) {
             if (rp && !rp.isDead && rp.nation !== parentShip.nation) {
+              if (Math.abs(rp.x - this.x) > minDist || Math.abs(rp.y - this.y) > minDist) continue;
               const d = Math.hypot(rp.x - this.x, rp.y - this.y);
               if (d < minDist) {
                 minDist = d;
@@ -523,19 +547,21 @@ class Drone {
         const isRecent = parentShip.lastTargetAsteroidTime && (now - parentShip.lastTargetAsteroidTime < 3500);
 
         if (targetAst && !targetAst.isDead && isRecent) {
-          const d = Math.hypot(targetAst.x - this.x, targetAst.y - this.y);
-          if (d <= 520) {
-            this.fireTimer = 0.80; // Mining laser pulse
-            const ang = Math.atan2(targetAst.y - this.y, targetAst.x - this.x);
-            const spd = 560;
-            const laser = new Laser(
-              this.x, this.y,
-              Math.cos(ang) * spd, Math.sin(ang) * spd,
-              14, false, parentShip.id,
-              0xffaa00, parentShip.nation, 420, false, 'standard'
-            );
-            game.lasers.push(laser);
-            game.scene.add(laser.mesh);
+          if (Math.abs(targetAst.x - this.x) <= 520 && Math.abs(targetAst.y - this.y) <= 520) {
+            const d = Math.hypot(targetAst.x - this.x, targetAst.y - this.y);
+            if (d <= 520) {
+              this.fireTimer = 0.80; // Mining laser pulse
+              const ang = Math.atan2(targetAst.y - this.y, targetAst.x - this.x);
+              const spd = 560;
+              const laser = new Laser(
+                this.x, this.y,
+                Math.cos(ang) * spd, Math.sin(ang) * spd,
+                14, false, parentShip.id,
+                0xffaa00, parentShip.nation, 420, false, 'standard'
+              );
+              game.lasers.push(laser);
+              game.scene.add(laser.mesh);
+            }
           }
         }
       }
@@ -2067,6 +2093,7 @@ class SpaceStation extends Entity {
       let minDist = 2200;
       for (const s of enemyShips) {
         if (s.isDead || s.nation === this.nation) continue;
+        if (Math.abs(s.x - this.x) > minDist || Math.abs(s.y - this.y) > minDist) continue;
         const d = Math.hypot(s.x - this.x, s.y - this.y);
         if (d < minDist) {
           minDist = d;

@@ -2155,11 +2155,14 @@ const ModelBuilder = {
 
   // Laser Bolt Mesh with Elemental Power scaling (Ice Frost, Magma Blast, Pitch-Black Void with White Glow)
   createLaserMesh(isHeavy = false, color = 0x00f0ff, damage = 10, element = 'standard') {
-    // Sleek needle-like laser bolt scaling - prevents overly thick beams across all tiers per user request
-    const lengthScale = Math.max(0.9, Math.min(1.6, Math.pow(damage / 10, 0.28)));
-    const radiusScale = Math.max(0.85, Math.min(1.25, Math.pow(damage / 10, 0.16)));
-    const length = (isHeavy ? 24 : 17) * lengthScale;
-    const radius = (isHeavy ? 1.6 : 1.1) * radiusScale;
+    if (!this._laserGeoCache) this._laserGeoCache = {};
+    if (!this._laserMatCache) this._laserMatCache = {};
+
+    // Sleek needle-like laser bolt scaling - quantize scales to reuse geometries in cache
+    const lengthScale = Math.round(Math.max(0.9, Math.min(1.6, Math.pow(damage / 10, 0.28))) * 10) / 10;
+    const radiusScale = Math.round(Math.max(0.85, Math.min(1.25, Math.pow(damage / 10, 0.16))) * 10) / 10;
+    const length = Math.round((isHeavy ? 24 : 17) * lengthScale);
+    const radius = Math.round(((isHeavy ? 1.6 : 1.1) * radiusScale) * 10) / 10;
 
     const group = new THREE.Group();
 
@@ -2169,50 +2172,66 @@ const ModelBuilder = {
       const beamLength = 26;
 
       // 1. Center Solid Obsidian Pitch-Black Beam Core (Thin needle)
-      const coreGeo = new THREE.CylinderGeometry(thinRadius, thinRadius, beamLength, 8);
-      const coreMat = new THREE.MeshBasicMaterial({
-        color: 0x040407 // Pure pitch black
-      });
-      const blackCore = new THREE.Mesh(coreGeo, coreMat);
+      if (!this._laserGeoCache['dark_core']) {
+        this._laserGeoCache['dark_core'] = new THREE.CylinderGeometry(thinRadius, thinRadius, beamLength, 8);
+      }
+      if (!this._laserMatCache['dark_core']) {
+        this._laserMatCache['dark_core'] = new THREE.MeshBasicMaterial({
+          color: 0x040407 // Pure pitch black
+        });
+      }
+      const blackCore = new THREE.Mesh(this._laserGeoCache['dark_core'], this._laserMatCache['dark_core']);
       group.add(blackCore);
 
       // 2. Radiant Pure White Glow Capsule (Thin outline)
-      const glowGeo = new THREE.CylinderGeometry(thinRadius * 1.55, thinRadius * 1.55, beamLength * 1.05, 8);
-      const glowMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff, // Pure intense white glow
-        transparent: true,
-        opacity: 0.90,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide
-      });
-      const whiteGlow = new THREE.Mesh(glowGeo, glowMat);
+      if (!this._laserGeoCache['dark_glow']) {
+        this._laserGeoCache['dark_glow'] = new THREE.CylinderGeometry(thinRadius * 1.55, thinRadius * 1.55, beamLength * 1.05, 8);
+      }
+      if (!this._laserMatCache['dark_glow']) {
+        this._laserMatCache['dark_glow'] = new THREE.MeshBasicMaterial({
+          color: 0xffffff, // Pure intense white glow
+          transparent: true,
+          opacity: 0.90,
+          blending: THREE.AdditiveBlending,
+          side: THREE.DoubleSide
+        });
+      }
+      const whiteGlow = new THREE.Mesh(this._laserGeoCache['dark_glow'], this._laserMatCache['dark_glow']);
       group.add(whiteGlow);
 
       // 3. Ethereal Outer Soft White Halo (Subtle fringe)
-      const haloGeo = new THREE.CylinderGeometry(thinRadius * 2.2, thinRadius * 2.2, beamLength * 1.10, 8);
-      const haloMat = new THREE.MeshBasicMaterial({
-        color: 0xf0f4ff,
-        transparent: true,
-        opacity: 0.35,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide
-      });
-      const whiteHalo = new THREE.Mesh(haloGeo, haloMat);
+      if (!this._laserGeoCache['dark_halo']) {
+        this._laserGeoCache['dark_halo'] = new THREE.CylinderGeometry(thinRadius * 2.2, thinRadius * 2.2, beamLength * 1.10, 8);
+      }
+      if (!this._laserMatCache['dark_halo']) {
+        this._laserMatCache['dark_halo'] = new THREE.MeshBasicMaterial({
+          color: 0xf0f4ff,
+          transparent: true,
+          opacity: 0.35,
+          blending: THREE.AdditiveBlending,
+          side: THREE.DoubleSide
+        });
+      }
+      const whiteHalo = new THREE.Mesh(this._laserGeoCache['dark_halo'], this._laserMatCache['dark_halo']);
       group.add(whiteHalo);
 
       // 4. White Head and Tail Glow Spheres
-      const tipGeo = new THREE.SphereGeometry(thinRadius * 1.5, 8, 8);
-      const tipMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.95,
-        blending: THREE.AdditiveBlending
-      });
-      const frontTip = new THREE.Mesh(tipGeo, tipMat);
+      if (!this._laserGeoCache['dark_tip']) {
+        this._laserGeoCache['dark_tip'] = new THREE.SphereGeometry(thinRadius * 1.5, 8, 8);
+      }
+      if (!this._laserMatCache['dark_tip']) {
+        this._laserMatCache['dark_tip'] = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.95,
+          blending: THREE.AdditiveBlending
+        });
+      }
+      const frontTip = new THREE.Mesh(this._laserGeoCache['dark_tip'], this._laserMatCache['dark_tip']);
       frontTip.position.set(0, beamLength / 2, 0);
       group.add(frontTip);
 
-      const rearTip = new THREE.Mesh(tipGeo, tipMat);
+      const rearTip = new THREE.Mesh(this._laserGeoCache['dark_tip'], this._laserMatCache['dark_tip']);
       rearTip.position.set(0, -beamLength / 2, 0);
       group.add(rearTip);
 
@@ -2225,25 +2244,40 @@ const ModelBuilder = {
     else if (element === 'fire') laserColor = 0xff4500;
     else if (element === 'standard' || !element) laserColor = 0x00ff44;
 
-    const geometry = new THREE.CylinderGeometry(radius, radius, length, 6);
-    const material = new THREE.MeshBasicMaterial({
-      color: laserColor,
-      transparent: true,
-      opacity: 0.95
-    });
-    const outerBeam = new THREE.Mesh(geometry, material);
+    const geoKey = `cyl_${radius}_${length}`;
+    if (!this._laserGeoCache[geoKey]) {
+      this._laserGeoCache[geoKey] = new THREE.CylinderGeometry(radius, radius, length, 6);
+    }
+    const matKey = `mat_${laserColor}`;
+    if (!this._laserMatCache[matKey]) {
+      this._laserMatCache[matKey] = new THREE.MeshBasicMaterial({
+        color: laserColor,
+        transparent: true,
+        opacity: 0.95
+      });
+    }
+    const outerBeam = new THREE.Mesh(this._laserGeoCache[geoKey], this._laserMatCache[matKey]);
     group.add(outerBeam);
 
     // Inner Core (Fire yellow plasma, heavy white core, or bright green core for initial laser)
     if (isHeavy || element === 'fire' || element === 'standard' || !element) {
-      const coreGeo = new THREE.CylinderGeometry(radius * 0.55, radius * 0.55, length * 1.05, 5);
-      const coreMat = new THREE.MeshBasicMaterial({
-        color: element === 'fire' ? 0xfff0aa : (element === 'standard' || !element ? 0xeeffee : 0xffffff),
-        transparent: true,
-        opacity: 0.95,
-        blending: THREE.AdditiveBlending
-      });
-      const innerBeam = new THREE.Mesh(coreGeo, coreMat);
+      const coreR = Math.round((radius * 0.55) * 10) / 10;
+      const coreL = Math.round(length * 1.05);
+      const coreGeoKey = `core_${coreR}_${coreL}`;
+      if (!this._laserGeoCache[coreGeoKey]) {
+        this._laserGeoCache[coreGeoKey] = new THREE.CylinderGeometry(coreR, coreR, coreL, 5);
+      }
+      const coreCol = element === 'fire' ? 0xfff0aa : (element === 'standard' || !element ? 0xeeffee : 0xffffff);
+      const coreMatKey = `core_mat_${coreCol}`;
+      if (!this._laserMatCache[coreMatKey]) {
+        this._laserMatCache[coreMatKey] = new THREE.MeshBasicMaterial({
+          color: coreCol,
+          transparent: true,
+          opacity: 0.95,
+          blending: THREE.AdditiveBlending
+        });
+      }
+      const innerBeam = new THREE.Mesh(this._laserGeoCache[coreGeoKey], this._laserMatCache[coreMatKey]);
       group.add(innerBeam);
     }
 

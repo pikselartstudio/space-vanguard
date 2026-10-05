@@ -373,6 +373,13 @@ class SoundSystem {
   playLaser(isHeavy = false, volume = 1.0) {
     if (!this.initialized || this.isSoundMuted || volume <= 0.02) return;
     const now = this.ctx.currentTime;
+
+    // Rate limit to prevent Web Audio buffer saturations during multi-mount rapid fire
+    if (this.lastLaserTime && (now - this.lastLaserTime < 0.045)) {
+      return;
+    }
+    this.lastLaserTime = now;
+
     const masterVol = Math.min(1.0, Math.max(0, volume));
 
     // 1. Visceral tactile sub-punch transient (kick thump)
