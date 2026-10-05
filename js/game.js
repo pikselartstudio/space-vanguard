@@ -2128,8 +2128,12 @@ class StarblastGame {
     this.lastTime = currentTime;
 
     if (this.isPlaying) {
-      this.handlePlayerInput(dt);
-      this.updatePhysicsAndCollisions(dt);
+      try {
+        this.handlePlayerInput(dt);
+        this.updatePhysicsAndCollisions(dt);
+      } catch (err) {
+        console.error('[GAME LOOP ERROR]:', err);
+      }
 
       // Camera smoothly tracks player directly from above with tactical screen shake
       if (this.player && !this.player.isDead) {

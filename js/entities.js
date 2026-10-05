@@ -195,7 +195,7 @@ class Gem extends Entity {
     }
   }
 
-  update(dt, worldSize, ships) {
+  update(dt, worldSize, ships, camLogicalX = null, camLogicalY = null) {
     if (this.isDead || this.isExpired) {
       if (this.mesh) this.mesh.visible = false;
       return;
@@ -262,11 +262,11 @@ class Gem extends Entity {
     this.y += this.vy * dt;
 
     if (worldSize > 0) {
-      const half = worldSize / 2;
-      while (this.x < -half) this.x += worldSize;
-      while (this.x > half) this.x -= worldSize;
-      while (this.y < -half) this.y += worldSize;
-      while (this.y > half) this.y -= worldSize;
+      const half = worldSize * 0.5;
+      if (this.x < -half) this.x += worldSize;
+      else if (this.x > half) this.x -= worldSize;
+      if (this.y < -half) this.y += worldSize;
+      else if (this.y > half) this.y -= worldSize;
     }
 
     if (this.mesh) {
