@@ -1279,6 +1279,9 @@ class StarblastGame {
   }
 
   updatePhysicsAndCollisions(dt) {
+    const camLogX = this.camera ? this.camera.position.x : (this.player ? this.player.x : 0);
+    const camLogY = this.camera ? -this.camera.position.y : (this.player ? this.player.y : 0);
+
     const allShips = [];
     if (this.player && !this.player.isDead) allShips.push(this.player);
     for (const rp of this.remotePlayers.values()) {
@@ -1352,8 +1355,6 @@ class StarblastGame {
         }
         continue;
       }
-      const camLogX = this.camera ? this.camera.position.x : (this.player ? this.player.x : 0);
-      const camLogY = this.camera ? -this.camera.position.y : (this.player ? this.player.y : 0);
       a.update(dt, this.worldSize, camLogX, camLogY);
     }
 
@@ -1409,23 +1410,19 @@ class StarblastGame {
 
         let ldx = laser.x - ast.x;
         let ldy = laser.y - ast.y;
-        if (this.worldSize) {
-          const half = this.worldSize * 0.5;
-          while (ldx > half) ldx -= this.worldSize;
-          while (ldx < -half) ldx += this.worldSize;
-          while (ldy > half) ldy -= this.worldSize;
-          while (ldy < -half) ldy += this.worldSize;
+        if (this.worldSize > 0) {
+          ldx -= Math.round(ldx / this.worldSize) * this.worldSize;
+          ldy -= Math.round(ldy / this.worldSize) * this.worldSize;
         }
         const dist = Math.hypot(ldx, ldy);
         if (dist < ast.radius + laser.radius) {
-          let odx = laser.startX - ast.x;
-          let ody = laser.startY - ast.y;
-          if (this.worldSize) {
-            const half = this.worldSize * 0.5;
-            while (odx > half) odx -= this.worldSize;
-            while (odx < -half) odx += this.worldSize;
-            while (ody > half) ody -= this.worldSize;
-            while (ody < -half) ody += this.worldSize;
+          const startX = (laser.startX !== undefined) ? laser.startX : laser.x;
+          const startY = (laser.startY !== undefined) ? laser.startY : laser.y;
+          let odx = startX - ast.x;
+          let ody = startY - ast.y;
+          if (this.worldSize > 0) {
+            odx -= Math.round(odx / this.worldSize) * this.worldSize;
+            ody -= Math.round(ody / this.worldSize) * this.worldSize;
           }
           const fromOriginDist = Math.hypot(odx, ody);
           if (fromOriginDist < minHitDist) {
@@ -1481,7 +1478,13 @@ class StarblastGame {
         for (const ship of allShips) {
           if (ship.isDead || ship.id === laser.ownerId) continue;
 
-          const dist = Math.hypot(laser.x - ship.x, laser.y - ship.y);
+          let sdx = laser.x - ship.x;
+          let sdy = laser.y - ship.y;
+          if (this.worldSize > 0) {
+            sdx -= Math.round(sdx / this.worldSize) * this.worldSize;
+            sdy -= Math.round(sdy / this.worldSize) * this.worldSize;
+          }
+          const dist = Math.hypot(sdx, sdy);
           if (dist < ship.radius + laser.radius) {
             // Case 1: Healer shooting own friendly player/ship -> RESTORE HEALTH / SHIELD!
             if (laser.isHealBeam && ship.nation === laser.nation) {
@@ -1655,12 +1658,9 @@ class StarblastGame {
 
         let gdx = gem.x - ship.x;
         let gdy = gem.y - ship.y;
-        if (this.worldSize) {
-          const half = this.worldSize * 0.5;
-          while (gdx > half) gdx -= this.worldSize;
-          while (gdx < -half) gdx += this.worldSize;
-          while (gdy > half) gdy -= this.worldSize;
-          while (gdy < -half) gdy += this.worldSize;
+        if (this.worldSize > 0) {
+          gdx -= Math.round(gdx / this.worldSize) * this.worldSize;
+          gdy -= Math.round(gdy / this.worldSize) * this.worldSize;
         }
         const dist = Math.hypot(gdx, gdy);
         const distFromHull = dist - ship.radius - gem.radius;
@@ -1717,12 +1717,9 @@ class StarblastGame {
         if (ast.isDead || ast.health <= 0) continue;
         let dx = ship.x - ast.x;
         let dy = ship.y - ast.y;
-        if (this.worldSize) {
-          const half = this.worldSize * 0.5;
-          while (dx > half) dx -= this.worldSize;
-          while (dx < -half) dx += this.worldSize;
-          while (dy > half) dy -= this.worldSize;
-          while (dy < -half) dy += this.worldSize;
+        if (this.worldSize > 0) {
+          dx -= Math.round(dx / this.worldSize) * this.worldSize;
+          dy -= Math.round(dy / this.worldSize) * this.worldSize;
         }
         const dist = Math.hypot(dx, dy);
         const minDist = ship.radius + ast.radius;

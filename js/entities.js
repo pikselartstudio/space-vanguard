@@ -215,12 +215,9 @@ class Gem extends Entity {
     if (magnetShip) {
       let dx = magnetShip.x - this.x;
       let dy = magnetShip.y - this.y;
-      if (worldSize) {
-        const half = worldSize * 0.5;
-        while (dx > half) dx -= worldSize;
-        while (dx < -half) dx += worldSize;
-        while (dy > half) dy -= worldSize;
-        while (dy < -half) dy += worldSize;
+      if (worldSize > 0) {
+        dx -= Math.round(dx / worldSize) * worldSize;
+        dy -= Math.round(dy / worldSize) * worldSize;
       }
       const dist = Math.hypot(dx, dy);
       if (dist > 1) {
@@ -241,7 +238,7 @@ class Gem extends Entity {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
-    if (worldSize) {
+    if (worldSize > 0) {
       const half = worldSize / 2;
       while (this.x < -half) this.x += worldSize;
       while (this.x > half) this.x -= worldSize;
@@ -252,14 +249,11 @@ class Gem extends Entity {
     if (this.mesh) {
       let renderX = this.x;
       let renderY = -this.y;
-      if (camLogicalX !== null && camLogicalY !== null && worldSize) {
-        const halfWorld = worldSize * 0.5;
+      if (camLogicalX !== null && camLogicalY !== null && worldSize > 0) {
         let cdx = this.x - camLogicalX;
-        while (cdx > halfWorld) cdx -= worldSize;
-        while (cdx < -halfWorld) cdx += worldSize;
         let cdy = this.y - camLogicalY;
-        while (cdy > halfWorld) cdy -= worldSize;
-        while (cdy < -halfWorld) cdy += worldSize;
+        cdx -= Math.round(cdx / worldSize) * worldSize;
+        cdy -= Math.round(cdy / worldSize) * worldSize;
         renderX = camLogicalX + cdx;
         renderY = -(camLogicalY + cdy);
       }
@@ -380,15 +374,11 @@ class Asteroid extends Entity {
       let renderY = -this.y;
 
       // Toroidal camera wrapping: seamlessly renders asteroids right across the map seam
-      if (camLogicalX !== null && camLogicalY !== null && worldSize) {
-        const halfWorld = worldSize * 0.5;
+      if (camLogicalX !== null && camLogicalY !== null && worldSize > 0) {
         let dx = this.x - camLogicalX;
-        while (dx > halfWorld) dx -= worldSize;
-        while (dx < -halfWorld) dx += worldSize;
-
         let dy = this.y - camLogicalY;
-        while (dy > halfWorld) dy -= worldSize;
-        while (dy < -halfWorld) dy += worldSize;
+        dx -= Math.round(dx / worldSize) * worldSize;
+        dy -= Math.round(dy / worldSize) * worldSize;
 
         renderX = camLogicalX + dx;
         renderY = -(camLogicalY + dy);
