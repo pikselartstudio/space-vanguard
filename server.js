@@ -81,14 +81,14 @@ const io = new Server(server, {
 });
 
 // ==========================================
-// PERSISTENT GALAXY WORLD STATE
+// PERSISTENT GALAXY WORLD STATE (1.2x shrunken world: 10000)
 // ==========================================
-const WORLD_SIZE = 12000;
+const WORLD_SIZE = 10000;
 
 const BASE_LOCATIONS = {
-  blue: { x: 0, y: -3150 },
-  red:  { x: -2750, y: 1825 },
-  gold: { x: 2750, y: 1825 }
+  blue: { x: 0, y: -2625 },
+  red:  { x: -2290, y: 1520 },
+  gold: { x: 2290, y: 1520 }
 };
 
 const stations = {
@@ -129,16 +129,17 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null, isOut
   let x, y;
   if (nearBase) {
     const angle = Math.random() * Math.PI * 2;
-    const r = 600 + Math.random() * 700;
+    const r = 500 + Math.random() * 650;
     x = nearBase.x + Math.cos(angle) * r;
     y = nearBase.y + Math.sin(angle) * r;
   } else if (isOuterRim) {
-    const dist = 3200 + Math.random() * 1900;
+    // Fill empty outer sectors and corners uniformly across the map
+    const dist = 2000 + Math.random() * (WORLD_SIZE / 2 - 2100);
     const angle = Math.random() * Math.PI * 2;
     x = Math.cos(angle) * dist;
     y = Math.sin(angle) * dist;
   } else {
-    const dist = 300 + Math.random() * (WORLD_SIZE / 2 - 400);
+    const dist = 300 + Math.random() * (WORLD_SIZE / 2 - 350);
     const angle = Math.random() * Math.PI * 2;
     x = Math.cos(angle) * dist;
     y = Math.sin(angle) * dist;
@@ -161,7 +162,7 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null, isOut
   } else if (nearNation === 'gold') {
     element = Math.random() < 0.50 ? 'ice' : 'fire';
   } else {
-    // Deep Space / Galactic Core (Expanded core threshold for 8250 map)
+    // Deep Space / Galactic Core
     if (distFromCenter < 2400) {
       // Core Anomaly: Rich Dark Matter Basin (65% Dark, 20% Fire, 15% Ice)
       const roll = Math.random();
@@ -194,20 +195,21 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null, isOut
   return ast;
 }
 
-// Populate galaxy: 160 persistent deep-space asteroids (halved per user request) + 18 beginner asteroids per home base
-for (let i = 0; i < 160; i++) {
+// User request: "asteroit sayılarını 1.5 kat artıralım. boş olan harita bölgelerine de asteroit koyalım"
+// Populate galaxy: 240 persistent deep-space asteroids (1.5x of 160) + 24 beginner asteroids per home base + 90 empty rim asteroids
+for (let i = 0; i < 240; i++) {
   generateAsteroid((i % 7) + 1);
 }
-// Each base gets 18 beginner asteroids
-const baseTiers = [1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3, 1, 2, 2, 1, 2, 3];
+// Each base gets 24 beginner asteroids
+const baseTiers = [1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3, 1, 1, 2, 2, 3, 1, 2, 2, 1, 2, 3, 2];
 for (const n of ['blue', 'red', 'gold']) {
   const b = BASE_LOCATIONS[n];
   for (const tier of baseTiers) {
     generateAsteroid(tier, b, n);
   }
 }
-// User request: "uzayın boş alanlarında da asteroit ekleyebilirsin farm yapmak isteyenler sotede takılabilecek"
-for (let i = 0; i < 45; i++) {
+// User request: "boş olan harita bölgelerine de asteroit koyalım ama harita geçişlerinde sırıtmamasınıda sağlayalım"
+for (let i = 0; i < 90; i++) {
   generateAsteroid((i % 7) + 1, null, null, true);
 }
 

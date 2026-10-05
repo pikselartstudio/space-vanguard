@@ -422,6 +422,7 @@ body, html {
   width: 360px;
   max-width: 90vw;
   user-select: none;
+  margin-left: 50px; /* User request: 50px sağa çekildi, sol yetenek barının sağında kalır */
 }
 
 .base-market-header {

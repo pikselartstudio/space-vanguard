@@ -3085,8 +3085,8 @@ const ModelBuilder = {
       root.add(rearReactor);
     }
 
-    // User request: "dronların boyutunu 3x arttır" (1.15 -> 3.45)
-    root.scale.set(3.45, 3.45, 3.45);
+    // User request: "dronlarımızı x2 kat küçült" (3.45 -> 1.725)
+    root.scale.set(1.725, 1.725, 1.725);
     return root;
   }
 };

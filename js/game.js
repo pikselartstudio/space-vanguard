@@ -19,7 +19,7 @@ const NATION_BOT_NAMES = {
 
 class StarblastGame {
   constructor() {
-    this.worldSize = 12000; // Balanced universe arena size, giving bases ample clearance
+    this.worldSize = 10000; // 1.2x shrunken universe arena size (was 12000)
     this.isPlaying = false;
     this.playerNation = 'blue';
     this.playerDeadHandled = false;
@@ -33,7 +33,7 @@ class StarblastGame {
       55,
       window.innerWidth / window.innerHeight,
       1,
-      12000
+      10000
     );
     this.camera.position.set(0, 0, 750); // Overhead view
     this.camera.lookAt(0, 0, 0);
@@ -71,11 +71,11 @@ class StarblastGame {
     this.stations = {};
     this.locallyDestroyedAsteroidIds = new Set();
 
-    // 3 Nation Base Locations (120-degree balanced layout across 8250x8250 galaxy, scaled 2x smaller)
+    // 3 Nation Base Locations (Scaled symmetrically for 10000 world size)
     this.baseLocations = {
-      blue: { x: 0, y: -3150 },      // South (scaled 2x smaller)
-      red:  { x: -2750, y: 1825 },   // North-West (scaled 2x smaller)
-      gold: { x: 2750, y: 1825 }     // North-East (scaled 2x smaller)
+      blue: { x: 0, y: -2625 },      // South
+      red:  { x: -2290, y: 1520 },   // North-West
+      gold: { x: 2290, y: 1520 }     // North-East
     };
 
     // Inputs
@@ -655,19 +655,20 @@ class StarblastGame {
   }
 
   spawnInitialWorld() {
-    // Only spawn offline asteroids if not populated by server (scaled 2x smaller: 160 asteroids)
+    // User request: "asteroit sayılarını 1.5 kat artıralım. boş olan harita bölgelerine de asteroit koyalım"
+    // 240 deep-space asteroids (1.5x of 160) + 14 beginner asteroids per base + 80 empty rim asteroids
     if (this.asteroids.length === 0) {
-      for (let i = 0; i < 160; i++) {
+      for (let i = 0; i < 240; i++) {
         const tier = (i % 7) + 1;
         this.spawnRandomAsteroid(tier);
       }
-      // Base surroundings (9 small/medium beginner asteroids per base)
-      const baseTiers = [1, 1, 2, 1, 2, 2, 3, 1, 2];
+      // Base surroundings (14 beginner asteroids per base)
+      const baseTiers = [1, 1, 2, 1, 2, 2, 3, 1, 2, 1, 2, 3, 2, 1];
       for (const n of ['blue', 'red', 'gold']) {
         const b = this.baseLocations[n];
         for (const tier of baseTiers) {
           const angle = Math.random() * Math.PI * 2;
-          const r = 600 + Math.random() * 700;
+          const r = 500 + Math.random() * 650;
           const x = b.x + Math.cos(angle) * r;
           const y = b.y + Math.sin(angle) * r;
           const ast = new Asteroid(x, y, tier);
@@ -678,9 +679,9 @@ class StarblastGame {
         }
       }
       // User request: uzayın boş alanlarında da asteroit ekle (soteye farm alanları)
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 80; i++) {
         const tier = (i % 7) + 1;
-        const dist = 3200 + Math.random() * 1900;
+        const dist = 2000 + Math.random() * (this.worldSize / 2 - 2100);
         const angle = Math.random() * Math.PI * 2;
         const x = Math.cos(angle) * dist;
         const y = Math.sin(angle) * dist;
@@ -696,7 +697,7 @@ class StarblastGame {
   spawnRandomAsteroid(tier = null) {
     if (this.isMenuBattle) return null;
     const sizeTier = tier || Math.floor(Math.random() * 7) + 1;
-    const dist = 300 + Math.random() * (this.worldSize / 2 - 400);
+    const dist = 300 + Math.random() * (this.worldSize / 2 - 350);
     const angle = Math.random() * Math.PI * 2;
     const x = Math.cos(angle) * dist;
     const y = Math.sin(angle) * dist;
@@ -872,12 +873,36 @@ class StarblastGame {
     }
   }
 
-  // User request: "shop kısmını m harfi ile açalım şuan bir türlü açamadım droitleri falan göremedim"
+  // Check if player is currently within the friendly home base perimeter
+  isPlayerInHomeBase() {
+    if (!this.player || this.player.isDead) return false;
+    const homeBase = this.stations ? this.stations[this.player.nation] : null;
+    if (!homeBase || homeBase.isDead) return false;
+    const worldSpan = this.worldSize || 10000;
+    const halfWorld = worldSpan * 0.5;
+    let dx = Math.abs(this.player.x - homeBase.x);
+    if (dx > halfWorld) dx = worldSpan - dx;
+    let dy = Math.abs(this.player.y - homeBase.y);
+    if (dy > halfWorld) dy = worldSpan - dy;
+    const dist = Math.hypot(dx, dy);
+    const perimeter = (homeBase.radius || 420) + 120;
+    return dist <= perimeter;
+  }
+
+  // User request: "shop kısmını base dışında açamayacak oyuncu."
   toggleShop(forceState = null) {
     if (!this.ui) return;
-    const newState = (forceState !== null) ? forceState : !this.ui.isShopOpen;
-    this.ui.setShopOpen(newState);
-    if (newState) {
+    const insideBase = this.isPlayerInHomeBase();
+    const desiredState = (forceState !== null) ? forceState : !this.ui.isShopOpen;
+
+    if (desiredState && !insideBase) {
+      this.ui.setShopOpen(false);
+      this.ui.showAnnouncement('⚠️ Pazar (SHOP) sadece ana üssünüzün içindeyken açılabilir!', 2500);
+      return;
+    }
+
+    this.ui.setShopOpen(desiredState);
+    if (desiredState) {
       if (window.soundSystem) window.soundSystem.playUpgrade();
       this.ui.showAnnouncement('🛒 Uzay Pazarı (SHOP) Açıldı! [M] veya [ESC] ile kapatabilirsiniz.', 2000);
     } else {
@@ -885,13 +910,19 @@ class StarblastGame {
     }
   }
 
-  // User request: Üs Marketi Satın Alma / Kuşanma (şuanlık ödeme sistemi yok)
-  // 1: Saldırı Dronu, 2: Savunma Dronu, 3: Maden Dronu, 4: S1, 5: S2, 6: S3 Fulleme
-  // Dron Kapasitesi: Seviye 1 için 2, Seviye 2 için 3... (tier + 1)
+  // User request: "shop alışverişini base dışında yapamayacak oyuncu."
   purchaseBaseItem(action) {
     if (!this.player || this.player.isDead) return;
+    if (!this.isPlayerInHomeBase()) {
+      if (this.ui) {
+        this.ui.setShopOpen(false);
+        this.ui.showAnnouncement('⚠️ Alışveriş yapmak için ana üssünüzün sınırları içinde olmalısınız!', 2500);
+      }
+      return;
+    }
+
     const homeBase = this.stations[this.player.nation];
-    if (!homeBase) return;
+    if (!homeBase || homeBase.isDead) return;
 
     if (action.startsWith('drone_')) {
       const droneType = action.replace('drone_', ''); // 'attack', 'defense', 'mining'
@@ -1049,22 +1080,47 @@ class StarblastGame {
     }
   }
 
-  // User request: "asteroitere bu png görseli hareketli vfx e çevirip patlama efekti olarak kullan. akalım nasıl oluyor sadece asteroit patlama efektini düzenleyelim."
+  // User request: "asteorit için yeni eklediğimiz patlama efektini kaldıralım çok kötü oldu. onun yerine aynı ona benzer bir alev partükül patlaması ekleyelim"
   createFieryAsteroidExplosion(x, y, radius = 30) {
-    // 1. Pixel-Art Animated Explosion VFX using custom PNG sprite
-    const vfx = new AsteroidExplosionVFX(x, y, radius);
-    this.particles.push(vfx);
-    this.scene.add(vfx.group);
+    const scaleFactor = Math.max(0.7, radius / 30);
 
-    // 2. Accompanying flying embers and rocky fragments matching the PNG's stones
-    const fireColors = [0xffcc00, 0xff7700, 0xff3300, 0x5a4535, 0xff9900, 0x3d2c20];
-    const particleCount = 14;
-    for (let i = 0; i < particleCount; i++) {
+    // 1. Core Thermal Flash: ultra-bright white & sun-gold hot-center particles
+    const coreColors = [0xffffff, 0xfff4cc, 0xffdd44, 0xffaa00];
+    const coreCount = Math.round(12 * scaleFactor);
+    for (let i = 0; i < coreCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 25 + Math.random() * 110;
-      const col = fireColors[Math.floor(Math.random() * fireColors.length)];
-      const size = 2.2 + Math.random() * 3.6;
-      const life = 0.28 + Math.random() * 0.35;
+      const speed = (18 + Math.random() * 65) * scaleFactor;
+      const col = coreColors[Math.floor(Math.random() * coreColors.length)];
+      const size = (4.0 + Math.random() * 5.0) * scaleFactor;
+      const life = 0.22 + Math.random() * 0.28;
+      const p = new Particle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, col, size, life);
+      this.particles.push(p);
+      this.scene.add(p.mesh);
+    }
+
+    // 2. Primary Blazing Flame Eruption: vibrant fiery orange, combustion red & bright gold particles
+    const flameColors = [0xff5500, 0xff7700, 0xff3300, 0xee2200, 0xff9900];
+    const flameCount = Math.round(18 * scaleFactor);
+    for (let i = 0; i < flameCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = (35 + Math.random() * 140) * scaleFactor;
+      const col = flameColors[Math.floor(Math.random() * flameColors.length)];
+      const size = (3.2 + Math.random() * 4.6) * scaleFactor;
+      const life = 0.32 + Math.random() * 0.38;
+      const p = new Particle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, col, size, life);
+      this.particles.push(p);
+      this.scene.add(p.mesh);
+    }
+
+    // 3. Asteroid Rock Shards & Fiery Smoke Embers: bursting stone fragments
+    const rockColors = [0x5c4033, 0x3d2b1f, 0x2b1d14, 0x8b5a2b, 0x4a3728];
+    const rockCount = Math.round(10 * scaleFactor);
+    for (let i = 0; i < rockCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = (25 + Math.random() * 115) * scaleFactor;
+      const col = rockColors[Math.floor(Math.random() * rockColors.length)];
+      const size = (2.4 + Math.random() * 3.4) * scaleFactor;
+      const life = 0.40 + Math.random() * 0.35;
       const p = new Particle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, col, size, life);
       this.particles.push(p);
       this.scene.add(p.mesh);
@@ -1965,9 +2021,9 @@ class StarblastGame {
       }
     }
 
-    // Replenish offline asteroids if not connected to server (halved to 180 cap)
+    // Replenish offline asteroids if not connected to server (270 cap, 1.5x increase)
     if (this.isPlaying && !this.isMenuBattle && (!this.network || !this.network.isConnected)) {
-      while (this.asteroids.length < 180) {
+      while (this.asteroids.length < 270) {
         this.spawnRandomAsteroid();
       }
     }

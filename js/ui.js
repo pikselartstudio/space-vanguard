@@ -996,12 +996,12 @@ class UIManager {
       player.isDockedAtBase = insideHomeBase;
     }
 
-    // User request: "istasyon içine girince açılmalı oradan ayrılınca kendi otomatik kapanmalı"
+    // User request: "shop kısmını base dışında açamayacak oyuncu. istasyon içine girince açılmalı oradan ayrılınca kendi otomatik kapanmalı"
     if (insideHomeBase && !this.wasInStationPerimeter) {
       // Just entered station: automatically open shop
       this.isShopOpen = true;
-    } else if (!insideHomeBase && this.wasInStationPerimeter) {
-      // Just left station: automatically close shop
+    } else if (!insideHomeBase) {
+      // Automatically close shop and disable donations outside base
       this.isShopOpen = false;
       if (this.game && this.game.isAutoDonating) {
         this.game.isAutoDonating = false;
@@ -1009,9 +1009,9 @@ class UIManager {
     }
     this.wasInStationPerimeter = insideHomeBase;
 
-    // Display Base Market IF this.isShopOpen is true
+    // Display Base Market ONLY IF this.isShopOpen is true AND player is inside home base
     let nearStation = false;
-    if (this.isShopOpen && homeBase && !homeBase.isDead && this.baseDockStatus) {
+    if (this.isShopOpen && insideHomeBase && homeBase && !homeBase.isDead && this.baseDockStatus) {
       nearStation = true;
       this.baseDockStatus.style.display = 'block';
       const isDonating = this.game && this.game.isAutoDonating ? 1 : 0;
@@ -1026,7 +1026,7 @@ class UIManager {
     if (!this.isShopOpen && stations && this.baseDockStatus) {
       let hostileStation = null;
       let minHostileDist = 1350;
-      const worldSpan = (this.game && this.game.worldSize) ? this.game.worldSize : 8250;
+      const worldSpan = (this.game && this.game.worldSize) ? this.game.worldSize : 10000;
       const halfWorld = worldSpan * 0.5;
       for (const k in stations) {
         const st = stations[k];
@@ -1152,8 +1152,15 @@ class UIManager {
     }
   }
 
-  // SHOP [M] Pazar penceresini aç/kapat
+  // SHOP [M] Pazar penceresini aç/kapat (Sadece ana üs içindeyken açılabilir)
   setShopOpen(isOpen) {
+    if (isOpen && this.game && typeof this.game.isPlayerInHomeBase === 'function' && !this.game.isPlayerInHomeBase()) {
+      this.isShopOpen = false;
+      if (this.shopHudBtn) this.shopHudBtn.classList.remove('active');
+      if (this.baseDockStatus) this.baseDockStatus.style.display = 'none';
+      return;
+    }
+
     this.isShopOpen = !!isOpen;
     if (this.shopHudBtn) {
       this.shopHudBtn.classList.toggle('active', this.isShopOpen);
