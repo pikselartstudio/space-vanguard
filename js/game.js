@@ -324,6 +324,20 @@ class StarblastGame {
         this.donateToHomeBase();
       }
 
+      // [M] Shop (Market) Toggle
+      if (e.code === 'KeyM') {
+        this.toggleShop();
+        return;
+      }
+
+      // [Escape] closes shop if open
+      if (e.code === 'Escape') {
+        if (this.ui && this.ui.isShopOpen) {
+          this.toggleShop(false);
+          return;
+        }
+      }
+
       // RCS & DFRT Drift toggle (Ctrl tuşu ile uzayda sürtünmesiz süzülme)
       if (e.code === 'ControlLeft' || e.code === 'ControlRight') {
         this.toggleDriftMode();
@@ -758,7 +772,13 @@ class StarblastGame {
     if (!homeBase || homeBase.isDead) return;
 
     const basePerimeter = (homeBase.radius || 420) + 180;
-    const dist = Math.hypot(this.player.x - homeBase.x, this.player.y - homeBase.y);
+    const worldSpan = this.worldSize || 8250;
+    const halfWorld = worldSpan * 0.5;
+    let dx = Math.abs(this.player.x - homeBase.x);
+    if (dx > halfWorld) dx = worldSpan - dx;
+    let dy = Math.abs(this.player.y - homeBase.y);
+    if (dy > halfWorld) dy = worldSpan - dy;
+    const dist = Math.hypot(dx, dy);
     if (dist > basePerimeter) {
       this.isAutoDonating = false;
       if (this.ui) {
@@ -852,6 +872,19 @@ class StarblastGame {
     }
   }
 
+  // User request: "shop kısmını m harfi ile açalım şuan bir türlü açamadım droitleri falan göremedim"
+  toggleShop(forceState = null) {
+    if (!this.ui) return;
+    const newState = (forceState !== null) ? forceState : !this.ui.isShopOpen;
+    this.ui.setShopOpen(newState);
+    if (newState) {
+      if (window.soundSystem) window.soundSystem.playUpgrade();
+      this.ui.showAnnouncement('🛒 Uzay Pazarı (SHOP) Açıldı! [M] veya [ESC] ile kapatabilirsiniz.', 2000);
+    } else {
+      this.ui.showAnnouncement('🛒 Uzay Pazarı kapatıldı.', 1500);
+    }
+  }
+
   // User request: Üs Marketi Satın Alma / Kuşanma (şuanlık ödeme sistemi yok)
   // 1: Saldırı Dronu, 2: Savunma Dronu, 3: Maden Dronu, 4: S1, 5: S2, 6: S3 Fulleme
   // Dron Kapasitesi: Seviye 1 için 2, Seviye 2 için 3... (tier + 1)
@@ -859,13 +892,6 @@ class StarblastGame {
     if (!this.player || this.player.isDead) return;
     const homeBase = this.stations[this.player.nation];
     if (!homeBase) return;
-
-    const basePerimeter = (homeBase.radius || 420) + 180;
-    const dist = Math.hypot(this.player.x - homeBase.x, this.player.y - homeBase.y);
-    if (dist > basePerimeter) {
-      if (this.ui) this.ui.showAnnouncement('⚠️ İkmal pazarını kullanmak için kendi üssünüzde olmalısınız!', 2500);
-      return;
-    }
 
     if (action.startsWith('drone_')) {
       const droneType = action.replace('drone_', ''); // 'attack', 'defense', 'mining'

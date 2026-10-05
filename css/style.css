@@ -442,6 +442,24 @@ body, html {
   text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
 }
 
+#base-market-close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: all 0.18s ease;
+}
+
+#base-market-close-btn:hover {
+  color: #ff3366;
+  text-shadow: 0 0 8px rgba(255, 51, 102, 0.7);
+  transform: scale(1.15);
+}
+
 .base-market-sub {
   font-size: 0.72rem;
   color: #94a3b8;
@@ -557,6 +575,14 @@ body, html {
   animation: starvedPulse 0.8s infinite alternate ease-in-out;
 }
 
+/* Action Buttons Row: DFRT + CTRL and SHOP [M] */
+#left-hud-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* DFRT + CTRL Drift Mode HUD Indicator */
 #drift-mode-indicator {
   display: inline-flex;
@@ -611,6 +637,56 @@ body, html {
   background: rgba(0, 255, 170, 0.25);
   color: #00ffaa;
   text-shadow: 0 0 8px #00ffaa;
+}
+
+/* SHOP [M] HUD Button */
+#shop-hud-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(8, 20, 36, 0.88);
+  border: 1px solid rgba(0, 200, 255, 0.4);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.76rem;
+  letter-spacing: 1px;
+  color: #8ec5fc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px rgba(0, 150, 255, 0.15);
+  width: fit-content;
+  user-select: none;
+  pointer-events: auto;
+}
+
+#shop-hud-btn:hover {
+  border-color: #00f0ff;
+  background: rgba(14, 38, 70, 0.95);
+  color: #00f0ff;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.45);
+  transform: translateY(-1px);
+}
+
+#shop-hud-btn.active {
+  border-color: #00f0ff;
+  background: rgba(0, 240, 255, 0.22);
+  color: #00f0ff;
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.55);
+}
+
+#shop-hud-btn .shop-key-tag {
+  font-weight: 900;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+#shop-hud-btn .shop-title-tag {
+  font-weight: 800;
+  color: #e0f2fe;
+  letter-spacing: 1.5px;
 }
 
 /* Top Right: Radar / Minimap & Leaderboard */

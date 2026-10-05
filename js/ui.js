@@ -18,6 +18,8 @@ class UIManager {
     this.baseDockStatus = document.getElementById('base-dock-status');
     this.driftIndicator = document.getElementById('drift-mode-indicator');
     this.driftStateText = document.getElementById('dfrt-state-text');
+    this.shopHudBtn = document.getElementById('shop-hud-btn');
+    this.isShopOpen = false;
 
     this.upgradeDock = document.getElementById('upgrade-dock');
     this.upgradeGrid = document.getElementById('upgrade-cards-grid');
@@ -536,6 +538,16 @@ class UIManager {
       });
     }
 
+    // SHOP [M] HUD Button click handler
+    if (this.shopHudBtn) {
+      this.shopHudBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.game) {
+          this.game.toggleShop();
+        }
+      });
+    }
+
     if (this.chatForm) {
       this.chatForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -962,15 +974,22 @@ class UIManager {
       this.updateDriftIndicator(player.isStabilizerActive !== false);
     }
 
-    // Base docking & donation prompt OR enemy base siege alert
+    // Base docking & donation prompt OR enemy base siege alert OR shop opened via [M]
     let nearStation = false;
     const homeBase = stations ? stations[player.nation] : null;
     if (homeBase && !homeBase.isDead && this.baseDockStatus) {
-      const dist = Math.hypot(player.x - homeBase.x, player.y - homeBase.y);
+      const worldSpan = (this.game && this.game.worldSize) ? this.game.worldSize : 8250;
+      const halfWorld = worldSpan * 0.5;
+      let dx = Math.abs(player.x - homeBase.x);
+      if (dx > halfWorld) dx = worldSpan - dx;
+      let dy = Math.abs(player.y - homeBase.y);
+      if (dy > halfWorld) dy = worldSpan - dy;
+      const dist = Math.hypot(dx, dy);
       const dockPerimeter = (homeBase.radius || 420) + 180;
       if (dist <= dockPerimeter) {
         nearStation = true;
         player.isDockedAtBase = true;
+        this.baseDockStatus.style.display = 'block';
         const isDonating = this.game && this.game.isAutoDonating ? 1 : 0;
         const marketKey = `${homeBase.level}_${homeBase.crystalsDonated}_${homeBase.hp}_${player.tier}_${player.drones ? player.drones.length : 0}_${(player.elementalAmmo && player.elementalAmmo.ice) || 0}_${(player.elementalAmmo && player.elementalAmmo.fire) || 0}_${(player.elementalAmmo && player.elementalAmmo.dark) || 0}_${isDonating}`;
         if (this.lastRenderedBaseDockKey !== marketKey) {
@@ -980,15 +999,33 @@ class UIManager {
       }
     }
 
-    if (!nearStation && stations && this.baseDockStatus) {
+    // Shop opened anywhere in space via [M] key or HUD button
+    if (!nearStation && this.isShopOpen && homeBase && this.baseDockStatus) {
+      nearStation = true;
+      this.baseDockStatus.style.display = 'block';
+      const isDonating = this.game && this.game.isAutoDonating ? 1 : 0;
+      const marketKey = `shop_${homeBase.level}_${homeBase.crystalsDonated}_${homeBase.hp}_${player.tier}_${player.drones ? player.drones.length : 0}_${(player.elementalAmmo && player.elementalAmmo.ice) || 0}_${(player.elementalAmmo && player.elementalAmmo.fire) || 0}_${(player.elementalAmmo && player.elementalAmmo.dark) || 0}_${isDonating}`;
+      if (this.lastRenderedBaseDockKey !== marketKey) {
+        this.lastRenderedBaseDockKey = marketKey;
+        this.renderBaseMarket(homeBase, player);
+      }
+    }
+
+    if (!nearStation && !this.isShopOpen && stations && this.baseDockStatus) {
       if (player) player.isDockedAtBase = false;
       // Check if near any hostile station (siege alert)
       let hostileStation = null;
       let minHostileDist = 1350;
+      const worldSpan = (this.game && this.game.worldSize) ? this.game.worldSize : 8250;
+      const halfWorld = worldSpan * 0.5;
       for (const k in stations) {
         const st = stations[k];
         if (!st || st.isDead || st.nation === player.nation) continue;
-        const d = Math.hypot(player.x - st.x, player.y - st.y);
+        let dx = Math.abs(player.x - st.x);
+        if (dx > halfWorld) dx = worldSpan - dx;
+        let dy = Math.abs(player.y - st.y);
+        if (dy > halfWorld) dy = worldSpan - dy;
+        const d = Math.hypot(dx, dy);
         if (d < minHostileDist) {
           minHostileDist = d;
           hostileStation = st;
@@ -1009,10 +1046,14 @@ class UIManager {
       }
     }
 
-    if (!nearStation && this.baseDockStatus) {
+    if (!nearStation && !this.isShopOpen && this.baseDockStatus) {
       if (player) player.isDockedAtBase = false;
       this.lastRenderedBaseDockKey = null;
       this.baseDockStatus.style.display = 'none';
+    }
+
+    if (this.shopHudBtn) {
+      this.shopHudBtn.classList.toggle('active', !!(this.isShopOpen || (player && player.isDockedAtBase)));
     }
 
     // Check if any stat can still be upgraded
@@ -1102,6 +1143,35 @@ class UIManager {
     }
   }
 
+  // SHOP [M] Pazar penceresini aç/kapat
+  setShopOpen(isOpen) {
+    this.isShopOpen = !!isOpen;
+    if (this.shopHudBtn) {
+      this.shopHudBtn.classList.toggle('active', this.isShopOpen);
+    }
+    if (this.baseDockStatus) {
+      if (this.isShopOpen) {
+        this.baseDockStatus.style.display = 'block';
+        const homeBase = (this.game && this.game.stations && this.game.player)
+          ? this.game.stations[this.game.player.nation]
+          : null;
+        if (homeBase && this.game.player) {
+          this.lastRenderedBaseDockKey = null; // Tekrar zorunlu çizdir
+          this.renderBaseMarket(homeBase, this.game.player);
+        }
+      } else {
+        const homeBase = (this.game && this.game.stations && this.game.player)
+          ? this.game.stations[this.game.player.nation]
+          : null;
+        const isDocked = (this.game && this.game.player && this.game.player.isDockedAtBase);
+        if (!isDocked) {
+          this.baseDockStatus.style.display = 'none';
+          this.lastRenderedBaseDockKey = null;
+        }
+      }
+    }
+  }
+
   // User request: Üs Pazarı ortalı SHOP, 6 kutu, en altta B ile 10ar bağış yapma
   renderBaseMarket(homeBase, player) {
     if (!this.baseDockStatus) return;
@@ -1113,8 +1183,10 @@ class UIManager {
     const pct = Math.round((homeBase.crystalsDonated / homeBase.crystalsRequired) * 100);
 
     this.baseDockStatus.innerHTML = `
-      <div class="base-market-header" style="justify-content: center; padding-bottom: 6px; margin-bottom: 8px;">
-        <div class="base-market-title" style="letter-spacing: 5px; font-size: 1.05rem; font-weight: 900;">SHOP</div>
+      <div class="base-market-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px; margin-bottom: 8px;">
+        <div style="font-size: 0.72rem; color: #64748b; font-family: 'Orbitron', monospace; font-weight: 600;">[M] TUŞU</div>
+        <div class="base-market-title" style="letter-spacing: 5px; font-size: 1.05rem; font-weight: 900; margin-left: 18px;">SHOP</div>
+        <button type="button" id="base-market-close-btn" title="Kapat (ESC / M)">✕</button>
       </div>
       <div class="base-market-grid">
         <!-- 1. Saldırı Dronu -->
@@ -1216,6 +1288,16 @@ class UIManager {
         e.stopPropagation();
         if (this.game) {
           this.game.donateToHomeBase();
+        }
+      });
+    }
+
+    const closeBtn = this.baseDockStatus.querySelector('#base-market-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.game) {
+          this.game.toggleShop(false);
         }
       });
     }
