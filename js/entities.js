@@ -213,8 +213,15 @@ class Gem extends Entity {
     }
 
     if (magnetShip) {
-      const dx = magnetShip.x - this.x;
-      const dy = magnetShip.y - this.y;
+      let dx = magnetShip.x - this.x;
+      let dy = magnetShip.y - this.y;
+      if (worldSize) {
+        const half = worldSize * 0.5;
+        while (dx > half) dx -= worldSize;
+        while (dx < -half) dx += worldSize;
+        while (dy > half) dy -= worldSize;
+        while (dy < -half) dy += worldSize;
+      }
       const dist = Math.hypot(dx, dy);
       if (dist > 1) {
         const dirX = dx / dist;
@@ -243,7 +250,20 @@ class Gem extends Entity {
     }
 
     if (this.mesh) {
-      this.mesh.position.set(this.x, -this.y, 0);
+      let renderX = this.x;
+      let renderY = -this.y;
+      if (camLogicalX !== null && camLogicalY !== null && worldSize) {
+        const halfWorld = worldSize * 0.5;
+        let cdx = this.x - camLogicalX;
+        while (cdx > halfWorld) cdx -= worldSize;
+        while (cdx < -halfWorld) cdx += worldSize;
+        let cdy = this.y - camLogicalY;
+        while (cdy > halfWorld) cdy -= worldSize;
+        while (cdy < -halfWorld) cdy += worldSize;
+        renderX = camLogicalX + cdx;
+        renderY = -(camLogicalY + cdy);
+      }
+      this.mesh.position.set(renderX, renderY, 0);
       this.mesh.rotation.x += this.rotSpeedX * dt;
       this.mesh.rotation.y += this.rotSpeedY * dt;
       const ring = this.mesh.getObjectByName('gemRing');
@@ -350,13 +370,31 @@ class Asteroid extends Entity {
     return topId;
   }
 
-  update(dt, worldSize) {
+  update(dt, worldSize, camLogicalX = null, camLogicalY = null) {
     // Asteroid stays strictly stationary at its fixed coordinates
     this.vx = 0;
     this.vy = 0;
 
     if (this.mesh) {
-      this.mesh.position.set(this.x, -this.y, 0);
+      let renderX = this.x;
+      let renderY = -this.y;
+
+      // Toroidal camera wrapping: seamlessly renders asteroids right across the map seam
+      if (camLogicalX !== null && camLogicalY !== null && worldSize) {
+        const halfWorld = worldSize * 0.5;
+        let dx = this.x - camLogicalX;
+        while (dx > halfWorld) dx -= worldSize;
+        while (dx < -halfWorld) dx += worldSize;
+
+        let dy = this.y - camLogicalY;
+        while (dy > halfWorld) dy -= worldSize;
+        while (dy < -halfWorld) dy += worldSize;
+
+        renderX = camLogicalX + dx;
+        renderY = -(camLogicalY + dy);
+      }
+
+      this.mesh.position.set(renderX, renderY, 0);
       this.mesh.rotation.x += this.rotSpeed.x * dt;
       this.mesh.rotation.y += this.rotSpeed.y * dt;
       this.mesh.rotation.z += this.rotSpeed.z * dt;
@@ -459,7 +497,7 @@ class Drone {
           this.fireTimer = 1.05; // 1 shot / sec
           const ang = Math.atan2(bestTarget.y - this.y, bestTarget.x - this.x);
           const spd = 620;
-          const laserColor = (parentShip.nation === 'red' ? 0xff3b5c : (parentShip.nation === 'gold' ? 0xffd044 : 0x00f0ff));
+          const laserColor = 0xff2244; // Independent high-energy Crimson plasma bolt
           const laser = new Laser(
             this.x, this.y,
             Math.cos(ang) * spd, Math.sin(ang) * spd,
@@ -480,7 +518,11 @@ class Drone {
         parentShip.shield = Math.min(parentShip.stats.shieldCap, parentShip.shield + 6.0 * dt);
       }
       if (this.mesh) {
-        this.mesh.rotation.z += dt * 3.5; // High-tech rotating protective core
+        this.mesh.rotation.z += dt * 1.2;
+        const outerRing = this.mesh.getObjectByName('defenseOuterRing');
+        const innerRing = this.mesh.getObjectByName('defenseInnerRing');
+        if (outerRing) outerRing.rotation.z += dt * 2.8;
+        if (innerRing) innerRing.rotation.y += dt * 3.6;
       }
     } else if (this.type === 'mining') {
       // User request: "maden dronu ben ateş ettiğim asteroite atak yapacak atak yapmadığım durumda saldırı yapmayacak"
@@ -970,26 +1012,27 @@ class Ship extends Entity {
     ctx.clearRect(0, 0, 512, 128);
 
     const nationColor = (this.nation === 'red') ? '#ff3b5c' : (this.nation === 'gold' ? '#ffd044' : '#00f0ff');
-    ctx.font = 'bold 52px "Orbitron", "Share Tech Mono", sans-serif';
+    ctx.font = 'bold 40px "Orbitron", "Share Tech Mono", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     // Dark solid outline for maximum clarity against deep space & bright stars
     ctx.strokeStyle = 'rgba(0, 5, 12, 0.95)';
-    ctx.lineWidth = 10;
+    ctx.lineWidth = 8;
     ctx.strokeText(this.name || 'PILOT', 256, 64);
 
     // Nation glow
     ctx.shadowColor = nationColor;
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 10;
     ctx.fillStyle = '#ffffff';
     ctx.fillText(this.name || 'PILOT', 256, 64);
 
     const texture = new THREE.CanvasTexture(canvas);
     const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
     this.nameSprite = new THREE.Sprite(spriteMat);
-    this.nameSprite.scale.set(150, 37.5, 1);
-    this.nameSprite.position.set(this.x, -this.y + this.radius + 36, 6);
+    // User request: fontu birazcık daha küçültelim (150, 37.5 -> 118, 29.5)
+    this.nameSprite.scale.set(118, 29.5, 1);
+    this.nameSprite.position.set(this.x, -this.y + this.radius + 34, 6);
     activeScene.add(this.nameSprite);
   }
 
@@ -1013,8 +1056,9 @@ class Ship extends Entity {
 
     this.healthBarGroup = new THREE.Group();
 
+    // User request: "kalkan göstergesini 1-2px büyültelim" (height: 4.5 -> 6.2, fill: 3.2 -> 4.6)
     // Background dark bar
-    const bgGeo = new THREE.PlaneGeometry(38, 4.5);
+    const bgGeo = new THREE.PlaneGeometry(42, 6.2);
     const bgMat = new THREE.MeshBasicMaterial({
       color: 0x050c16,
       transparent: true,
@@ -1035,14 +1079,14 @@ class Ship extends Entity {
     this.healthBarGroup.add(borderLine);
 
     // Health / Shield Fill bar
-    const fillGeo = new THREE.PlaneGeometry(36, 3.2);
-    fillGeo.translate(18, 0, 0); // Translate origin to left edge for clean scale.x
+    const fillGeo = new THREE.PlaneGeometry(40, 4.6);
+    fillGeo.translate(20, 0, 0); // Translate origin to left edge for clean scale.x
     this.healthFillMat = new THREE.MeshBasicMaterial({
       color: 0x00e676,
       depthWrite: false
     });
     this.healthFillMesh = new THREE.Mesh(fillGeo, this.healthFillMat);
-    this.healthFillMesh.position.set(-18, 0, 0.1);
+    this.healthFillMesh.position.set(-20, 0, 0.1);
     this.healthBarGroup.add(this.healthFillMesh);
 
     this.healthBarGroup.position.set(this.x, -this.y + this.radius + 18, 4);
@@ -1381,7 +1425,7 @@ class RemotePlayer extends Ship {
 
     // Name tag position
     if (this.nameSprite) {
-      this.nameSprite.position.set(this.x, -this.y + this.radius + 36, 6);
+      this.nameSprite.position.set(this.x, -this.y + this.radius + 34, 6);
     }
 
     // Engine flame (smooth ion light)

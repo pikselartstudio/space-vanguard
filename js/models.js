@@ -2844,83 +2844,211 @@ const ModelBuilder = {
     return group;
   },
 
-  // User request: "1.2.3. olanlar için minik arkadan gelecek dronlar oluştur gemilere uyumlu olacak"
+  // User request: "yandaki dronların ulus renklerinde olmalarına gerek yok ve tasarımlarını değişebilirsin"
   createDroneMesh(type = 'attack', nation = 'blue') {
-    const nationColor = (nation === 'red') ? 0xff3b5c : (nation === 'gold' ? 0xffd044 : 0x00f0ff);
     const root = new THREE.Group();
 
-    const hullMat = new THREE.MeshStandardMaterial({
-      color: 0xd0d8e2,
-      roughness: 0.3,
-      metalness: 0.5,
-      flatShading: true
-    });
-    const nationMat = new THREE.MeshStandardMaterial({
-      color: nationColor,
-      roughness: 0.25,
-      metalness: 0.6,
-      flatShading: true
-    });
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: nationColor
-    });
-
     if (type === 'attack') {
-      // Sleek mini fighter with twin blasters
-      const body = new THREE.Mesh(new THREE.ConeGeometry(3.5, 9, 5), hullMat);
-      body.rotation.x = Math.PI / 2;
+      // 1. ATTACK DRONE: "Spectre-IV Strike Interceptor"
+      // Stealth Titanium Charcoal, Gunmetal & High-Energy Crimson Plasma Emitters
+      const stealthCarbonMat = new THREE.MeshStandardMaterial({
+        color: 0x161a22,
+        roughness: 0.32,
+        metalness: 0.75,
+        flatShading: true
+      });
+      const gunmetalMat = new THREE.MeshStandardMaterial({
+        color: 0x334155,
+        roughness: 0.28,
+        metalness: 0.85,
+        flatShading: true
+      });
+      const crimsonPlasmaMat = new THREE.MeshBasicMaterial({
+        color: 0xff2244
+      });
+
+      // Sharp aerodynamic wedge chassis
+      const bodyGeo = new THREE.ConeGeometry(3.4, 10.5, 4);
+      bodyGeo.rotateX(Math.PI / 2);
+      bodyGeo.rotateZ(Math.PI / 4);
+      const body = new THREE.Mesh(bodyGeo, stealthCarbonMat);
       root.add(body);
 
-      const wingL = new THREE.Mesh(new THREE.BoxGeometry(7, 0.8, 3), nationMat);
-      wingL.position.set(0, 0, -1);
-      root.add(wingL);
+      // Angled stealth delta wings
+      const wingGeo = new THREE.BoxGeometry(9.2, 0.75, 4.2);
+      const wing = new THREE.Mesh(wingGeo, gunmetalMat);
+      wing.position.set(0, 0, -1.2);
+      root.add(wing);
 
-      const barrelL = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 5, 4), nationMat);
+      // Crimson plasma wingtip rails
+      const tipL = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 4.8), crimsonPlasmaMat);
+      tipL.position.set(-4.6, 0.1, -1.0);
+      root.add(tipL);
+
+      const tipR = tipL.clone();
+      tipR.position.x = 4.6;
+      root.add(tipR);
+
+      // Twin forward heavy railgun barrels
+      const barrelL = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.62, 5.8, 6), gunmetalMat);
       barrelL.rotation.x = Math.PI / 2;
-      barrelL.position.set(-3.2, 0, 1.5);
+      barrelL.position.set(-2.2, 0.1, 2.8);
       root.add(barrelL);
 
+      const muzzleL = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.16, 6, 12), crimsonPlasmaMat);
+      muzzleL.position.set(-2.2, 0.1, 5.8);
+      root.add(muzzleL);
+
       const barrelR = barrelL.clone();
-      barrelR.position.x = 3.2;
+      barrelR.position.x = 2.2;
       root.add(barrelR);
 
-      const thruster = new THREE.Mesh(new THREE.SphereGeometry(1.4, 6, 6), glowMat);
-      thruster.position.set(0, 0, -4.5);
-      root.add(thruster);
+      const muzzleR = muzzleL.clone();
+      muzzleR.position.x = 2.2;
+      root.add(muzzleR);
+
+      // Twin micro ion thrusters at rear
+      const thrustL = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.5, 1.5, 6), stealthCarbonMat);
+      thrustL.rotation.x = Math.PI / 2;
+      thrustL.position.set(-1.4, 0, -5.2);
+      root.add(thrustL);
+
+      const glowL = new THREE.Mesh(new THREE.SphereGeometry(0.65, 6, 6), crimsonPlasmaMat);
+      glowL.position.set(-1.4, 0, -5.8);
+      root.add(glowL);
+
+      const thrustR = thrustL.clone();
+      thrustR.position.x = 1.4;
+      root.add(thrustR);
+
+      const glowR = glowL.clone();
+      glowR.position.x = 1.4;
+      root.add(glowR);
 
     } else if (type === 'defense') {
-      // Hexagonal guardian orb with energy rings
-      const core = new THREE.Mesh(new THREE.IcosahedronGeometry(4.2, 1), hullMat);
+      // 2. DEFENSE DRONE: "Aegis-X Sentinel Core"
+      // Polished Platinum Pearl, Cybernetic Chrome & Quantum Cyan Gyroscopic Gimbal Rings
+      const pearlMat = new THREE.MeshStandardMaterial({
+        color: 0xf1f5f9,
+        roughness: 0.18,
+        metalness: 0.90,
+        flatShading: true
+      });
+      const chromeMat = new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        roughness: 0.22,
+        metalness: 0.85
+      });
+      const cyanQuantumMat = new THREE.MeshBasicMaterial({
+        color: 0x00f5ff
+      });
+      const shieldCoronaMat = new THREE.MeshBasicMaterial({
+        color: 0x00e5ff,
+        transparent: true,
+        opacity: 0.35,
+        wireframe: true
+      });
+
+      // Faceted platinum central guardian core
+      const core = new THREE.Mesh(new THREE.IcosahedronGeometry(3.6, 0), pearlMat);
       root.add(core);
 
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(5.8, 0.7, 6, 18), nationMat);
-      root.add(ring);
+      // Pulsating internal quantum plasma orb
+      const innerOrb = new THREE.Mesh(new THREE.SphereGeometry(2.3, 12, 12), cyanQuantumMat);
+      root.add(innerOrb);
 
-      const glowSphere = new THREE.Mesh(new THREE.SphereGeometry(2.2, 8, 8), glowMat);
-      root.add(glowSphere);
+      // Outer wireframe holographic shield bubble
+      const shieldBubble = new THREE.Mesh(new THREE.SphereGeometry(4.8, 10, 8), shieldCoronaMat);
+      shieldBubble.name = 'defenseShieldBubble';
+      root.add(shieldBubble);
+
+      // Concentric gyroscopic stabilizer rings
+      const outerRing = new THREE.Mesh(new THREE.TorusGeometry(6.2, 0.42, 6, 24), chromeMat);
+      outerRing.name = 'defenseOuterRing';
+      root.add(outerRing);
+
+      const innerRing = new THREE.Mesh(new THREE.TorusGeometry(4.8, 0.36, 6, 20), cyanQuantumMat);
+      innerRing.rotation.x = Math.PI / 3;
+      innerRing.name = 'defenseInnerRing';
+      root.add(innerRing);
+
+      // 4 Orbital energy nodal pips along outer ring
+      for (let i = 0; i < 4; i++) {
+        const ang = (i / 4) * Math.PI * 2;
+        const node = new THREE.Mesh(new THREE.SphereGeometry(0.72, 6, 6), cyanQuantumMat);
+        node.position.set(Math.cos(ang) * 6.2, Math.sin(ang) * 6.2, 0);
+        root.add(node);
+      }
 
     } else {
-      // Mining Drone: extractor pod with drill emitter
-      const pod = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 7, 6), hullMat);
-      pod.rotation.x = Math.PI / 2;
-      root.add(pod);
+      // 3. MINING DRONE: "Goliath Heavy Excavator"
+      // Heavy Industrial Basalt Carbon, Hazard Amber-Gold & Intense Laser Bore Emitter
+      const basaltMat = new THREE.MeshStandardMaterial({
+        color: 0x1e293b,
+        roughness: 0.38,
+        metalness: 0.65,
+        flatShading: true
+      });
+      const industrialGoldMat = new THREE.MeshStandardMaterial({
+        color: 0xf59e0b,
+        roughness: 0.25,
+        metalness: 0.70,
+        flatShading: true
+      });
+      const amberGlowMat = new THREE.MeshBasicMaterial({
+        color: 0xffb703
+      });
 
-      const noseCone = new THREE.Mesh(new THREE.ConeGeometry(2.8, 4, 6), nationMat);
-      noseCone.rotation.x = -Math.PI / 2;
-      noseCone.position.set(0, 0, 4.5);
-      root.add(noseCone);
+      // Rugged hexagonal extractor chassis
+      const chassisGeo = new THREE.CylinderGeometry(3.2, 3.7, 7.5, 6);
+      chassisGeo.rotateX(Math.PI / 2);
+      const chassis = new THREE.Mesh(chassisGeo, basaltMat);
+      root.add(chassis);
 
-      const tipGlow = new THREE.Mesh(new THREE.SphereGeometry(1.6, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffaa00 }));
-      tipGlow.position.set(0, 0, 6.5);
-      root.add(tipGlow);
+      // Heavy conical excavator drill head
+      const drillGeo = new THREE.ConeGeometry(3.0, 4.8, 6);
+      drillGeo.rotateX(-Math.PI / 2);
+      const drillHead = new THREE.Mesh(drillGeo, industrialGoldMat);
+      drillHead.position.set(0, 0, 4.8);
+      root.add(drillHead);
 
-      const solarL = new THREE.Mesh(new THREE.BoxGeometry(6, 0.5, 2.5), nationMat);
-      solarL.position.set(-3.5, 0, 0);
-      root.add(solarL);
+      // Intense focal amber drill lens at nose tip
+      const tipLens = new THREE.Mesh(new THREE.SphereGeometry(1.4, 8, 8), amberGlowMat);
+      tipLens.position.set(0, 0, 7.2);
+      root.add(tipLens);
 
-      const solarR = solarL.clone();
-      solarR.position.x = 3.5;
-      root.add(solarR);
+      // Dual articulated hydraulic cutter arms
+      const armGeo = new THREE.BoxGeometry(1.1, 1.1, 6.2);
+      const armL = new THREE.Mesh(armGeo, industrialGoldMat);
+      armL.position.set(-3.2, 0, 3.2);
+      root.add(armL);
+
+      const clawL = new THREE.Mesh(new THREE.ConeGeometry(0.9, 2.2, 4), basaltMat);
+      clawL.rotation.x = -Math.PI / 2;
+      clawL.position.set(-3.2, 0, 6.8);
+      root.add(clawL);
+
+      const armR = new THREE.Mesh(armGeo, industrialGoldMat);
+      armR.position.set(3.2, 0, 3.2);
+      root.add(armR);
+
+      const clawR = clawL.clone();
+      clawR.position.x = 3.2;
+      root.add(clawR);
+
+      // Heavy-duty rear power pack & solar radiator fins
+      const radiatorL = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.45, 3.0), basaltMat);
+      radiatorL.position.set(-3.5, 0, -2.0);
+      root.add(radiatorL);
+
+      const radiatorR = radiatorL.clone();
+      radiatorR.position.x = 3.5;
+      root.add(radiatorR);
+
+      const rearReactor = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 2.2, 6), amberGlowMat);
+      rearReactor.rotation.x = Math.PI / 2;
+      rearReactor.position.set(0, 0, -4.4);
+      root.add(rearReactor);
     }
 
     // User request: "dronların boyutunu 3x arttır" (1.15 -> 3.45)

@@ -549,6 +549,14 @@ body, html {
   box-shadow: 0 0 12px rgba(0, 240, 255, 0.35);
 }
 
+.base-market-footer.donating-active {
+  background: rgba(234, 179, 8, 0.22);
+  border: 1.5px solid #eab308;
+  color: #fef08a;
+  box-shadow: 0 0 16px rgba(234, 179, 8, 0.5);
+  animation: starvedPulse 0.8s infinite alternate ease-in-out;
+}
+
 /* DFRT + CTRL Drift Mode HUD Indicator */
 #drift-mode-indicator {
   display: inline-flex;
@@ -803,7 +811,7 @@ body, html {
 .hud-icon-exp { color: #c084fc; }
 
 .meter-val {
-  font-size: 0.72rem;
+  font-size: 0.67rem;
   font-weight: 700;
   color: #f1f5f9;
   display: flex;
@@ -838,7 +846,7 @@ body, html {
 }
 
 .meter-val .val-extra {
-  font-size: 0.62rem;
+  font-size: 0.60rem;
   color: #f87171;
   margin-left: 2px;
 }
@@ -852,6 +860,11 @@ body, html {
   border-radius: 3px;
   position: relative;
   overflow: hidden;
+}
+
+/* User request: "kalkan göstergesini 1-2px büyültelim" */
+.hud-shd .meter-track {
+  height: 16px;
 }
 
 .meter-grid-overlay {

@@ -144,6 +144,13 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null, isOut
     y = Math.sin(angle) * dist;
   }
 
+  // Toroidal boundary normalization: guarantees every asteroid is strictly within [-half, half]
+  const halfWorld = WORLD_SIZE / 2;
+  while (x < -halfWorld) x += WORLD_SIZE;
+  while (x > halfWorld) x -= WORLD_SIZE;
+  while (y < -halfWorld) y += WORLD_SIZE;
+  while (y > halfWorld) y -= WORLD_SIZE;
+
   let element = 'ice';
   const distFromCenter = Math.hypot(x, y);
 

@@ -82,8 +82,9 @@ class StarblastGame {
     this.keys = {};
     this.mouseWorld = { x: 0, y: 0 };
     this.mouseScreenX = window.innerWidth / 2;
-    this.mouseScreenY = window.innerHeight / 2;
     this.donateTimer = 0;
+    this.isAutoDonating = false;
+    this.autoDonateTimer = 0;
     this.cameraShakeTimer = 0;
     // Camera Zoom Controls (Mouse wheel roll in/out per user request)
     this.cameraZoomFactor = 1.0;
@@ -748,16 +749,29 @@ class StarblastGame {
     }
   }
 
+  // User request: "baseye geldiğimde otomatik üzerinden boşlalma olmasın b tuşuna basınca 10ar şekilde alsın tekrar b basılınca dursun"
   donateToHomeBase() {
     if (!this.player || this.player.isDead) return;
     const homeBase = this.stations[this.player.nation];
-    if (!homeBase) return;
+    if (!homeBase || homeBase.isDead) return;
 
     const basePerimeter = (homeBase.radius || 420) + 180;
     const dist = Math.hypot(this.player.x - homeBase.x, this.player.y - homeBase.y);
     if (dist > basePerimeter) {
+      this.isAutoDonating = false;
       if (this.ui) {
         this.ui.showAnnouncement(`⚠️ Üsse bağış yapmak için kendi üssünüzün içine girmelisiniz! (${Math.round(dist)}m uzaktasınız)`, 2500);
+      }
+      return;
+    }
+
+    // Toggle: if already donating, pressing B stops donation
+    if (this.isAutoDonating) {
+      this.isAutoDonating = false;
+      this.autoDonateTimer = 0;
+      if (this.ui) {
+        this.ui.showAnnouncement('⏸️ Üsse bağış durduruldu.', 2000);
+        this.ui.updateHUD(this.player, this.stations);
       }
       return;
     }
@@ -769,7 +783,27 @@ class StarblastGame {
       return;
     }
 
-    // User request: "b tuşunu basılınca hepisini değil 10ar şekilde envanterden üsse boşalma olsun"
+    // Start 10-by-10 donation stream!
+    this.isAutoDonating = true;
+    this.autoDonateTimer = 0;
+    this.executeSingleDonationStep();
+    if (this.ui) {
+      this.ui.showAnnouncement(`🏛️ Üsse bağış başlatıldı (10'ar aktarılıyor... Durdurmak için [B])`, 2500);
+    }
+  }
+
+  executeSingleDonationStep() {
+    if (!this.player || this.player.isDead || this.player.crystals <= 0) {
+      this.isAutoDonating = false;
+      if (this.ui) this.ui.updateHUD(this.player, this.stations);
+      return;
+    }
+    const homeBase = this.stations[this.player.nation];
+    if (!homeBase || homeBase.isDead) {
+      this.isAutoDonating = false;
+      return;
+    }
+
     const amount = Math.min(10, this.player.crystals);
     this.player.crystals -= amount;
     this.player.score += amount * 25;
@@ -785,10 +819,18 @@ class StarblastGame {
       }
     }
 
-    window.soundSystem.playUpgrade();
-    this.createExplosionParticles(homeBase.x, homeBase.y, NATIONS[this.player.nation].color, 16);
+    if (window.soundSystem) {
+      window.soundSystem.playUpgrade();
+    }
+    this.createExplosionParticles(homeBase.x, homeBase.y, NATIONS[this.player.nation].color, 14);
+
+    if (this.player.crystals <= 0) {
+      this.isAutoDonating = false;
+      if (this.ui) {
+        this.ui.showAnnouncement('✅ Kargo tamamen üsse aktarıldı!', 2500);
+      }
+    }
     if (this.ui) {
-      this.ui.showAnnouncement(`🏛️ Üsse ${amount} Kredi aktarıldı! (Kalan Kargo: ${this.player.crystals})`, 1800);
       this.ui.updateHUD(this.player, this.stations);
     }
   }
@@ -1271,19 +1313,27 @@ class StarblastGame {
         if (d <= healPerimeter) {
           // Heal friendly ship shield
           this.player.shield = Math.min(this.player.stats.shieldCap, this.player.shield + 60 * dt);
-          // Auto donate crystals to base
-          if (this.player.crystals > 0) {
-            this.donateTimer += dt;
-            if (this.donateTimer > 0.15) {
-              this.donateTimer = 0;
-              const donated = Math.min(5, this.player.crystals);
-              this.player.crystals -= donated;
-              this.player.score += donated * 25;
-              const res = homeBase.donate(donated);
-              window.soundSystem.playGemPickup();
-              if (res.leveledUp) {
-                window.soundSystem.playTierUp();
+          // User request: "otomatik üzerinden boşalma olmasın b tuşuna basınca 10ar şekilde alsın tekrar b basılınca dursun"
+          if (this.isAutoDonating) {
+            if (this.player.crystals <= 0) {
+              this.isAutoDonating = false;
+              if (this.ui) this.ui.updateHUD(this.player, this.stations);
+            } else {
+              this.autoDonateTimer = (this.autoDonateTimer || 0) + dt;
+              if (this.autoDonateTimer >= 0.40) {
+                this.autoDonateTimer = 0;
+                this.executeSingleDonationStep();
               }
+            }
+          }
+        } else {
+          // If player flew outside base perimeter while donating, cancel donation stream
+          if (this.isAutoDonating) {
+            this.isAutoDonating = false;
+            this.autoDonateTimer = 0;
+            if (this.ui) {
+              this.ui.showAnnouncement('⚠️ Üs bölgesinden çıkıldığı için bağış durduruldu.', 2000);
+              this.ui.updateHUD(this.player, this.stations);
             }
           }
         }
@@ -1302,7 +1352,9 @@ class StarblastGame {
         }
         continue;
       }
-      a.update(dt, this.worldSize);
+      const camLogX = this.camera ? this.camera.position.x : (this.player ? this.player.x : 0);
+      const camLogY = this.camera ? -this.camera.position.y : (this.player ? this.player.y : 0);
+      a.update(dt, this.worldSize, camLogX, camLogY);
     }
 
     // 3. Bot simulation removed - pure multiplayer arena with human pilots
@@ -1355,9 +1407,27 @@ class StarblastGame {
         const ast = this.asteroids[j];
         if (ast.isDead || ast.health <= 0) continue;
 
-        const dist = Math.hypot(laser.x - ast.x, laser.y - ast.y);
+        let ldx = laser.x - ast.x;
+        let ldy = laser.y - ast.y;
+        if (this.worldSize) {
+          const half = this.worldSize * 0.5;
+          while (ldx > half) ldx -= this.worldSize;
+          while (ldx < -half) ldx += this.worldSize;
+          while (ldy > half) ldy -= this.worldSize;
+          while (ldy < -half) ldy += this.worldSize;
+        }
+        const dist = Math.hypot(ldx, ldy);
         if (dist < ast.radius + laser.radius) {
-          const fromOriginDist = Math.hypot(laser.startX - ast.x, laser.startY - ast.y);
+          let odx = laser.startX - ast.x;
+          let ody = laser.startY - ast.y;
+          if (this.worldSize) {
+            const half = this.worldSize * 0.5;
+            while (odx > half) odx -= this.worldSize;
+            while (odx < -half) odx += this.worldSize;
+            while (ody > half) ody -= this.worldSize;
+            while (ody < -half) ody += this.worldSize;
+          }
+          const fromOriginDist = Math.hypot(odx, ody);
           if (fromOriginDist < minHitDist) {
             minHitDist = fromOriginDist;
             closestAst = ast;
@@ -1567,7 +1637,7 @@ class StarblastGame {
     // 6. Update Gems & Pickup
     for (let i = this.gems.length - 1; i >= 0; i--) {
       const gem = this.gems[i];
-      gem.update(dt, this.worldSize, allShips);
+      gem.update(dt, this.worldSize, allShips, camLogX, camLogY);
 
       if (gem.isExpired) {
         gem.destroy(this.scene);
@@ -1583,7 +1653,16 @@ class StarblastGame {
           continue;
         }
 
-        const dist = Math.hypot(gem.x - ship.x, gem.y - ship.y);
+        let gdx = gem.x - ship.x;
+        let gdy = gem.y - ship.y;
+        if (this.worldSize) {
+          const half = this.worldSize * 0.5;
+          while (gdx > half) gdx -= this.worldSize;
+          while (gdx < -half) gdx += this.worldSize;
+          while (gdy > half) gdy -= this.worldSize;
+          while (gdy < -half) gdy += this.worldSize;
+        }
+        const dist = Math.hypot(gdx, gdy);
         const distFromHull = dist - ship.radius - gem.radius;
         if (distFromHull <= 18 || dist <= ship.radius + 14) {
           // Immediately destroy and remove crystal locally - guarantees zero crystals get stuck on the ship!
@@ -1636,8 +1715,15 @@ class StarblastGame {
       for (let j = this.asteroids.length - 1; j >= 0; j--) {
         const ast = this.asteroids[j];
         if (ast.isDead || ast.health <= 0) continue;
-        const dx = ship.x - ast.x;
-        const dy = ship.y - ast.y;
+        let dx = ship.x - ast.x;
+        let dy = ship.y - ast.y;
+        if (this.worldSize) {
+          const half = this.worldSize * 0.5;
+          while (dx > half) dx -= this.worldSize;
+          while (dx < -half) dx += this.worldSize;
+          while (dy > half) dy -= this.worldSize;
+          while (dy < -half) dy += this.worldSize;
+        }
         const dist = Math.hypot(dx, dy);
         const minDist = ship.radius + ast.radius;
 

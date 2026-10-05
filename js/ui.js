@@ -971,8 +971,8 @@ class UIManager {
       if (dist <= dockPerimeter) {
         nearStation = true;
         player.isDockedAtBase = true;
-        this.baseDockStatus.style.display = 'block';
-        const marketKey = `${homeBase.level}_${homeBase.crystalsDonated}_${homeBase.hp}_${player.tier}_${player.drones ? player.drones.length : 0}_${(player.elementalAmmo && player.elementalAmmo.ice) || 0}_${(player.elementalAmmo && player.elementalAmmo.fire) || 0}_${(player.elementalAmmo && player.elementalAmmo.dark) || 0}`;
+        const isDonating = this.game && this.game.isAutoDonating ? 1 : 0;
+        const marketKey = `${homeBase.level}_${homeBase.crystalsDonated}_${homeBase.hp}_${player.tier}_${player.drones ? player.drones.length : 0}_${(player.elementalAmmo && player.elementalAmmo.ice) || 0}_${(player.elementalAmmo && player.elementalAmmo.fire) || 0}_${(player.elementalAmmo && player.elementalAmmo.dark) || 0}_${isDonating}`;
         if (this.lastRenderedBaseDockKey !== marketKey) {
           this.lastRenderedBaseDockKey = marketKey;
           this.renderBaseMarket(homeBase, player);
@@ -1190,9 +1190,12 @@ class UIManager {
         </div>
       </div>
 
-      <!-- User request: "Bağış Yapma için b tuşuna basın kısmı en altta olsun ve b tuşunu basılınca hepisini değil 10ar şekilde envanterden üsse boşalma olsun" -->
-      <div class="base-market-footer" id="base-market-donate-btn" title="Tıklayın veya klavyeden [B] tuşuna basın (Her seferde 10 Kredi)">
-        🏛️ <b>[B]</b> Tuşuyla Üsse Bağış Yap (10 Kredi Boşalt) • Üs Sv. <b>${homeBase.level}/5</b> (%${pct})
+      <!-- User request: "otomatik üzerinden boşlalma olmasın b tuşuna basınca 10ar şekilde alsın tekrar b basılınca dursun" -->
+      <div class="base-market-footer ${this.game && this.game.isAutoDonating ? 'donating-active' : ''}" id="base-market-donate-btn" title="Tıklayın veya klavyeden [B] tuşuna basın (10'ar Kredi Aktarımı Başlat/Durdur)">
+        ${this.game && this.game.isAutoDonating
+          ? `⏸️ <b>[B]</b> Bağışı Durdur (10'ar aktarılıyor...) • Üs Sv. <b>${homeBase.level}/5</b> (%${pct})`
+          : `🏛️ <b>[B]</b> Tuşuyla Bağış Yap (10'ar Aktarımı Başlat) • Üs Sv. <b>${homeBase.level}/5</b> (%${pct})`
+        }
       </div>
     `;
 
