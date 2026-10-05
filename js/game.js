@@ -1049,17 +1049,22 @@ class StarblastGame {
     }
   }
 
-  // User request: "asteoritlerin patlaması aşırı yayılmasın çok büyük bir patlama hacmi var 1 kat düşür."
+  // User request: "asteroitere bu png görseli hareketli vfx e çevirip patlama efekti olarak kullan. akalım nasıl oluyor sadece asteroit patlama efektini düzenleyelim."
   createFieryAsteroidExplosion(x, y, radius = 30) {
-    // Fiery Flame, Blazing Ember & Smoke Particles (Compact volume, halved spread and particle count)
-    const fireColors = [0xff2200, 0xff5500, 0xff9900, 0xffcc00, 0xffffff, 0x4a1805, 0xff7700];
-    const particleCount = 24;
+    // 1. Pixel-Art Animated Explosion VFX using custom PNG sprite
+    const vfx = new AsteroidExplosionVFX(x, y, radius);
+    this.particles.push(vfx);
+    this.scene.add(vfx.group);
+
+    // 2. Accompanying flying embers and rocky fragments matching the PNG's stones
+    const fireColors = [0xffcc00, 0xff7700, 0xff3300, 0x5a4535, 0xff9900, 0x3d2c20];
+    const particleCount = 14;
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 20 + Math.random() * 95;
+      const speed = 25 + Math.random() * 110;
       const col = fireColors[Math.floor(Math.random() * fireColors.length)];
-      const size = 2.4 + Math.random() * 4.2;
-      const life = 0.35 + Math.random() * 0.45;
+      const size = 2.2 + Math.random() * 3.6;
+      const life = 0.28 + Math.random() * 0.35;
       const p = new Particle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, col, size, life);
       this.particles.push(p);
       this.scene.add(p.mesh);
