@@ -3088,5 +3088,150 @@ const ModelBuilder = {
     // User request: "dronlarımızı x2 kat küçült" (3.45 -> 1.725)
     root.scale.set(1.725, 1.725, 1.725);
     return root;
+  },
+
+  // Plan A: Neutral Mining Refinery Platform (Territory Control / King of the Hill)
+  createRefineryMesh(controllingNation = null) {
+    const root = new THREE.Group();
+    root.name = 'refineryRoot';
+
+    const nationColors = {
+      blue: 0x0099ff,
+      red: 0xff2a4b,
+      gold: 0xffbb00
+    };
+    const activeColor = (controllingNation && nationColors[controllingNation]) ? nationColors[controllingNation] : 0x00f0ff;
+    const isNeutral = !controllingNation;
+
+    // Materials
+    const darkAlloyMat = new THREE.MeshStandardMaterial({
+      color: 0x141e2c,
+      roughness: 0.40,
+      metalness: 0.75,
+      flatShading: true
+    });
+    const panelMat = new THREE.MeshStandardMaterial({
+      color: 0x223248,
+      roughness: 0.35,
+      metalness: 0.60,
+      flatShading: true
+    });
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: activeColor,
+      roughness: 0.25,
+      metalness: 0.55,
+      flatShading: true
+    });
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: activeColor,
+      transparent: true,
+      opacity: isNeutral ? 0.75 : 0.95
+    });
+
+    // 1. Heavy Hexagonal Base Platform
+    const baseGeo = new THREE.CylinderGeometry(44, 52, 14, 6);
+    baseGeo.rotateX(Math.PI / 2);
+    const baseMesh = new THREE.Mesh(baseGeo, darkAlloyMat);
+    root.add(baseMesh);
+
+    // Upper structural platform deck
+    const deckGeo = new THREE.CylinderGeometry(34, 42, 8, 6);
+    deckGeo.rotateX(Math.PI / 2);
+    const deckMesh = new THREE.Mesh(deckGeo, panelMat);
+    deckMesh.position.z = 8;
+    root.add(deckMesh);
+
+    // Accent collar
+    const collarGeo = new THREE.CylinderGeometry(26, 32, 6, 6);
+    collarGeo.rotateX(Math.PI / 2);
+    const collarMesh = new THREE.Mesh(collarGeo, accentMat);
+    collarMesh.position.z = 13;
+    root.add(collarMesh);
+
+    // 2. 6 Heavy Industrial Extraction Pylons radiating outward
+    for (let i = 0; i < 6; i++) {
+      const ang = (i / 6) * Math.PI * 2;
+      const pylonGroup = new THREE.Group();
+      pylonGroup.rotation.z = ang;
+
+      const pylonGeo = new THREE.BoxGeometry(6, 48, 8);
+      const pylonMesh = new THREE.Mesh(pylonGeo, darkAlloyMat);
+      pylonMesh.position.set(0, 42, 4);
+      pylonGroup.add(pylonMesh);
+
+      // Pylon glowing energy conduits
+      const conduitGeo = new THREE.BoxGeometry(2.2, 36, 3);
+      const conduitMesh = new THREE.Mesh(conduitGeo, glowMat);
+      conduitMesh.position.set(0, 42, 9);
+      pylonGroup.add(conduitMesh);
+
+      // Pylon tip antenna
+      const tipGeo = new THREE.ConeGeometry(2.4, 9, 4);
+      tipGeo.rotateX(-Math.PI / 2);
+      const tipMesh = new THREE.Mesh(tipGeo, accentMat);
+      tipMesh.position.set(0, 68, 4);
+      pylonGroup.add(tipMesh);
+
+      root.add(pylonGroup);
+    }
+
+    // 3. Rotating Outer Collector Ring
+    const outerRingGroup = new THREE.Group();
+    outerRingGroup.name = 'refineryOuterRing';
+    const outerRingMesh = new THREE.Mesh(new THREE.TorusGeometry(74, 3.2, 8, 40), darkAlloyMat);
+    outerRingGroup.add(outerRingMesh);
+
+    // 6 Orbital capacitor pods along outer ring
+    for (let i = 0; i < 6; i++) {
+      const ang = (i / 6) * Math.PI * 2;
+      const podMesh = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 8, 6), accentMat);
+      podMesh.position.set(Math.cos(ang) * 74, Math.sin(ang) * 74, 0);
+      outerRingGroup.add(podMesh);
+
+      const podGlow = new THREE.Mesh(new THREE.SphereGeometry(2.2, 8, 8), glowMat);
+      podGlow.position.set(Math.cos(ang) * 74, Math.sin(ang) * 74, 4.5);
+      outerRingGroup.add(podGlow);
+    }
+    root.add(outerRingGroup);
+
+    // 4. Counter-rotating Inner Focusing Ring
+    const innerRingGroup = new THREE.Group();
+    innerRingGroup.name = 'refineryInnerRing';
+    const innerRingMesh = new THREE.Mesh(new THREE.TorusGeometry(54, 2.5, 6, 32), accentMat);
+    innerRingGroup.add(innerRingMesh);
+    root.add(innerRingGroup);
+
+    // 5. Central Pulsing High-Energy Core
+    const coreMesh = new THREE.Mesh(new THREE.OctahedronGeometry(16, 1), glowMat);
+    coreMesh.name = 'refineryCore';
+    coreMesh.position.set(0, 0, 18);
+    root.add(coreMesh);
+
+    // Beacon spire tip
+    const spireGeo = new THREE.CylinderGeometry(1.2, 2.8, 22, 6);
+    spireGeo.rotateX(Math.PI / 2);
+    const spireMesh = new THREE.Mesh(spireGeo, accentMat);
+    spireMesh.name = 'refineryBeacon';
+    spireMesh.position.set(0, 0, 32);
+    root.add(spireMesh);
+
+    // 6. Holographic Territory Boundary Ring
+    const holoRingGeo = new THREE.RingGeometry(110, 114, 48);
+    const holoRingMat = new THREE.MeshBasicMaterial({
+      color: activeColor,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: isNeutral ? 0.22 : 0.45
+    });
+    const holoRing = new THREE.Mesh(holoRingGeo, holoRingMat);
+    holoRing.position.set(0, 0, -2);
+    root.add(holoRing);
+
+    root.scale.set(1.9, 1.9, 1.9);
+    return root;
   }
 };
+
+if (typeof window !== 'undefined') {
+  window.ModelBuilder = ModelBuilder;
+}

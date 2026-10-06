@@ -32,6 +32,12 @@ const NATIONS = {
   }
 };
 
+const UPGRADE_COSTS = [30, 50, 80, 120, 180, 260];
+function getUpgradeCost(level) {
+  const lvl = Math.max(0, Math.min(5, Math.floor(level || 0)));
+  return UPGRADE_COSTS[lvl] || 50;
+}
+
 const UPGRADE_CONFIG = [
   { id: 'shieldCap', name: 'Kalkan Kapasitesi', shortName: 'KALKAN', icon: '🛡️', key: '1', max: 6, costPerLevel: 50, bonusPercent: 0.15 },
   { id: 'shieldRegen', name: 'Kalkan Yenilenmesi', shortName: 'K. YENİLEME', icon: '🔄', key: '2', max: 6, costPerLevel: 50, bonusPercent: 0.20 },
@@ -74,7 +80,8 @@ const SHIP_TREE = {
     weapons: [
       { offset: { x: 0, y: 25 }, isHeavy: false, energyCost: 5 }
     ],
-    evolvesTo: ['tier-2']
+    // User request: Ağaç sistemi ile 4 uzmanlık sınıfına ayrılır
+    evolvesTo: ['tank-rhino', 'speed-dart', 'bruiser-crusader', 'healer-cleric']
   },
 
   // SEVİYE 2: İğne Avcı (2.png)
@@ -229,7 +236,7 @@ const SHIP_TREE = {
     weapons: [
       { offset: { x: 0, y: 25 }, isHeavy: false, energyCost: 5 }
     ],
-    evolvesTo: ['tier-2']
+    evolvesTo: ['tank-rhino', 'speed-dart', 'bruiser-crusader', 'healer-cleric']
   },
 
   // =========================================================================
@@ -261,7 +268,7 @@ const SHIP_TREE = {
     weapons: [
       { offset: { x: 0, y: 22 }, isHeavy: true, energyCost: 26 }
     ],
-    evolvesTo: []
+    evolvesTo: ['tank-goliath', 'bruiser-marauder']
   },
   // Seviye 3 Tank
   'tank-goliath': {
@@ -289,7 +296,7 @@ const SHIP_TREE = {
     weapons: [
       { offset: { x: 0, y: 29 }, isHeavy: true, energyCost: 45 }
     ],
-    evolvesTo: []
+    evolvesTo: ['tank-titan']
   },
   // Seviye 4 Tank (Zirve)
   'tank-titan': {
@@ -317,7 +324,7 @@ const SHIP_TREE = {
     weapons: [
       { offset: { x: 0, y: 38 }, isHeavy: true, energyCost: 65 }
     ],
-    evolvesTo: []
+    evolvesTo: ['tier-5']
   },
 
   // =========================================================================
@@ -351,7 +358,7 @@ const SHIP_TREE = {
       { offset: { x: 0, y: 22 }, isHeavy: false, energyCost: 7 },
       { offset: { x: 8, y: 16 }, isHeavy: false, energyCost: 6 }
     ],
-    evolvesTo: []
+    evolvesTo: ['speed-phantom', 'bruiser-marauder']
   },
   // Seviye 3 Hızlı Avcı
   'speed-phantom': {
@@ -381,7 +388,7 @@ const SHIP_TREE = {
       { offset: { x: 0, y: 28 }, isHeavy: false, energyCost: 12 },
       { offset: { x: 12, y: 20 }, isHeavy: false, energyCost: 10 }
     ],
-    evolvesTo: []
+    evolvesTo: ['speed-tempest']
   },
   // Seviye 4 Hızlı Avcı (Zirve)
   'speed-tempest': {
@@ -411,7 +418,7 @@ const SHIP_TREE = {
       { offset: { x: 0, y: 34 }, isHeavy: true, energyCost: 18 },
       { offset: { x: 16, y: 25 }, isHeavy: false, energyCost: 14 }
     ],
-    evolvesTo: []
+    evolvesTo: ['tier-5']
   },
 
   // =========================================================================
@@ -444,7 +451,7 @@ const SHIP_TREE = {
       { offset: { x: -10, y: 20 }, isHeavy: false, energyCost: 11 },
       { offset: { x: 10, y: 20 }, isHeavy: false, energyCost: 11 }
     ],
-    evolvesTo: []
+    evolvesTo: ['bruiser-marauder', 'tank-goliath', 'speed-phantom']
   },
   // Seviye 3 Dengeli Savaşçı
   'bruiser-marauder': {
@@ -473,7 +480,7 @@ const SHIP_TREE = {
       { offset: { x: -14, y: 26 }, isHeavy: true, energyCost: 18 },
       { offset: { x: 14, y: 26 }, isHeavy: true, energyCost: 18 }
     ],
-    evolvesTo: []
+    evolvesTo: ['bruiser-warlord']
   },
   // Seviye 4 Dengeli Savaşçı (Zirve)
   'bruiser-warlord': {
@@ -502,7 +509,7 @@ const SHIP_TREE = {
       { offset: { x: -18, y: 32 }, isHeavy: true, energyCost: 28 },
       { offset: { x: 18, y: 32 }, isHeavy: true, energyCost: 28 }
     ],
-    evolvesTo: []
+    evolvesTo: ['tier-5']
   },
 
   // =========================================================================
@@ -536,7 +543,7 @@ const SHIP_TREE = {
       { offset: { x: -10, y: 18 }, isHeavy: false, energyCost: 10 },
       { offset: { x: 10, y: 18 }, isHeavy: false, energyCost: 10 }
     ],
-    evolvesTo: []
+    evolvesTo: ['healer-guardian']
   },
   // Seviye 3 Şifacı
   'healer-guardian': {
@@ -566,7 +573,7 @@ const SHIP_TREE = {
       { offset: { x: -14, y: 24 }, isHeavy: false, energyCost: 16 },
       { offset: { x: 14, y: 24 }, isHeavy: false, energyCost: 16 }
     ],
-    evolvesTo: []
+    evolvesTo: ['healer-aegis']
   },
   // Seviye 4 Şifacı (Zirve)
   'healer-aegis': {
@@ -596,6 +603,24 @@ const SHIP_TREE = {
       { offset: { x: -18, y: 30 }, isHeavy: true, energyCost: 24 },
       { offset: { x: 18, y: 30 }, isHeavy: true, energyCost: 24 }
     ],
-    evolvesTo: []
+    evolvesTo: ['tier-5']
   }
 };
+
+if (typeof window !== 'undefined') {
+  window.NATIONS = NATIONS;
+  window.SHIP_TREE = SHIP_TREE;
+  window.UPGRADE_CONFIG = UPGRADE_CONFIG;
+  window.UPGRADE_COSTS = UPGRADE_COSTS;
+  window.getUpgradeCost = getUpgradeCost;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    NATIONS,
+    SHIP_TREE,
+    UPGRADE_CONFIG,
+    UPGRADE_COSTS,
+    getUpgradeCost
+  };
+}

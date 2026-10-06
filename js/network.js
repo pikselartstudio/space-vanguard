@@ -121,6 +121,9 @@ class NetworkManager {
       if (data.stations && this.game) {
         this.game.syncServerStations(data.stations);
       }
+      if (data.refineries && this.game) {
+        this.game.syncServerRefineries(data.refineries);
+      }
       if (data.crystals && this.game) {
         this.game.syncServerCrystals(data.crystals);
       }
@@ -149,6 +152,9 @@ class NetworkManager {
         }
         if (data.stations) {
           this.game.syncServerStations(data.stations);
+        }
+        if (data.refineries) {
+          this.game.syncServerRefineries(data.refineries);
         }
         if (data.crystals) {
           this.game.syncServerCrystals(data.crystals);
@@ -278,6 +284,22 @@ class NetworkManager {
     this.socket.on('base_destroyed', (data) => {
       if (this.game) {
         this.game.onServerBaseDestroyed(data);
+      }
+    });
+
+    // Neutral Mining Refineries (Plan A)
+    this.socket.on('refineries_state', (data) => {
+      if (this.game && data.refineries) {
+        this.game.syncServerRefineries(data.refineries);
+      }
+    });
+
+    this.socket.on('refineries_income', (data) => {
+      if (this.game && this.game.player && data.rewards) {
+        const myReward = data.rewards[this.game.player.nation] || 0;
+        if (myReward > 0 && this.game.ui) {
+          this.game.ui.showAnnouncement(`💎 Rafineri Geliri: +${myReward} Kristal`, 1500);
+        }
       }
     });
 

@@ -97,18 +97,25 @@ const stations = {
   gold: { nation: 'gold', x: BASE_LOCATIONS.gold.x, y: BASE_LOCATIONS.gold.y, hp: 100000, maxHp: 100000, level: 1, crystalsDonated: 0, crystalsRequired: 100, isDead: false }
 };
 
-// Asteroid Yields Configuration (Max 1-4 Pieces per user request)
+// Rebalanced Asteroid Yields (~2.5x reduced EXP yields per user request so leveling takes real effort)
 const ASTEROID_HEALTHS = [0, 16, 42, 105, 230, 460, 920, 1650];
 const TIER_YIELDS = [
   null,
-  { min: 1, max: 2, totalPoints: 2 },
-  { min: 1, max: 3, totalPoints: 6 },
-  { min: 2, max: 3, totalPoints: 15 },
-  { min: 2, max: 4, totalPoints: 32 },
-  { min: 2, max: 4, totalPoints: 60 },
-  { min: 2, max: 4, totalPoints: 105 },
-  { min: 1, max: 4, totalPoints: 180, allowSingleMega: true }
+  { min: 1, max: 1, totalPoints: 1 },
+  { min: 1, max: 2, totalPoints: 3 },
+  { min: 1, max: 2, totalPoints: 6 },
+  { min: 1, max: 3, totalPoints: 12 },
+  { min: 2, max: 3, totalPoints: 24 },
+  { min: 2, max: 3, totalPoints: 42 },
+  { min: 1, max: 3, totalPoints: 75, allowSingleMega: true }
 ];
+
+// Neutral Mining Refineries (Plan A - Territory Control / King of the Hill)
+const refineries = {
+  alpha: { id: 'alpha', name: 'Rafineri Alfa', letter: 'α', x: 0, y: 2800, controllingNation: null, captureProgress: 0, contested: false },
+  beta:  { id: 'beta',  name: 'Rafineri Beta',  letter: 'β', x: -2500, y: -1500, controllingNation: null, captureProgress: 0, contested: false },
+  gamma: { id: 'gamma', name: 'Rafineri Gama',  letter: 'γ', x: 2500, y: -1500, controllingNation: null, captureProgress: 0, contested: false }
+};
 
 const asteroids = new Map();
 let nextAsteroidId = 1;
@@ -323,16 +330,24 @@ function resetGalaxyServer(prevWinner = null) {
   activeCrystals.clear();
   nextCrystalId = 1;
 
-  // 4. Randomize cosmic galaxy theme on reset
+  // 4. Reset neutral refineries
+  for (const k in refineries) {
+    refineries[k].controllingNation = null;
+    refineries[k].captureProgress = 0;
+    refineries[k].contested = false;
+  }
+
+  // 5. Randomize cosmic galaxy theme on reset
   currentGalaxyTheme = (Math.random() < 0.5) ? 'deep_blue' : 'emerald_space';
 
-  // 5. Reset all active player battle states
+  // 6. Reset all active player battle states
   players.clear();
 
-  // 6. Broadcast reset galaxy data & team distribution to all clients
+  // 7. Broadcast reset galaxy data & team distribution to all clients
   const teamDist = getTeamDistribution();
   io.emit('galaxy_reset', {
     stations,
+    refineries: Object.values(refineries),
     asteroids: Array.from(asteroids.values()),
     teamStatus: teamDist,
     galaxyTheme: currentGalaxyTheme
@@ -379,6 +394,7 @@ io.on('connection', (socket) => {
     yourId: socket.id,
     teamStatus: teamDist,
     stations,
+    refineries: Object.values(refineries),
     asteroids: Array.from(asteroids.values()),
     players: Array.from(players.values()),
     crystals: Array.from(activeCrystals.values()),
@@ -572,25 +588,13 @@ io.on('connection', (socket) => {
       ast.isDead = true;
       ast.health = 0;
 
-      // Spawn crystal drops (85% green for level-up, rare S1/S2/S3 ammo)
+      // User request: S1/S2/S3 only from shop, asteroids yield green EXP crystals with reduced yields
       const droppedGems = [];
-      const dropCount = Math.max(2, Math.min(6, ast.crystalCount || (ast.tier + 1)));
-      const totalVal = Math.max(dropCount * 2, ast.crystalTotalValue || (dropCount * 3));
+      const dropCount = Math.max(1, Math.min(3, ast.crystalCount || 1));
+      const totalVal = Math.max(dropCount, ast.crystalTotalValue || dropCount);
       const valEach = Math.max(1, Math.round(totalVal / dropCount));
       for (let i = 0; i < dropCount; i++) {
         const gemId = `gem-${nextCrystalId++}`;
-        const roll = Math.random();
-        let gemElem = 'green';
-        if (roll < 0.08) {
-          gemElem = 'ice';    // Rare Laser - S1
-        } else if (roll < 0.15) {
-          gemElem = 'fire';   // Rare Laser - S2
-        } else if (roll < 0.20) {
-          gemElem = 'dark';   // Ultra-rare Laser - S3
-        } else {
-          gemElem = 'green';  // EXP / Level-up
-        }
-        // Compact cluster right at break point (no scattering across the screen)
         const offsetAngle = (i / dropCount) * Math.PI * 2;
         const offsetDist = 8 + Math.random() * 12;
         const gem = {
@@ -598,7 +602,7 @@ io.on('connection', (socket) => {
           x: ast.x + Math.cos(offsetAngle) * offsetDist,
           y: ast.y + Math.sin(offsetAngle) * offsetDist,
           value: valEach,
-          element: gemElem,
+          element: 'green',
           targetId: socket.id,
           createdAt: Date.now()
         };
@@ -666,14 +670,15 @@ io.on('connection', (socket) => {
       victim.isDead = true;
       victim.shield = 0;
 
-      // Drop carried credits as bounty. Victim crystals reset to 0 upon death per user request
+      // User request: 50% crystal drop & loss upon death
       const carried = victim.crystals || 0;
-      victim.crystals = 0; // Envanter 0a indi!
+      const lost = Math.floor(carried * 0.5);
+      victim.crystals = carried - lost; // Player keeps 50%, loses 50%
 
-      const count = Math.min(30, Math.max(carried > 0 ? 4 : 0, Math.floor(carried / 30)));
+      const count = Math.min(20, Math.max(lost > 0 ? 3 : 0, Math.floor(lost / 25)));
       const droppedGems = [];
-      if (count > 0 && carried > 0) {
-        const valEach = Math.max(1, Math.round(carried / count));
+      if (count > 0 && lost > 0) {
+        const valEach = Math.max(1, Math.round(lost / count));
         for (let i = 0; i < count; i++) {
           const gemId = `gem-${nextCrystalId++}`;
           const gem = {
@@ -681,7 +686,7 @@ io.on('connection', (socket) => {
             x: victim.x + (Math.random() - 0.5) * 45,
             y: victim.y + (Math.random() - 0.5) * 45,
             value: valEach,
-            element: 'fire',
+            element: 'green',
             targetId: attacker.id,
             createdAt: Date.now()
           };
@@ -691,7 +696,7 @@ io.on('connection', (socket) => {
       }
 
       attacker.kills = (attacker.kills || 0) + 1;
-      attacker.score += 500 + carried * 10;
+      attacker.score += 500 + lost * 10;
 
       io.emit('player_killed', {
         victimId: victim.id,
@@ -1026,6 +1031,128 @@ setInterval(() => {
     io.emit('crystals_expired', { crystalIds: expiredIds });
   }
 }, 2000);
+
+// ==========================================
+// REFINERIES CAPTURE & TERRITORY TICK (1Hz)
+// (Plan A - Neutral Mining Refineries: +2 Crystals / 3s to controlling nation)
+// ==========================================
+let refineryIncomeTimer = 0;
+setInterval(() => {
+  if (players.size === 0) return;
+
+  const worldSpan = WORLD_SIZE;
+  const halfWorld = worldSpan * 0.5;
+  let statusChanged = false;
+
+  for (const refKey in refineries) {
+    const ref = refineries[refKey];
+    // Check players within 480 units of refinery
+    const presentNations = new Set();
+    const nationCounts = { blue: 0, red: 0, gold: 0 };
+
+    for (const [pid, p] of players) {
+      if (p.isDead || !p.nation) continue;
+      let dx = Math.abs(p.x - ref.x);
+      if (dx > halfWorld) dx = worldSpan - dx;
+      let dy = Math.abs(p.y - ref.y);
+      if (dy > halfWorld) dy = worldSpan - dy;
+      if (Math.hypot(dx, dy) <= 480) {
+        presentNations.add(p.nation);
+        nationCounts[p.nation] = (nationCounts[p.nation] || 0) + 1;
+      }
+    }
+
+    if (presentNations.size === 0) {
+      // Empty - contested is false, progress stays unchanged
+      if (ref.contested) {
+        ref.contested = false;
+        statusChanged = true;
+      }
+    } else if (presentNations.size > 1) {
+      // Multiple opposing nations inside - contested!
+      if (!ref.contested) {
+        ref.contested = true;
+        statusChanged = true;
+      }
+    } else {
+      // Exactly 1 nation present
+      const occupyingNation = Array.from(presentNations)[0];
+      if (ref.contested) {
+        ref.contested = false;
+        statusChanged = true;
+      }
+
+      if (ref.controllingNation === occupyingNation) {
+        // Already controlled by occupying nation
+        if (ref.captureProgress < 100) {
+          ref.captureProgress = Math.min(100, ref.captureProgress + 10);
+          statusChanged = true;
+        }
+      } else if (ref.controllingNation !== null) {
+        // Controlled by enemy nation: de-capture first
+        ref.captureProgress = Math.max(0, ref.captureProgress - 12);
+        statusChanged = true;
+        if (ref.captureProgress <= 0) {
+          ref.controllingNation = null;
+          io.emit('chat_message', {
+            id: `ref-neutral-${Date.now()}-${ref.id}`,
+            senderName: 'STRATEJİ',
+            nation: occupyingNation,
+            text: `⚔️ [${ref.name}] tarafsız hale getirildi!`,
+            isSystem: true,
+            timestamp: Date.now()
+          });
+        }
+      } else {
+        // Unclaimed / neutral: capturing!
+        ref.captureProgress = Math.min(100, ref.captureProgress + 10);
+        statusChanged = true;
+        if (ref.captureProgress >= 100) {
+          ref.controllingNation = occupyingNation;
+          io.emit('chat_message', {
+            id: `ref-cap-${Date.now()}-${ref.id}`,
+            senderName: 'STRATEJİ',
+            nation: occupyingNation,
+            text: `🚩 [${ref.name}] ${occupyingNation.toUpperCase()} ulusu tarafından ele geçirildi! (+2 Pasif Kristal / 3sn)`,
+            isSystem: true,
+            timestamp: Date.now()
+          });
+        }
+      }
+    }
+  }
+
+  // Passive income tick every 3 seconds
+  refineryIncomeTimer += 1;
+  if (refineryIncomeTimer >= 3) {
+    refineryIncomeTimer = 0;
+    const rewards = { blue: 0, red: 0, gold: 0 };
+    for (const refKey in refineries) {
+      const ref = refineries[refKey];
+      if (ref.controllingNation) {
+        rewards[ref.controllingNation] += 2;
+      }
+    }
+
+    let rewardedAny = false;
+    for (const [pid, p] of players) {
+      if (p.isDead || !p.nation) continue;
+      const amt = rewards[p.nation] || 0;
+      if (amt > 0) {
+        p.crystals = (p.crystals || 0) + amt;
+        p.mined = (p.mined || 0) + amt;
+        rewardedAny = true;
+      }
+    }
+    if (rewardedAny) {
+      io.emit('refineries_income', { rewards });
+    }
+  }
+
+  if (statusChanged) {
+    io.emit('refineries_state', { refineries: Object.values(refineries) });
+  }
+}, 1000);
 
 // Start HTTP & WebSocket Server
 server.listen(PORT, () => {

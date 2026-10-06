@@ -57,7 +57,7 @@ body, html {
   transform: translateX(-50%);
   width: fit-content;
   min-width: 170px;
-  max-width: 440px;
+  max-width: 760px;
   background: rgba(2, 12, 24, 0.88);
   border: 1px solid rgba(0, 240, 255, 0.55);
   border-radius: 8px;
@@ -527,6 +527,53 @@ body, html {
   line-height: 1.25;
 }
 
+.market-level-tag {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+  margin-left: 4px;
+}
+
+.market-level-tag.active {
+  background: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.market-lock-tag {
+  display: inline-block;
+  font-size: 0.60rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  margin-left: 3px;
+}
+
+.base-market-card.locked {
+  opacity: 0.62;
+  cursor: not-allowed;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.base-market-card.locked:hover {
+  background: rgba(14, 28, 52, 0.85);
+  border-color: rgba(239, 68, 68, 0.4);
+  transform: none;
+  box-shadow: none;
+}
+
+.base-market-card.maxed {
+  opacity: 0.88;
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
 .base-market-btn {
   background: rgba(0, 200, 255, 0.18);
   border: 1px solid rgba(0, 240, 255, 0.55);
@@ -541,7 +588,14 @@ body, html {
   transition: all 0.15s ease;
 }
 
-.base-market-card:hover .base-market-btn {
+.base-market-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: rgba(148, 163, 184, 0.3);
+  color: #94a3b8;
+}
+
+.base-market-card:hover .base-market-btn:not(:disabled) {
   background: #00f0ff;
   color: #031220;
   box-shadow: 0 0 8px #00f0ff;

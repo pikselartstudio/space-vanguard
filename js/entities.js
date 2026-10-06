@@ -310,23 +310,23 @@ class Asteroid extends Entity {
     this.maxHealth = healths[tier] || (tier * 220);
     this.health = this.maxHealth;
 
-    // Yield configuration: Max 1 - 4 pieces! ("en fazla 1-4 arası dağılma olssun ve parçalar en büyük asteroitten büyük bir tek parça çıkabilir şeklinde")
+    // Yield configuration: Rebalanced EXP yields (~2.5x reduced so leveling takes actual effort)
     const tierYields = [
       null,
-      { min: 1, max: 2, totalPoints: 2 },
-      { min: 1, max: 3, totalPoints: 6 },
-      { min: 2, max: 3, totalPoints: 15 },
-      { min: 2, max: 4, totalPoints: 32 },
-      { min: 2, max: 4, totalPoints: 60 },
-      { min: 2, max: 4, totalPoints: 105 },
-      { min: 1, max: 4, totalPoints: 180 }
+      { min: 1, max: 1, totalPoints: 1 },
+      { min: 1, max: 2, totalPoints: 3 },
+      { min: 1, max: 2, totalPoints: 6 },
+      { min: 1, max: 3, totalPoints: 12 },
+      { min: 2, max: 3, totalPoints: 24 },
+      { min: 2, max: 3, totalPoints: 42 },
+      { min: 1, max: 3, totalPoints: 75 }
     ];
     const yCfg = tierYields[tier] || tierYields[1];
     let count = Math.floor(Math.random() * (yCfg.max - yCfg.min + 1)) + yCfg.min;
     if (tier === 7 && Math.random() < 0.45) {
       count = 1; // Devasa asteroidden tek büyük zengin parça
     }
-    this.crystalCount = Math.max(1, Math.min(4, count));
+    this.crystalCount = Math.max(1, Math.min(3, count));
     // Balanced EXP yield: reduced points so leveling requires active asteroid hunting
     this.crystalTotalValue = yCfg.totalPoints;
 
@@ -422,10 +422,11 @@ class Asteroid extends Entity {
 
 // Tactical Companion Escort Drone (Attack, Defense, Mining)
 class Drone {
-  constructor(type = 'attack', nation = 'blue', scene = null) {
+  constructor(type = 'attack', nation = 'blue', scene = null, level = 1) {
     this.type = type; // 'attack', 'defense', 'mining'
     this.nation = nation || 'blue';
     this.scene = scene;
+    this.level = Math.max(1, Math.min(3, Math.floor(level || 1)));
     this.x = 0;
     this.y = 0;
     this.rotation = 0;
@@ -433,6 +434,10 @@ class Drone {
     this.isDead = false;
     this.mesh = ModelBuilder.createDroneMesh(type, nation);
     if (scene) scene.add(this.mesh);
+  }
+
+  setLevel(lvl) {
+    this.level = Math.max(1, Math.min(3, Math.floor(lvl || 1)));
   }
 
   destroy(scene) {
@@ -486,6 +491,9 @@ class Drone {
       this.mesh.rotation.z = -this.rotation + Math.PI / 2;
     }
 
+    // User request: "her üst seviye için x1.2 olarak artsın verdiği değerde ona göre katlasın"
+    const statMultiplier = Math.pow(1.2, this.level - 1);
+
     // Drone Specializations:
     if (this.type === 'attack') {
       this.fireTimer -= dt;
@@ -512,10 +520,11 @@ class Drone {
           const ang = Math.atan2(bestTarget.y - this.y, bestTarget.x - this.x);
           const spd = 620;
           const laserColor = 0xff2244; // Independent high-energy Crimson plasma bolt
+          const attackDmg = Math.round(12 * statMultiplier);
           const laser = new Laser(
             this.x, this.y,
             Math.cos(ang) * spd, Math.sin(ang) * spd,
-            12, false, parentShip.id,
+            attackDmg, false, parentShip.id,
             laserColor, parentShip.nation, 450, false, 'standard'
           );
           game.lasers.push(laser);
@@ -527,9 +536,9 @@ class Drone {
         }
       }
     } else if (this.type === 'defense') {
-      // Passive nanite shield repair: +6 shield/sec to parent ship
+      // Passive nanite shield repair: +6 shield/sec to parent ship * statMultiplier
       if (parentShip.shield < parentShip.stats.shieldCap) {
-        parentShip.shield = Math.min(parentShip.stats.shieldCap, parentShip.shield + 6.0 * dt);
+        parentShip.shield = Math.min(parentShip.stats.shieldCap, parentShip.shield + (6.0 * statMultiplier) * dt);
       }
       if (this.mesh) {
         this.mesh.rotation.z += dt * 1.2;
@@ -554,10 +563,11 @@ class Drone {
               this.fireTimer = 0.65 + Math.random() * 0.35 + (index * 0.18);
               const ang = Math.atan2(targetAst.y - this.y, targetAst.x - this.x);
               const spd = 560;
+              const miningDmg = Math.round(14 * statMultiplier);
               const laser = new Laser(
                 this.x, this.y,
                 Math.cos(ang) * spd, Math.sin(ang) * spd,
-                14, false, parentShip.id,
+                miningDmg, false, parentShip.id,
                 0xffaa00, parentShip.nation, 420, false, 'standard'
               );
               game.lasers.push(laser);
@@ -873,16 +883,19 @@ class Ship extends Entity {
       this.vy += Math.sin(this.rotation) * warpAccel * dt;
     }
 
+    const refineryBoost = this.isRefineryBoosted ? 1.10 : 1.0;
+    const finalSpeed = (this.stats.shipSpeed || 150) * refineryBoost;
+
     // Normal Thrust acceleration
     if (this.isThrusting) {
-      const accel = this.stats.shipSpeed * 2.2 * speedPenalty;
+      const accel = finalSpeed * 2.2 * speedPenalty;
       this.vx += Math.cos(this.rotation) * accel * dt;
       this.vy += Math.sin(this.rotation) * accel * dt;
     }
 
     // Speed clamping (allows 2.5x speed multiplier during active 3-second warp propulsion)
     const warpMult = isWarpActive ? 2.5 : 1.0;
-    const maxAllowedSpeed = this.stats.shipSpeed * speedPenalty * warpMult;
+    const maxAllowedSpeed = finalSpeed * speedPenalty * warpMult;
     const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
     if (currentSpeed > maxAllowedSpeed) {
       this.vx = (this.vx / currentSpeed) * maxAllowedSpeed;
@@ -1950,8 +1963,12 @@ class BotShip extends Ship {
       return;
     }
 
-    // Upgrade stats when crystals >= 50, prioritizing combat effectiveness
-    const available = UPGRADE_CONFIG.filter(u => this.upgrades[u.id] < u.max && this.crystals >= u.costPerLevel);
+    // Upgrade stats when crystals >= scaling cost, prioritizing combat effectiveness
+    const available = UPGRADE_CONFIG.filter(u => {
+      const currentLevel = this.upgrades[u.id] || 0;
+      const cost = typeof getUpgradeCost === 'function' ? getUpgradeCost(currentLevel) : (UPGRADE_COSTS[currentLevel] || 50);
+      return currentLevel < u.max && this.crystals >= cost;
+    });
     if (available.length > 0) {
       const priorityOrder = ['fireDamage', 'shieldCap', 'fireSpeed', 'energyRegen', 'shipSpeed', 'shieldRegen', 'energyCap', 'shipAgility'];
       let choice = null;
@@ -1961,7 +1978,9 @@ class BotShip extends Ship {
       }
       if (!choice) choice = available[0];
 
-      this.crystals -= choice.costPerLevel;
+      const currentLevel = this.upgrades[choice.id] || 0;
+      const cost = typeof getUpgradeCost === 'function' ? getUpgradeCost(currentLevel) : (UPGRADE_COSTS[currentLevel] || 50);
+      this.crystals -= cost;
       this.upgrades[choice.id]++;
       this.recomputeStats();
     }
@@ -2087,4 +2106,67 @@ class SpaceStation extends Entity {
       }
     }
   }
+}
+
+// Plan A: Neutral Mining Refinery Platform (Territory Control / King of the Hill)
+class MiningRefinery extends Entity {
+  constructor(id, name, letter, x, y, scene) {
+    super(x, y, 220, 99999);
+    this.id = id;
+    this.name = name;
+    this.letter = letter || 'α';
+    this.radius = 480; // Capture perimeter
+    this.controllingNation = null;
+    this.captureProgress = 0;
+    this.contested = false;
+    this.scene = scene;
+
+    this.mesh = ModelBuilder.createRefineryMesh(this.controllingNation);
+    this.mesh.position.set(x, -y, -120);
+    this.outerRing = this.mesh.getObjectByName('refineryOuterRing');
+    this.innerRing = this.mesh.getObjectByName('refineryInnerRing');
+    this.energyCore = this.mesh.getObjectByName('refineryCore');
+
+    if (scene) scene.add(this.mesh);
+  }
+
+  setControllingNation(nation) {
+    if (this.controllingNation === nation) return;
+    this.controllingNation = nation;
+    if (this.scene && this.mesh) {
+      this.scene.remove(this.mesh);
+    }
+    this.mesh = ModelBuilder.createRefineryMesh(this.controllingNation);
+    this.mesh.position.set(this.x, -this.y, -120);
+    this.outerRing = this.mesh.getObjectByName('refineryOuterRing');
+    this.innerRing = this.mesh.getObjectByName('refineryInnerRing');
+    this.energyCore = this.mesh.getObjectByName('refineryCore');
+    if (this.scene) this.scene.add(this.mesh);
+  }
+
+  update(dt) {
+    if (this.outerRing) {
+      this.outerRing.rotation.z += 0.22 * dt;
+    }
+    if (this.innerRing) {
+      this.innerRing.rotation.z -= 0.35 * dt;
+    }
+    if (this.energyCore) {
+      this.energyCore.rotation.x += 0.45 * dt;
+      this.energyCore.rotation.y += 0.65 * dt;
+    }
+  }
+
+  destroy(scene) {
+    this.isDead = true;
+    const activeScene = scene || this.scene;
+    if (this.mesh && activeScene) {
+      activeScene.remove(this.mesh);
+      this.mesh = null;
+    }
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.MiningRefinery = MiningRefinery;
 }

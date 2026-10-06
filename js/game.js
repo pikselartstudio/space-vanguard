@@ -69,6 +69,7 @@ class StarblastGame {
     this.bots = [];
     this.remotePlayers = new Map();
     this.stations = {};
+    this.refineries = {};
     this.locallyDestroyedAsteroidIds = new Set();
 
     // 3 Nation Base Locations (Scaled symmetrically for 10000 world size)
@@ -76,6 +77,13 @@ class StarblastGame {
       blue: { x: 0, y: -2625 },      // South
       red:  { x: -2290, y: 1520 },   // North-West
       gold: { x: 2290, y: 1520 }     // North-East
+    };
+
+    // Plan A: 3 Neutral Mining Refineries (Territory Control / King of the Hill)
+    this.refineryLocations = {
+      alpha: { id: 'alpha', name: 'Rafineri Alfa', letter: 'α', x: 0, y: 2800 },
+      beta:  { id: 'beta',  name: 'Rafineri Beta',  letter: 'β', x: -2500, y: -1500 },
+      gamma: { id: 'gamma', name: 'Rafineri Gama',  letter: 'γ', x: 2500, y: -1500 }
     };
 
     // Inputs
@@ -511,6 +519,9 @@ class StarblastGame {
       }
     }
 
+    // Spawn 3 Neutral Mining Refineries (Plan A)
+    this.initRefineries();
+
     // Spawn player at own nation base
     const spawn = this.getNationSpawn(chosenNation);
     const myId = (this.network && this.network.myId) ? this.network.myId : 'player';
@@ -738,8 +749,11 @@ class StarblastGame {
       return;
     }
 
-    if (currentLevel < cfg.max && this.player.crystals >= cfg.costPerLevel) {
-      this.player.crystals -= cfg.costPerLevel;
+    // Scaling stat upgrade costs: [30, 50, 80, 120, 180, 260]
+    const cost = typeof getUpgradeCost === 'function' ? getUpgradeCost(currentLevel) : (UPGRADE_COSTS[currentLevel] || 50);
+
+    if (currentLevel < cfg.max && this.player.crystals >= cost) {
+      this.player.crystals -= cost;
       this.player.upgrades[statId]++;
       this.player.recomputeStats();
       this.lastPlayerUpgrades = { ...this.player.upgrades };
@@ -749,6 +763,10 @@ class StarblastGame {
       }
       if (this.network && this.network.isConnected) {
         this.network.sendPlayerState(this.player);
+      }
+    } else if (currentLevel < cfg.max && this.player.crystals < cost) {
+      if (this.ui) {
+        this.ui.showAnnouncement(`⚠️ Yetersiz kristal! Gereken: ${cost} Kristal (Mevcut: ${this.player.crystals})`, 1800);
       }
     }
   }
@@ -924,65 +942,129 @@ class StarblastGame {
     const homeBase = this.stations[this.player.nation];
     if (!homeBase || homeBase.isDead) return;
 
-    if (action.startsWith('drone_')) {
-      const droneType = action.replace('drone_', ''); // 'attack', 'defense', 'mining'
-      const maxDrones = this.player.maxDrones;
+    const names = { attack: 'Saldırı Dronu', defense: 'Savunma Dronu', mining: 'Maden Dronu' };
+
+    // Drone purchase and leveling (Max Lv. 3, 500 / 600 / 720 crystals)
+    if (action.startsWith('drone_') || action.startsWith('upgrade_drone_')) {
+      const droneType = action.replace('upgrade_drone_', '').replace('drone_', ''); // 'attack', 'defense', 'mining'
       if (!this.player.drones) this.player.drones = [];
 
+      const existingDrone = this.player.drones.find(d => d.type === droneType);
+
+      if (existingDrone && (action.startsWith('upgrade_drone_') || existingDrone.level < 3)) {
+        if (existingDrone.level >= 3) {
+          if (this.ui) this.ui.showAnnouncement(`⭐ ${names[droneType]} zaten maksimum Seviye 3!`, 2200);
+          return;
+        }
+        const upgradeCost = existingDrone.level === 1 ? 600 : 720;
+        if (this.player.crystals < upgradeCost) {
+          if (this.ui) this.ui.showAnnouncement(`⚠️ Yetersiz kristal! Seviye ${existingDrone.level + 1} yükseltmesi için ${upgradeCost} Kristal gereklidir.`, 2500);
+          return;
+        }
+        this.player.crystals -= upgradeCost;
+        existingDrone.setLevel(existingDrone.level + 1);
+        window.soundSystem.playUpgrade();
+        if (this.ui) {
+          this.ui.showAnnouncement(`⬆️ ${names[droneType]} Seviye ${existingDrone.level}'e yükseltildi! (Güç x${(Math.pow(1.2, existingDrone.level - 1)).toFixed(2)})`, 2500);
+          this.ui.updateHUD(this.player, this.stations);
+        }
+        return;
+      }
+
+      // Purchase new drone
+      const buyCost = 500;
+      if (this.player.crystals < buyCost) {
+        if (this.ui) this.ui.showAnnouncement(`⚠️ Yetersiz kristal! Dron satın almak için ${buyCost} Kristal gereklidir.`, 2500);
+        return;
+      }
+
+      const maxDrones = this.player.maxDrones;
       if (this.player.drones.length >= maxDrones) {
-        // Replace oldest drone
         const old = this.player.drones.shift();
         if (old) old.destroy(this.scene);
       }
 
-      const drone = new Drone(droneType, this.player.nation, this.scene);
+      this.player.crystals -= buyCost;
+      const drone = new Drone(droneType, this.player.nation, this.scene, 1);
       drone.x = this.player.x;
       drone.y = this.player.y;
       this.player.drones.push(drone);
 
       window.soundSystem.playUpgrade();
-      const names = { attack: 'Saldırı Dronu', defense: 'Savunma Dronu', mining: 'Maden Dronu' };
       if (this.ui) {
-        this.ui.showAnnouncement(`🛸 ${names[droneType] || 'Dron'} konuşlandırıldı! (Kapasite: ${this.player.drones.length}/${maxDrones})`, 2500);
+        this.ui.showAnnouncement(`🛸 ${names[droneType]} (Sv.1) konuşlandırıldı! (${buyCost} Kristal • Kapasite: ${this.player.drones.length}/${maxDrones})`, 2500);
         this.ui.updateHUD(this.player, this.stations);
       }
       return;
     }
 
-    if (action === 'refill_s1') {
+    // 100x S1 Cryo Buz Lazeri (250 Kristal • Üs Sv. 1+)
+    if (action === 'refill_s1' || action === 'buy_s1') {
+      const cost = 250;
+      if (homeBase.level < 1) {
+        if (this.ui) this.ui.showAnnouncement('⚠️ S1 Buz Lazeri için Ana Üs Seviye 1 olmalıdır!', 2500);
+        return;
+      }
+      if (this.player.crystals < cost) {
+        if (this.ui) this.ui.showAnnouncement(`⚠️ Yetersiz kristal! 100x S1 Lazeri için ${cost} Kristal gereklidir.`, 2500);
+        return;
+      }
+      this.player.crystals -= cost;
       if (!this.player.elementalAmmo) this.player.elementalAmmo = { ice: 0, fire: 0, dark: 0 };
       if (!this.player.unlockedWeapons) this.player.unlockedWeapons = {};
       this.player.unlockedWeapons['ice'] = true;
-      this.player.elementalAmmo.ice = 999;
+      this.player.elementalAmmo.ice = Math.min(999, (this.player.elementalAmmo.ice || 0) + 100);
       window.soundSystem.playUpgrade();
       if (this.ui) {
-        this.ui.showAnnouncement('❄️ S1 Cryo Buz Lazeri cephanesi fullendi! (999 Adet)', 2500);
+        this.ui.showAnnouncement(`❄️ 100x S1 Cryo Buz Lazeri satın alındı! (Mevcut: ${this.player.elementalAmmo.ice} Adet)`, 2500);
         this.ui.updateHUD(this.player, this.stations);
       }
       return;
     }
 
-    if (action === 'refill_s2') {
+    // 100x S2 Termal Alev Lazeri (500 Kristal • Üs Sv. 2+)
+    if (action === 'refill_s2' || action === 'buy_s2') {
+      const cost = 500;
+      if (homeBase.level < 2) {
+        if (this.ui) this.ui.showAnnouncement(`⚠️ S2 Termal Lazer KİLİTLİ! Ana Üssü Seviye 2'ye yükseltmek için kristal bağışlayın. (Şu anki: Sv.${homeBase.level})`, 3000);
+        return;
+      }
+      if (this.player.crystals < cost) {
+        if (this.ui) this.ui.showAnnouncement(`⚠️ Yetersiz kristal! 100x S2 Lazeri için ${cost} Kristal gereklidir.`, 2500);
+        return;
+      }
+      this.player.crystals -= cost;
       if (!this.player.elementalAmmo) this.player.elementalAmmo = { ice: 0, fire: 0, dark: 0 };
       if (!this.player.unlockedWeapons) this.player.unlockedWeapons = {};
       this.player.unlockedWeapons['fire'] = true;
-      this.player.elementalAmmo.fire = 999;
+      this.player.elementalAmmo.fire = Math.min(999, (this.player.elementalAmmo.fire || 0) + 100);
       window.soundSystem.playUpgrade();
       if (this.ui) {
-        this.ui.showAnnouncement('🔥 S2 Termal Alev Lazeri cephanesi fullendi! (999 Adet)', 2500);
+        this.ui.showAnnouncement(`🔥 100x S2 Termal Alev Lazeri satın alındı! (Mevcut: ${this.player.elementalAmmo.fire} Adet)`, 2500);
         this.ui.updateHUD(this.player, this.stations);
       }
       return;
     }
 
-    if (action === 'refill_s3') {
+    // 100x S3 Void Karanlık Lazeri (750 Kristal • Üs Sv. 3+)
+    if (action === 'refill_s3' || action === 'buy_s3') {
+      const cost = 750;
+      if (homeBase.level < 3) {
+        if (this.ui) this.ui.showAnnouncement(`⚠️ S3 Void Lazeri KİLİTLİ! Ana Üssü Seviye 3'e yükseltmek için kristal bağışlayın. (Şu anki: Sv.${homeBase.level})`, 3000);
+        return;
+      }
+      if (this.player.crystals < cost) {
+        if (this.ui) this.ui.showAnnouncement(`⚠️ Yetersiz kristal! 100x S3 Lazeri için ${cost} Kristal gereklidir.`, 2500);
+        return;
+      }
+      this.player.crystals -= cost;
       if (!this.player.elementalAmmo) this.player.elementalAmmo = { ice: 0, fire: 0, dark: 0 };
       if (!this.player.unlockedWeapons) this.player.unlockedWeapons = {};
       this.player.unlockedWeapons['dark'] = true;
-      this.player.elementalAmmo.dark = 999;
+      this.player.elementalAmmo.dark = Math.min(999, (this.player.elementalAmmo.dark || 0) + 100);
       window.soundSystem.playUpgrade();
       if (this.ui) {
-        this.ui.showAnnouncement('🌑 S3 Void Karanlık Lazeri cephanesi fullendi! (999 Adet)', 2500);
+        this.ui.showAnnouncement(`🌑 100x S3 Void Karanlık Lazeri satın alındı! (Mevcut: ${this.player.elementalAmmo.dark} Adet)`, 2500);
         this.ui.updateHUD(this.player, this.stations);
       }
       return;
@@ -1402,6 +1484,33 @@ class StarblastGame {
     for (const key in this.stations) {
       const st = this.stations[key];
       st.update(dt);
+    }
+
+    // 2. Update 3 Neutral Mining Refineries (Plan A - Rings, Core rotation, territory speed boost)
+    for (const key in this.refineries) {
+      const ref = this.refineries[key];
+      if (ref) ref.update(dt);
+    }
+
+    // Territory speed boost (+10% speed within 1200px of refinery controlled by player's nation)
+    if (this.player && !this.player.isDead) {
+      let nearControlledRefinery = false;
+      const worldSpan = this.worldSize || 10000;
+      const halfWorld = worldSpan * 0.5;
+      for (const key in this.refineries) {
+        const ref = this.refineries[key];
+        if (ref && ref.controllingNation === this.player.nation) {
+          let dx = Math.abs(this.player.x - ref.x);
+          if (dx > halfWorld) dx = worldSpan - dx;
+          let dy = Math.abs(this.player.y - ref.y);
+          if (dy > halfWorld) dy = worldSpan - dy;
+          if (Math.hypot(dx, dy) <= 1200) {
+            nearControlledRefinery = true;
+            break;
+          }
+        }
+      }
+      this.player.isRefineryBoosted = nearControlledRefinery;
     }
 
     // Base interaction for player: heal shield and auto-donate in perimeter
@@ -2447,6 +2556,31 @@ class StarblastGame {
         }
       }
     }
+  }
+
+  initRefineries() {
+    if (!this.refineries) this.refineries = {};
+    for (const key of ['alpha', 'beta', 'gamma']) {
+      const loc = this.refineryLocations[key];
+      if (loc && (!this.refineries[key] || !this.refineries[key].mesh || !this.refineries[key].mesh.parent)) {
+        this.refineries[key] = new MiningRefinery(loc.id, loc.name, loc.letter, loc.x, loc.y, this.scene);
+      }
+    }
+  }
+
+  syncServerRefineries(serverRefineries) {
+    if (!serverRefineries) return;
+    this.initRefineries();
+    const list = Array.isArray(serverRefineries) ? serverRefineries : Object.values(serverRefineries);
+    list.forEach(rData => {
+      if (!rData || !rData.id) return;
+      const ref = this.refineries[rData.id];
+      if (ref) {
+        ref.setControllingNation(rData.controllingNation);
+        ref.captureProgress = rData.captureProgress || 0;
+        ref.contested = !!rData.contested;
+      }
+    });
   }
 
   syncServerCrystals(serverCrystals) {
