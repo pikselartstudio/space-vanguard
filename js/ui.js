@@ -1280,15 +1280,14 @@ class UIManager {
             <span class="shiptree-tier-pill">Sv. ${cfg.tier || 2}</span>
             <span class="shiptree-ship-name">${cfg.name || shipKey}</span>
           </div>
-          <div class="shiptree-card-desc">${cfg.description || ''}</div>
           <div class="shiptree-stats-mini">
-            <div><span>🛡️ Kalkan:</span> <b>${baseStats.shieldCap || '-'}</b></div>
-            <div><span>💥 Hasar:</span> <b>${baseStats.fireDamage || '-'}</b></div>
-            <div><span>💨 Hız:</span> <b>${baseStats.shipSpeed || '-'}</b></div>
-            <div><span>📦 Ambar:</span> <b>${cfg.cargoCapacity || '-'}</b></div>
+            <div title="Kalkan"><span class="stat-ico">🛡️</span> <b>${baseStats.shieldCap || '-'}</b></div>
+            <div title="Hasar"><span class="stat-ico">💥</span> <b>${baseStats.fireDamage || '-'}</b></div>
+            <div title="Hız"><span class="stat-ico">💨</span> <b>${baseStats.shipSpeed || '-'}</b></div>
+            <div title="Ambar"><span class="stat-ico">📦</span> <b>${cfg.cargoCapacity || '-'}</b></div>
           </div>
           <button type="button" class="shiptree-select-btn" data-ship="${shipKey}">
-            ${isCurrent ? '✔ AKTİF GEMİ' : '🚀 SEÇ / TEST ET'}
+            ${isCurrent ? '✔ AKTİF' : '🚀 SEÇ'}
           </button>
         `;
 
@@ -2212,7 +2211,7 @@ class UIManager {
     listEl.innerHTML = refs.map(r => {
       const nation = r.controllingNation;
       const nationCfg = nation ? (NATIONS[nation] || NATIONS['blue']) : null;
-      const ownerLabel = nationCfg ? nationCfg.name.substring(0, 6) : 'NÖTR';
+      const ownerLabel = nationCfg ? nationCfg.name.toUpperCase() : 'NÖTR';
       const ownerColor = nationCfg ? nationCfg.hex : '#94a3b8';
       const badgeLetter = r.letter || (r.id === 'alpha' ? 'A' : (r.id === 'beta' ? 'B' : 'C'));
       const badgeBg = nationCfg ? `${nationCfg.hex}33` : 'rgba(255, 255, 255, 0.1)';

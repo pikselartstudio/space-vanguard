@@ -639,6 +639,9 @@ class StarblastGame {
     if (this.lastPlayerScore) {
       this.player.score = this.lastPlayerScore;
     }
+    if (this.lastPlayerKills !== undefined) {
+      this.player.kills = this.lastPlayerKills;
+    }
     this.player.crystals = 0; // User request: öldükten sonra dirilmede envanter 0a inecek
     this.player.mined = 0;    // User request: pvpde yada çarpmada ölürsede sıfırlanacak
     this.lastRetainedCrystals = 0;
@@ -1640,7 +1643,7 @@ class StarblastGame {
                   st.maxHp = st.level * 100000;
                   st.hp = st.maxHp;
                   st.crystalsDonated = 0;
-                  st.crystalsRequired = Math.round(st.crystalsRequired * 2.2);
+                  st.crystalsRequired = Math.round(st.crystalsRequired * 2.0);
                   if (st.mesh) this.scene.remove(st.mesh);
                   st.mesh = ModelBuilder.createStationMesh(occNation, st.level);
                   st.mesh.position.set(st.x, -st.y, -150);
@@ -1689,7 +1692,7 @@ class StarblastGame {
             st.maxHp = st.level * 100000;
             st.hp = st.maxHp;
             st.crystalsDonated -= st.crystalsRequired;
-            st.crystalsRequired = Math.round(st.crystalsRequired * 2.2);
+            st.crystalsRequired = Math.round(st.crystalsRequired * 2.0);
             if (st.mesh) this.scene.remove(st.mesh);
             st.mesh = ModelBuilder.createStationMesh(nKey, st.level);
             st.mesh.position.set(st.x, -st.y, -150);
@@ -1715,6 +1718,8 @@ class StarblastGame {
           b.vy = 0;
           b.shield = b.stats.shieldCap;
           b.energy = b.stats.energyCap;
+          b.crystals = 0;
+          b.mined = 0;
           b.isDead = false;
           b.respawnTimer = 0;
           b.spawnShieldTimer = 3.5;
@@ -1838,6 +1843,7 @@ class StarblastGame {
           this.lastPlayerShipKey = this.player.shipKey;
           this.lastPlayerUpgrades = { ...this.player.upgrades };
           this.lastPlayerScore = this.player.score;
+          this.lastPlayerKills = this.player.kills || 0;
           this.lastUnlockedWeapons = { ...(this.player.unlockedWeapons || {}) };
           this.lastActiveWeapon = this.player.activeWeapon || 'standard';
           this.lastWarpUnlocked = !!this.player.warpUnlocked;
@@ -2023,8 +2029,22 @@ class StarblastGame {
             const isVictimBot = this.bots.some(b => b.id === ship.id);
             const isAttackerBot = laser.ownerId && String(laser.ownerId).startsWith('bot-');
 
+            // Tier Combat Rebalance: Low tier ships cannot bully high-tier battleships
+            const defenderTier = ship.tier || 1;
+            const attackerTier = laser.attackerTier || 1;
+            let tierDmgMultiplier = 1.0;
+            const tierDiff = defenderTier - attackerTier;
+            if (tierDiff > 0) {
+              // Heavy armor mitigation against lower tier attackers
+              tierDmgMultiplier = Math.max(0.20, Math.pow(0.70, tierDiff));
+            } else if (tierDiff < 0) {
+              // High tier guns deal bonus crushing damage to lower tier scouts
+              tierDmgMultiplier = 1.0 + Math.abs(tierDiff) * 0.35;
+            }
+            const finalDamage = laser.damage * 0.85 * tierDmgMultiplier;
+
             if (isVictimBot || isAttackerBot || !this.network || !this.network.isConnected) {
-              const shipKilled = ship.takeDamage(laser.damage * 0.85);
+              const shipKilled = ship.takeDamage(finalDamage);
               if (shipKilled) {
                 this.handleShipDestroyed(ship, laser.ownerId);
               }
@@ -2032,7 +2052,7 @@ class StarblastGame {
                 this.ui.updateHUD(this.player, this.stations);
               }
             } else {
-              this.network.emitHitPlayer(ship.id, laser.damage * 0.85, false);
+              this.network.emitHitPlayer(ship.id, finalDamage, false);
             }
 
             // Healer hitting enemy also regenerates health: "şifacı vurduğu zaman can yeniler"
@@ -2876,28 +2896,34 @@ class StarblastGame {
     }
     this.bots = [];
 
-    // User request: 3 teams x 3 bots = 9 bots total with varied autonomous roles
-    const botConfigs = [
-      // Red Team: Kryos (Mars)
-      { id: 'bot-red-1', name: 'Kryos-Avcı', nation: 'red', role: 'fighter', shipKey: 'fly' },
-      { id: 'bot-red-2', name: 'Kryos-Muhafız', nation: 'red', role: 'miner', shipKey: 'fly' },
-      { id: 'bot-red-3', name: 'Kryos-Öncü', nation: 'red', role: 'explorer', shipKey: 'fly' },
-
-      // Blue Team: Veylar (Earth)
-      { id: 'bot-blue-1', name: 'Veylar-Gözcü', nation: 'blue', role: 'explorer', shipKey: 'fly' },
-      { id: 'bot-blue-2', name: 'Veylar-Savaşçı', nation: 'blue', role: 'fighter', shipKey: 'fly' },
-      { id: 'bot-blue-3', name: 'Veylar-Mühendis', nation: 'blue', role: 'miner', shipKey: 'fly' },
-
-      // Gold Team: Aethel (Saturn)
-      { id: 'bot-gold-1', name: 'Aethel-Şahin', nation: 'gold', role: 'fighter', shipKey: 'fly' },
-      { id: 'bot-gold-2', name: 'Aethel-Titan', nation: 'gold', role: 'miner', shipKey: 'fly' },
-      { id: 'bot-gold-3', name: 'Aethel-Maden', nation: 'gold', role: 'explorer', shipKey: 'fly' }
+    // User request: 15 bots per nation across all 3 nations (45 bots total)
+    const nations = [
+      { nation: 'red', prefix: 'Kryos', titles: ['Avcı', 'Muhafız', 'Öncü', 'Komutan', 'Savaşçı', 'Gözcü', 'Mühendis', 'Korsan', 'Titan', 'Dreadnought', 'Vanguard', 'Akıncı', 'Gölge', 'Barbar', 'Cellat'] },
+      { nation: 'blue', prefix: 'Veylar', titles: ['Gözcü', 'Savaşçı', 'Mühendis', 'Gezgin', 'Yıldız', 'Koruyucu', 'Karakol', 'Astral', 'Gökmen', 'Filo', 'Şövalye', 'Fırtına', 'Şafak', 'Nebula', 'Pusula'] },
+      { nation: 'gold', prefix: 'Aethel', titles: ['Şahin', 'Titan', 'Maden', 'Güneş', 'Işık', 'Ateş', 'Hükümdar', 'Gözlemci', 'Zirve', 'Altın', 'Vurgun', 'Görkem', 'Kartal', 'Lejyon', 'Baron'] }
     ];
+
+    const roles = ['miner', 'fighter', 'explorer'];
+    const botConfigs = [];
+
+    for (const n of nations) {
+      for (let i = 0; i < 15; i++) {
+        const title = n.titles[i] || `Pilot-${i + 1}`;
+        const role = roles[i % roles.length];
+        botConfigs.push({
+          id: `bot-${n.nation}-${i + 1}`,
+          name: `${n.prefix}-${title}`,
+          nation: n.nation,
+          role: role,
+          shipKey: 'fly'
+        });
+      }
+    }
 
     for (const cfg of botConfigs) {
       const spawn = this.getNationSpawn(cfg.nation);
-      const offsetX = (Math.random() - 0.5) * 160;
-      const offsetY = (Math.random() - 0.5) * 160;
+      const offsetX = (Math.random() - 0.5) * 280;
+      const offsetY = (Math.random() - 0.5) * 280;
       const bot = new BotShip(cfg.id, cfg.name, cfg.shipKey, spawn.x + offsetX, spawn.y + offsetY, cfg.nation, this.scene, cfg.role);
       if (bot.mesh && !bot.mesh.parent) {
         this.scene.add(bot.mesh);
@@ -3246,6 +3272,7 @@ class StarblastGame {
       this.lastPlayerShipKey = this.player.shipKey;
       this.lastPlayerUpgrades = { ...this.player.upgrades };
       this.lastPlayerScore = this.player.score;
+      this.lastPlayerKills = this.player.kills || 0;
       this.lastUnlockedWeapons = { ...(this.player.unlockedWeapons || {}) };
       this.lastActiveWeapon = this.player.activeWeapon || 'standard';
       this.lastWarpUnlocked = !!this.player.warpUnlocked;

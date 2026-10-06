@@ -103,7 +103,7 @@ class Particle {
 
 // Laser Bolt
 class Laser extends Entity {
-  constructor(x, y, vx, vy, damage, isHeavy, ownerId, color = 0x00f0ff, nation = 'blue', maxRange = 600, isHealBeam = false, element = 'standard') {
+  constructor(x, y, vx, vy, damage, isHeavy, ownerId, color = 0x00f0ff, nation = 'blue', maxRange = 600, isHealBeam = false, element = 'standard', attackerTier = 1) {
     const radiusScale = Math.max(0.85, Math.min(2.2, Math.sqrt(damage / 10)));
     super(x, y, (isHeavy ? 6 : 4) * radiusScale, 0.1);
     this.startX = x;
@@ -118,6 +118,7 @@ class Laser extends Entity {
     this.isHealBeam = isHealBeam;
     this.element = element;
     this.color = color;
+    this.attackerTier = attackerTier || 1;
     const speed = Math.hypot(vx, vy);
     this.lifetime = speed > 0 ? (this.maxRange / speed) * 1.08 : 1.5;
     this.rotation = Math.atan2(vy, vx);
@@ -541,7 +542,8 @@ class Drone {
             this.x, this.y,
             Math.cos(ang) * spd, Math.sin(ang) * spd,
             attackDmg, false, parentShip.id,
-            laserColor, parentShip.nation, 450, false, 'standard'
+            laserColor, parentShip.nation, 450, false, 'standard',
+            parentShip.tier || 1
           );
           game.lasers.push(laser);
           game.scene.add(laser.mesh);
@@ -584,7 +586,8 @@ class Drone {
                 this.x, this.y,
                 Math.cos(ang) * spd, Math.sin(ang) * spd,
                 miningDmg, false, parentShip.id,
-                0xffaa00, parentShip.nation, 420, false, 'standard'
+                0xffaa00, parentShip.nation, 420, false, 'standard',
+                parentShip.tier || 1
               );
               game.lasers.push(laser);
               game.scene.add(laser.mesh);
@@ -847,7 +850,8 @@ class Ship extends Entity {
           this.nation,
           blastRadius, // Range confined to 2 ships width
           false,
-          'fire'
+          'fire',
+          this.tier || 1
         );
         fireLaserCallback(novaLaser);
       }
@@ -1335,7 +1339,8 @@ class Ship extends Entity {
           this.nation,
           maxRange,
           false,
-          this.activeWeapon
+          this.activeWeapon,
+          this.tier || 1
         );
         lasers.push(laser);
       }
@@ -1420,7 +1425,8 @@ class Ship extends Entity {
         this.nation,
         this.stats.fireRange || 600,
         isHeal,
-        'standard'
+        'standard',
+        this.tier || 1
       );
       lasers.push(laser);
     }
@@ -2019,12 +2025,15 @@ class BotShip extends Ship {
     // Obstacle avoidance: steer away from collision course with asteroids
     for (const a of asteroids) {
       if (a.isDead) continue;
-      const d = Math.hypot(a.x - this.x, a.y - this.y);
+      const dx = this.x - a.x;
+      const dy = this.y - a.y;
+      if (Math.abs(dx) > 130 || Math.abs(dy) > 130) continue;
+      const d = Math.hypot(dx, dy);
       const safePerimeter = this.radius + a.radius + 40;
       if (d < safePerimeter && d > 1) {
         const pushFactor = (1 - d / safePerimeter);
-        const pushX = (this.x - a.x) / d;
-        const pushY = (this.y - a.y) / d;
+        const pushX = dx / d;
+        const pushY = dy / d;
         this.vx += pushX * 400 * pushFactor * dt;
         this.vy += pushY * 400 * pushFactor * dt;
       }
@@ -2038,7 +2047,10 @@ class BotShip extends Ship {
     let minDist = 1800;
     for (const a of asteroids) {
       if (a.isDead) continue;
-      const dist = Math.hypot(a.x - this.x, a.y - this.y);
+      const dx = a.x - this.x;
+      const dy = a.y - this.y;
+      if (Math.abs(dx) > minDist || Math.abs(dy) > minDist) continue;
+      const dist = Math.hypot(dx, dy);
       if (dist < minDist) {
         minDist = dist;
         nearest = a;
@@ -2110,7 +2122,7 @@ class SpaceStation extends Entity {
     this.hp = 100000;
     this.shieldRegenRate = 45; // 45 HP/sec passive shield repair
     this.crystalsDonated = 0;
-    this.crystalsRequired = 100;
+    this.crystalsRequired = 250;
     this.turretTimer = 0;
     this.rotationSpeed = 0.25;
     this.shieldFlashTimer = 0;
@@ -2137,7 +2149,7 @@ class SpaceStation extends Entity {
       this.maxHp = this.level * 100000; // Each level increases HP by 100k (Lv1=100k up to Lv5=500k)
       this.hp = this.maxHp;
       this.crystalsDonated = 0;
-      this.crystalsRequired = Math.round(this.crystalsRequired * 2.2);
+      this.crystalsRequired = Math.round(this.crystalsRequired * 2.0);
       leveledUp = true;
 
       // Preserve current continuous rotation angles so upgrade doesn't jump or change angle

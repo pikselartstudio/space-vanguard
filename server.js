@@ -92,9 +92,9 @@ const BASE_LOCATIONS = {
 };
 
 const stations = {
-  blue: { nation: 'blue', x: BASE_LOCATIONS.blue.x, y: BASE_LOCATIONS.blue.y, hp: 100000, maxHp: 100000, level: 1, crystalsDonated: 0, crystalsRequired: 100, isDead: false },
-  red:  { nation: 'red',  x: BASE_LOCATIONS.red.x,  y: BASE_LOCATIONS.red.y,  hp: 100000, maxHp: 100000, level: 1, crystalsDonated: 0, crystalsRequired: 100, isDead: false },
-  gold: { nation: 'gold', x: BASE_LOCATIONS.gold.x, y: BASE_LOCATIONS.gold.y, hp: 100000, maxHp: 100000, level: 1, crystalsDonated: 0, crystalsRequired: 100, isDead: false }
+  blue: { nation: 'blue', x: BASE_LOCATIONS.blue.x, y: BASE_LOCATIONS.blue.y, hp: 100000, maxHp: 100000, level: 1, crystalsDonated: 0, crystalsRequired: 250, isDead: false },
+  red:  { nation: 'red',  x: BASE_LOCATIONS.red.x,  y: BASE_LOCATIONS.red.y,  hp: 100000, maxHp: 100000, level: 1, crystalsDonated: 0, crystalsRequired: 250, isDead: false },
+  gold: { nation: 'gold', x: BASE_LOCATIONS.gold.x, y: BASE_LOCATIONS.gold.y, hp: 100000, maxHp: 100000, level: 1, crystalsDonated: 0, crystalsRequired: 250, isDead: false }
 };
 
 // Rebalanced Asteroid Yields (~2.5x reduced EXP yields per user request so leveling takes real effort)
@@ -330,7 +330,7 @@ function resetGalaxyServer(prevWinner = null) {
     stations[n].maxHp = 100000;
     stations[n].level = 1;
     stations[n].crystalsDonated = 0;
-    stations[n].crystalsRequired = 100;
+    stations[n].crystalsRequired = 250;
     stations[n].isDead = false;
   }
 
@@ -894,7 +894,7 @@ io.on('connection', (socket) => {
       base.maxHp = base.level * 100000;
       base.hp = base.maxHp;
       base.crystalsDonated = 0;
-      base.crystalsRequired = Math.round(base.crystalsRequired * 2.2);
+      base.crystalsRequired = Math.round(base.crystalsRequired * 2.0);
       leveledUp = true;
 
       io.emit('chat_message', {
@@ -1149,7 +1149,7 @@ setInterval(() => {
               base.maxHp = base.level * 100000;
               base.hp = base.maxHp;
               base.crystalsDonated = 0;
-              base.crystalsRequired = Math.round(base.crystalsRequired * 2.2);
+              base.crystalsRequired = Math.round(base.crystalsRequired * 2.0);
               leveledUp = true;
               io.emit('chat_message', {
                 id: `base-lvl-${Date.now()}`,
@@ -1222,7 +1222,7 @@ setInterval(() => {
         base.maxHp = base.level * 100000;
         base.hp = base.maxHp;
         base.crystalsDonated -= base.crystalsRequired;
-        base.crystalsRequired = Math.round(base.crystalsRequired * 2.2);
+        base.crystalsRequired = Math.round(base.crystalsRequired * 2.0);
         leveledUp = true;
         io.emit('chat_message', {
           id: `base-lvl-${Date.now()}`,
