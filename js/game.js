@@ -338,8 +338,18 @@ class StarblastGame {
         return;
       }
 
-      // [Escape] closes shop if open
+      // [Y] Ship Tree Modal Toggle
+      if (e.code === 'KeyY') {
+        if (this.ui) this.ui.toggleShipTreeModal();
+        return;
+      }
+
+      // [Escape] closes modals if open
       if (e.code === 'Escape') {
+        if (this.ui && this.ui.isShipTreeOpen) {
+          this.ui.toggleShipTreeModal(false);
+          return;
+        }
         if (this.ui && this.ui.isShopOpen) {
           this.toggleShop(false);
           return;
@@ -450,7 +460,7 @@ class StarblastGame {
   getNationSpawn(nation) {
     const baseLoc = this.baseLocations[nation] || this.baseLocations['blue'];
     const offsetAngle = Math.random() * Math.PI * 2;
-    const offsetDist = 480 + Math.random() * 90; // Safely beside 420-radius station
+    const offsetDist = 280 + Math.random() * 80; // Safely inside 450+120 base docking perimeter, outside 230 hull
     return {
       x: baseLoc.x + Math.cos(offsetAngle) * offsetDist,
       y: baseLoc.y + Math.sin(offsetAngle) * offsetDist

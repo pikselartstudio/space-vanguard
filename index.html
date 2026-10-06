@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Play:wght@400;700&display=swap" rel="stylesheet">
   <link rel="preload" href="/fonts/SpaceMelons.woff" as="font" type="font/woff" crossorigin>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=2.2.1">
 </head>
 <body>
   <!-- 3D WebGL Canvas Layer -->
@@ -100,6 +100,10 @@
           <div id="shop-hud-btn" class="interactive" title="Uzay Pazarı & İkmal / Dron Menüsü (Açmak/Kapatmak için [M] tuşuna basın veya tıklayın)">
             <span class="shop-key-tag">[M]</span>
             <span class="shop-title-tag">SHOP</span>
+          </div>
+          <div id="shiptree-hud-btn" class="interactive" title="Gemi Gelişim Ağacı & 12 Uzman Gemi (Açmak/Kapatmak için [Y] tuşuna basın veya tıklayın)">
+            <span class="shiptree-key-tag">[Y]</span>
+            <span class="shiptree-title-tag">AĞAÇ</span>
           </div>
         </div>
         <!-- Base Dock / Shop Market Status (Opens below DFRT + CTRL and [M] SHOP buttons) -->
@@ -519,6 +523,7 @@
 
 
         <button id="play-btn" class="play-btn">START</button>
+        <button type="button" id="main-shiptree-btn" class="play-btn-ghost" style="margin-top: 9px; width: 100%; border: 1px solid rgba(0, 240, 255, 0.45); color: #38bdf8; font-family: 'Orbitron', monospace; font-size: 0.78rem; font-weight: 700; padding: 8px 12px; letter-spacing: 1.5px; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; background: rgba(8, 24, 48, 0.65);">🚀 GEMİ GELİŞİM AĞACI (12 GEMİ)</button>
       </div>
 
       <!-- Bottom Social Icons Bar (Visual only, non-clickable) -->
@@ -562,6 +567,31 @@
         <div class="modal-actions">
           <button id="server-save-btn" class="play-btn-small">KAYDET VE BAĞLAN</button>
           <button id="server-local-btn" class="play-btn-ghost">VARSAYILAN</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ship Evolution Tree & Hangar Modal -->
+    <div id="shiptree-modal" class="modal-overlay interactive" style="display: none;">
+      <div class="modal-card shiptree-modal-card">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span class="modal-title" style="letter-spacing: 2px;">🚀 GEMİ GELİŞİM AĞACI (12 UZMAN GEMİ)</span>
+            <span style="font-size: 0.75rem; color: #38bdf8; background: rgba(56, 189, 248, 0.15); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">[Y] KISAYOLU</span>
+          </div>
+          <button id="shiptree-modal-close" class="modal-close-btn" title="Kapat (ESC / Y)">✕</button>
+        </div>
+        <div class="modal-desc" style="margin-bottom: 14px; line-height: 1.5;">
+          Seviye 1 <b>Keşif Avcısı</b>'ndan sonra kargonuz dolduğunda (💎 60) 4 farklı uzmanlık sınıfına ayrılırsınız. Her sınıf 3 seviye boyunca özelleşir ve Seviye 5 <b>Aegis Kruvazörü</b>'ne bağlanır. Test etmek istediğiniz gemiyi anında seçebilirsiniz:
+        </div>
+        <div id="shiptree-grid" class="shiptree-grid">
+          <!-- Populated dynamically by UI.js -->
+        </div>
+        <div class="modal-actions" style="margin-top: 14px; justify-content: space-between;">
+          <div style="font-size: 0.75rem; color: #94a3b8; display: flex; align-items: center; gap: 8px;">
+            <span>🛡️ TANK</span> • <span>⚡ ÖNLEME / HIZ</span> • <span>⚔️ AĞIR SAVAŞÇI</span> • <span>💚 ŞİFACI</span>
+          </div>
+          <button id="shiptree-modal-dismiss" class="play-btn-small">KAPAT</button>
         </div>
       </div>
     </div>
@@ -654,13 +684,13 @@
   <!-- Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-  <script src="js/audio.js"></script>
-  <script src="js/shipTree.js"></script>
-  <script src="js/models.js"></script>
-  <script src="js/entities.js"></script>
-  <script src="js/network.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/universe/space-universe.js"></script>
-  <script src="js/game.js"></script>
+  <script src="js/audio.js?v=2.2.1"></script>
+  <script src="js/shipTree.js?v=2.2.1"></script>
+  <script src="js/models.js?v=2.2.1"></script>
+  <script src="js/entities.js?v=2.2.1"></script>
+  <script src="js/network.js?v=2.2.1"></script>
+  <script src="js/ui.js?v=2.2.1"></script>
+  <script src="js/universe/space-universe.js?v=2.2.1"></script>
+  <script src="js/game.js?v=2.2.1"></script>
 </body>
 </html>

@@ -20,6 +20,13 @@ class UIManager {
     this.driftStateText = document.getElementById('dfrt-state-text');
     this.shopHudBtn = document.getElementById('shop-hud-btn');
     this.isShopOpen = false;
+    this.shiptreeHudBtn = document.getElementById('shiptree-hud-btn');
+    this.mainShiptreeBtn = document.getElementById('main-shiptree-btn');
+    this.shiptreeModal = document.getElementById('shiptree-modal');
+    this.shiptreeGrid = document.getElementById('shiptree-grid');
+    this.shiptreeModalClose = document.getElementById('shiptree-modal-close');
+    this.shiptreeModalDismiss = document.getElementById('shiptree-modal-dismiss');
+    this.isShipTreeOpen = false;
     this.wasInStationPerimeter = false;
 
     this.upgradeDock = document.getElementById('upgrade-dock');
@@ -546,6 +553,32 @@ class UIManager {
         if (this.game) {
           this.game.toggleShop();
         }
+      });
+    }
+
+    // Ship Tree [Y] HUD & Main Menu Button click handlers
+    if (this.shiptreeHudBtn) {
+      this.shiptreeHudBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleShipTreeModal();
+      });
+    }
+    if (this.mainShiptreeBtn) {
+      this.mainShiptreeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleShipTreeModal();
+      });
+    }
+    if (this.shiptreeModalClose) {
+      this.shiptreeModalClose.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleShipTreeModal(false);
+      });
+    }
+    if (this.shiptreeModalDismiss) {
+      this.shiptreeModalDismiss.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleShipTreeModal(false);
       });
     }
 
@@ -1150,6 +1183,122 @@ class UIManager {
     if (this.driftStateText) {
       this.driftStateText.textContent = isActive ? 'ON' : 'OFF';
     }
+  }
+
+  // SHIP TREE [Y] Gemi Gelişim Ağacı penceresini aç/kapat
+  toggleShipTreeModal(forceState = null) {
+    if (!this.shiptreeModal) return;
+    const nextState = forceState !== null ? forceState : !this.isShipTreeOpen;
+    this.isShipTreeOpen = nextState;
+    this.shiptreeModal.style.display = nextState ? 'flex' : 'none';
+    if (this.shiptreeHudBtn) {
+      this.shiptreeHudBtn.classList.toggle('active', nextState);
+    }
+    if (nextState) {
+      this.renderShipTreeGrid();
+    }
+  }
+
+  renderShipTreeGrid() {
+    if (!this.shiptreeGrid) return;
+    this.shiptreeGrid.innerHTML = '';
+
+    const branches = [
+      {
+        id: 'tank',
+        name: 'TANK SINIFI',
+        icon: '🛡️',
+        desc: 'Ağır zırh, yüksek kalkan kapasitesi ve darbelere dayanıklılık.',
+        color: '#f59e0b',
+        ships: ['tank-rhino', 'tank-goliath', 'tank-titan']
+      },
+      {
+        id: 'speed',
+        name: 'HIZ / ÖNLEME',
+        icon: '⚡',
+        desc: 'Süpersonik itki, üstün manevra ve seri iğne lazerleri.',
+        color: '#00f0ff',
+        ships: ['speed-dart', 'speed-phantom', 'speed-tempest']
+      },
+      {
+        id: 'bruiser',
+        name: 'AĞIR SAVAŞÇI',
+        icon: '⚔️',
+        desc: 'Yüksek ateş gücü, çok namlulu hücum ve yıkıcı darbe.',
+        color: '#ff2a4b',
+        ships: ['bruiser-crusader', 'bruiser-marauder', 'bruiser-warlord']
+      },
+      {
+        id: 'healer',
+        name: 'DESTEK / ŞİFACI',
+        icon: '💚',
+        desc: 'Dost gemileri ve ana üssü onaran restorasyon lazerleri.',
+        color: '#10b981',
+        ships: ['healer-cleric', 'healer-guardian', 'healer-aegis']
+      }
+    ];
+
+    branches.forEach(branch => {
+      const col = document.createElement('div');
+      col.className = `shiptree-branch-col branch-${branch.id}`;
+
+      const header = document.createElement('div');
+      header.className = 'shiptree-branch-header';
+      header.innerHTML = `
+        <div class="branch-title" style="color: ${branch.color};">
+          <span>${branch.icon}</span> <span>${branch.name}</span>
+        </div>
+        <div class="branch-desc">${branch.desc}</div>
+      `;
+      col.appendChild(header);
+
+      const list = document.createElement('div');
+      list.className = 'shiptree-cards-list';
+
+      branch.ships.forEach(shipKey => {
+        const cfg = (typeof SHIP_TREE !== 'undefined' && SHIP_TREE[shipKey]) ? SHIP_TREE[shipKey] : {};
+        const card = document.createElement('div');
+        const isCurrent = this.game && this.game.player && this.game.player.shipKey === shipKey;
+        card.className = `shiptree-ship-card ${isCurrent ? 'current' : ''}`;
+
+        const baseStats = cfg.baseStats || {};
+        card.innerHTML = `
+          <div class="shiptree-card-header">
+            <span class="shiptree-tier-pill">Sv. ${cfg.tier || 2}</span>
+            <span class="shiptree-ship-name">${cfg.name || shipKey}</span>
+          </div>
+          <div class="shiptree-card-desc">${cfg.description || ''}</div>
+          <div class="shiptree-stats-mini">
+            <div><span>🛡️ Kalkan:</span> <b>${baseStats.shieldCap || '-'}</b></div>
+            <div><span>💥 Hasar:</span> <b>${baseStats.fireDamage || '-'}</b></div>
+            <div><span>💨 Hız:</span> <b>${baseStats.shipSpeed || '-'}</b></div>
+            <div><span>📦 Ambar:</span> <b>${cfg.cargoCapacity || '-'}</b></div>
+          </div>
+          <button type="button" class="shiptree-select-btn" data-ship="${shipKey}">
+            ${isCurrent ? '✔ AKTİF GEMİ' : '🚀 SEÇ / TEST ET'}
+          </button>
+        `;
+
+        const btn = card.querySelector('.shiptree-select-btn');
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (this.game && this.game.player && !this.game.player.isDead) {
+            this.game.evolvePlayer(shipKey);
+            this.showAnnouncement(`⭐ GEMİ DEĞİŞTİRİLDİ: ${cfg.name || shipKey} (Seviye ${cfg.tier || 2})`, 2500);
+            this.toggleShipTreeModal(false);
+          } else if (this.game) {
+            this.game.lastPlayerShipKey = shipKey;
+            this.showAnnouncement(`🚀 Başlangıç Gemisi Seçildi: ${cfg.name || shipKey}`, 2000);
+            this.toggleShipTreeModal(false);
+          }
+        });
+
+        list.appendChild(card);
+      });
+
+      col.appendChild(list);
+      this.shiptreeGrid.appendChild(col);
+    });
   }
 
   // SHOP [M] Pazar penceresini aç/kapat (Sadece ana üs içindeyken açılabilir)
