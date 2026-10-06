@@ -137,7 +137,7 @@ class Laser extends Entity {
     return 0x00ff44;
   }
 
-  update(dt, worldSize) {
+  update(dt, worldSize, camLogicalX = null, camLogicalY = null) {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     this.lifetime -= dt;
@@ -155,7 +155,17 @@ class Laser extends Entity {
     }
 
     if (this.mesh) {
-      this.mesh.position.set(this.x, -this.y, 1);
+      let renderX = this.x;
+      let renderY = -this.y;
+      if (camLogicalX !== null && camLogicalY !== null && worldSize > 0) {
+        let cdx = this.x - camLogicalX;
+        let cdy = this.y - camLogicalY;
+        cdx -= Math.round(cdx / worldSize) * worldSize;
+        cdy -= Math.round(cdy / worldSize) * worldSize;
+        renderX = camLogicalX + cdx;
+        renderY = -(camLogicalY + cdy);
+      }
+      this.mesh.position.set(renderX, renderY, 1);
     }
   }
 
@@ -221,10 +231,16 @@ class Gem extends Entity {
     if (this.collectDelay <= 0 && Array.isArray(ships)) {
       for (const ship of ships) {
         if (ship.isDead) continue;
-        // User request: "son seviye ve kargo full dolunca daha toplama yapılmasın"
-        const shipCfg = SHIP_TREE[ship.shipKey];
-        if (shipCfg && shipCfg.tier >= 4 && ship.crystals >= shipCfg.cargoCapacity) {
+        // User request: Yeşil kristal ambara gider (ambar dolunca yerde kalır).
+        // Renkli kristaller sadece lazere gider (lazer doluysa yerde kalır, ambar dolu olsa da lazer için toplanır).
+        const isGreen = (!this.element || this.element === 'green');
+        if (isGreen && ship.crystals >= (ship.stats.cargoCapacity || 60)) {
           continue;
+        }
+        if (!isGreen) {
+          const maxAmmo = (ship.maxElementalAmmo && ship.maxElementalAmmo[this.element]) || 150;
+          const curAmmo = (ship.elementalAmmo && ship.elementalAmmo[this.element]) || 0;
+          if (curAmmo >= maxAmmo) continue;
         }
         const centerDist = Math.hypot(ship.x - this.x, ship.y - this.y);
         const hullDist = centerDist - ship.radius;
@@ -624,6 +640,7 @@ class Ship extends Entity {
     this.mined = 0;
     this.donations = 0;
     this.rcsEnabled = true; // Reaction Control System (auto-damping)
+    this.shieldDamageCooldown = 0; // 3-second delay after taking damage before natural shield regen begins
 
     // Elemental & Tactical Action Systems
     // User request: "ekstra kredi ile açılmasına gerek yok hiç birinin space ve r direkt aktif olsun."
@@ -764,6 +781,7 @@ class Ship extends Entity {
 
     this.shield -= amount;
     this.shieldDamageFlash = 0.2; // Show shield bubble for 200ms
+    this.shieldDamageCooldown = 3.0; // User request: hasar aldıktan sonra 3 saniye sonra yenileme başlasın
 
     if (this.shield <= 0) {
       this.shield = 0;
@@ -910,8 +928,23 @@ class Ship extends Entity {
     }
 
     // Regen Shields & Energy
+    // User request: "çarpışmalarda saldırı alınca yani kalkan düşünce yenilemeyi sadece dronlar hızlı yapsın. dronlar yoksa hasar aldıktan sonra 3 saniye sonra yenileme başlasın geminin kendi özelliği olarak."
+    if (this.shieldDamageCooldown > 0) {
+      this.shieldDamageCooldown -= dt;
+    }
+
     if (this.shield < this.stats.shieldCap) {
-      this.shield = Math.min(this.stats.shieldCap, this.shield + this.stats.shieldRegen * dt);
+      // 1. Defense drones actively repair shield rapidly immediately (bypassing damage delay)
+      const defDrone = (this.drones || []).find(d => d.type === 'defense' && !d.isDead);
+      if (defDrone) {
+        const droneRegenSpeed = (defDrone.level || 1) * 22; // Lv.1 = +22/s, Lv.2 = +44/s, Lv.3 = +66/s
+        this.shield = Math.min(this.stats.shieldCap, this.shield + droneRegenSpeed * dt);
+      }
+
+      // 2. Ship's natural passive shield regen only starts after 3 seconds without taking damage
+      if (this.shieldDamageCooldown <= 0) {
+        this.shield = Math.min(this.stats.shieldCap, this.shield + this.stats.shieldRegen * dt);
+      }
     }
     if (this.energy < this.stats.energyCap) {
       this.energy = Math.min(this.stats.energyCap, this.energy + this.stats.energyRegen * dt);
@@ -1505,12 +1538,14 @@ class RemotePlayer extends Ship {
 
 // AI Controlled Bot Ship with Smart Tactics
 class BotShip extends Ship {
-  constructor(id, name, shipKey = 'fly', x = 0, y = 0, nation = 'red', scene = null) {
+  constructor(id, name, shipKey = 'fly', x = 0, y = 0, nation = 'red', scene = null, role = 'miner') {
     super(id, name, shipKey, x, y, false, nation, scene);
 
-    this.state = 'MINING'; // MINING, COMBAT, RETURNING_TO_BASE, DEFENDING_BASE, FLEEING
+    this.role = role || 'miner'; // 'miner', 'fighter', 'explorer'
+    this.state = 'MINING'; // MINING, COMBAT, RETURNING_TO_BASE, DEFENDING_BASE, FLEEING, CAPTURING_REFINERY, SUPPORT
     this.stateTimer = 0;
     this.targetEntity = null;
+    this.refineryTarget = null;
     this.autoUpgradeTimer = 1.0;
     this.strafeTimer = 0;
     this.strafeDir = Math.random() > 0.5 ? 1 : -1;
@@ -1518,9 +1553,11 @@ class BotShip extends Ship {
     this.gemTarget = null;
     this.gemTargetTimer = 0;
     this.ignoredGems = new Map();
+    this.mined = 0;
+    this.donations = 0;
   }
 
-  updateAI(dt, asteroids, ships, gems, stations = null) {
+  updateAI(dt, asteroids, ships, gems, stations = null, refineries = null) {
     this.stateTimer -= dt;
     this.autoUpgradeTimer -= dt;
 
@@ -1612,6 +1649,7 @@ class BotShip extends Ship {
         this.donateTimer = 0;
         const donateAmt = Math.min(10, this.crystals);
         this.crystals -= donateAmt;
+        this.donations = (this.donations || 0) + donateAmt;
         this.score += donateAmt * 20;
         homeBase.donate(donateAmt);
       }
@@ -1719,6 +1757,29 @@ class BotShip extends Ship {
       }
     }
 
+    // Priority F: Capture or Defend Neutral / Contested Refineries (Explorers & Free-roaming ships)
+    if (this.state !== 'RETURNING_TO_BASE' && this.state !== 'SUPPORT' && this.state !== 'FLEEING' && this.state !== 'COMBAT' && refineries) {
+      if (this.role === 'explorer' || (this.role === 'fighter' && Math.random() < 0.35) || (Math.random() < 0.15)) {
+        let bestRef = null;
+        let minRefDist = 5500;
+        for (const k in refineries) {
+          const ref = refineries[k];
+          if (!ref) continue;
+          if (ref.controllingNation !== this.nation || ref.contested) {
+            const d = Math.hypot(ref.x - this.x, ref.y - this.y);
+            if (d < minRefDist) {
+              minRefDist = d;
+              bestRef = ref;
+            }
+          }
+        }
+        if (bestRef && (minRefDist < 3600 || this.role === 'explorer')) {
+          this.state = 'CAPTURING_REFINERY';
+          this.refineryTarget = bestRef;
+        }
+      }
+    }
+
     // 4. State Execution
     if (this.state === 'RETURNING_TO_BASE' && hasBase) {
       const dx = homeBase.x - this.x;
@@ -1820,6 +1881,33 @@ class BotShip extends Ship {
         let angleDiff = Math.abs(this.targetRotation - this.rotation);
         while (angleDiff > Math.PI) angleDiff = Math.abs(angleDiff - Math.PI * 2);
         this.isShooting = (dist <= (this.stats.fireRange || 600) * 0.95 && angleDiff < 0.38);
+      }
+    }
+    else if (this.state === 'CAPTURING_REFINERY') {
+      if (!this.refineryTarget) {
+        this.state = 'MINING';
+      } else {
+        const dx = this.refineryTarget.x - this.x;
+        const dy = this.refineryTarget.y - this.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > 360) {
+          this.targetRotation = Math.atan2(dy, dx);
+          this.isThrusting = true;
+          this.isShooting = false;
+        } else {
+          // Inside refinery capture radius (480) - orbit smoothly around station
+          const orbitAngle = Math.atan2(dy, dx) + Math.PI / 2;
+          this.targetRotation = orbitAngle;
+          this.isThrusting = (dist > 200);
+          this.isShooting = false;
+
+          // If fully captured and secured by own nation, return to mining/patrol
+          if (this.refineryTarget.controllingNation === this.nation && !this.refineryTarget.contested && (this.refineryTarget.captureProgress || 0) >= 100) {
+            this.state = 'MINING';
+            this.refineryTarget = null;
+          }
+        }
       }
     }
     else { // 'MINING'
@@ -1958,19 +2046,35 @@ class BotShip extends Ship {
     const config = SHIP_TREE[this.shipKey];
     // Evolve as soon as cargo is full
     if (this.crystals >= config.cargoCapacity && config.evolvesTo && config.evolvesTo.length > 0) {
-      const nextKey = config.evolvesTo[Math.floor(Math.random() * config.evolvesTo.length)];
+      let nextKey = null;
+      if (this.role === 'miner') {
+        nextKey = config.evolvesTo.find(k => k.includes('tank') || k.includes('bruiser')) || config.evolvesTo[0];
+      } else if (this.role === 'fighter') {
+        nextKey = config.evolvesTo.find(k => k.includes('speed') || k.includes('bruiser')) || config.evolvesTo[0];
+      } else if (this.role === 'explorer') {
+        nextKey = config.evolvesTo.find(k => k.includes('healer') || k.includes('speed')) || config.evolvesTo[0];
+      } else {
+        nextKey = config.evolvesTo[Math.floor(Math.random() * config.evolvesTo.length)];
+      }
       this.evolve(nextKey, this.scene);
       return;
     }
 
-    // Upgrade stats when crystals >= scaling cost, prioritizing combat effectiveness
+    // Upgrade stats when crystals >= scaling cost, prioritizing role effectiveness
     const available = UPGRADE_CONFIG.filter(u => {
       const currentLevel = this.upgrades[u.id] || 0;
       const cost = typeof getUpgradeCost === 'function' ? getUpgradeCost(currentLevel) : (UPGRADE_COSTS[currentLevel] || 50);
       return currentLevel < u.max && this.crystals >= cost;
     });
     if (available.length > 0) {
-      const priorityOrder = ['fireDamage', 'shieldCap', 'fireSpeed', 'energyRegen', 'shipSpeed', 'shieldRegen', 'energyCap', 'shipAgility'];
+      let priorityOrder = ['fireDamage', 'shieldCap', 'fireSpeed', 'energyRegen', 'shipSpeed', 'shieldRegen', 'energyCap', 'shipAgility'];
+      if (this.role === 'miner') {
+        priorityOrder = ['cargoCapacity', 'shieldCap', 'shieldRegen', 'energyRegen', 'fireDamage', 'shipSpeed', 'fireSpeed', 'energyCap'];
+      } else if (this.role === 'fighter') {
+        priorityOrder = ['fireDamage', 'fireSpeed', 'shieldCap', 'shipSpeed', 'energyRegen', 'shieldRegen', 'energyCap', 'shipAgility'];
+      } else if (this.role === 'explorer') {
+        priorityOrder = ['shipSpeed', 'shipAgility', 'energyRegen', 'shieldRegen', 'shieldCap', 'fireDamage', 'fireSpeed', 'energyCap'];
+      }
       let choice = null;
       for (const p of priorityOrder) {
         const found = available.find(u => u.id === p);

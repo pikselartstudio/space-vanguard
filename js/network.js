@@ -298,7 +298,8 @@ class NetworkManager {
       if (this.game && this.game.player && data.rewards) {
         const myReward = data.rewards[this.game.player.nation] || 0;
         if (myReward > 0 && this.game.ui) {
-          this.game.ui.showAnnouncement(`💎 Rafineri Geliri: +${myReward} Kristal`, 1500);
+          // User request: "rafineri gelirini sadece istatistik kısmında arttığını görelim ekstra görmemize gerek yok. ortada ki gelen yazı ile gerek yok."
+          this.game.ui.updateHUD(this.game.player, this.game.stations);
         }
       }
     });

@@ -522,14 +522,14 @@ class UIManager {
       });
     });
 
-    // Leaderboard Tabs (3 Tabs: PvP Kills, Mining Farm, Base Donations) - Default to 'mined' per user request
-    this.activeLeaderboardMetric = 'mined';
+    // Leaderboard Tabs (3 Tabs: Base Donations, Mining Farm, PvP Kills) - Default to 'donations' (Üs Puanı) per user request
+    this.activeLeaderboardMetric = 'donations';
     const lbTabs = document.querySelectorAll('.lb-tab');
     lbTabs.forEach(tab => {
       tab.addEventListener('click', (e) => {
         e.stopPropagation();
         lbTabs.forEach(t => t.classList.toggle('active', t === tab));
-        this.activeLeaderboardMetric = tab.dataset.metric || 'mined';
+        this.activeLeaderboardMetric = tab.dataset.metric || 'donations';
         if (this.game && this.game.player) {
           this.updateLeaderboard(this.game.player, this.game.remotePlayers);
         }
@@ -1169,6 +1169,9 @@ class UIManager {
     if (player.crystals >= player.stats.cargoCapacity && hasNextTier) {
       this.showTierUpDropBanner(player);
     }
+
+    // Update Holographic Refinery Status Widget (left of radar)
+    this.updateRefineryHologram(this.game ? this.game.refineries : null);
   }
 
   updateDriftIndicator(isActive) {
@@ -1350,11 +1353,11 @@ class UIManager {
         return {
           level: 0,
           label: 'YOK',
-          btnText: 'KUŞAN (500 💎)',
+          btnText: 'KUŞAN (150 💎)',
           action: `drone_${type}`,
-          cost: 500,
+          cost: 150,
           isMax: false,
-          desc: type === 'attack' ? 'PvP Düşman Avcısı' : (type === 'defense' ? '+6 Kalkan/sn Onarım' : 'Hedef Asteroiti Kazar')
+          desc: type === 'attack' ? 'PvP Düşman Avcısı' : (type === 'defense' ? 'Hızlı Kalkan Onarımı' : 'Hedef Asteroiti Kazar')
         };
       }
       if (drone.level >= 3) {
@@ -1369,7 +1372,7 @@ class UIManager {
         };
       }
       const nextLvl = drone.level + 1;
-      const nextCost = drone.level === 1 ? 600 : 720;
+      const nextCost = drone.level === 1 ? 300 : 500;
       return {
         level: drone.level,
         label: `Sv. ${drone.level}/3`,
@@ -1448,15 +1451,17 @@ class UIManager {
           <button type="button" class="base-market-btn" ${minInfo.isMax ? 'disabled' : ''}>${minInfo.btnText}</button>
         </div>
 
-        <!-- 4. 100x S1 Cryo Buz Lazeri (250 Kristal) -->
+        <!-- 4. 100x S1 Cryo Buz Lazeri (250 Kristal) - Eşleşen Skill Bar İkonu -->
         <div class="base-market-card ${s1Locked ? 'locked' : ''}" data-action="buy_s1">
           <div class="base-market-card-top">
             <div class="base-market-card-icon" style="background: rgba(0, 240, 255, 0.15); border: 1px solid rgba(0, 240, 255, 0.4);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00f0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="2" x2="12" y2="22"/>
-                <line x1="2" y1="12" x2="22" y2="12"/>
-                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-                <line x1="19.07" y1="4.93" x2="4.93" y2="19.07"/>
+              <svg viewBox="0 0 32 32" width="24" height="24">
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#00f0ff" stroke-width="2.5" stroke-linecap="round" />
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" />
+                <line x1="10" y1="22" x2="16" y2="12" stroke="#7dd3fc" stroke-width="1.5" stroke-dasharray="2 2" />
+                <line x1="22" y1="22" x2="16" y2="12" stroke="#7dd3fc" stroke-width="1.5" stroke-dasharray="2 2" />
+                <circle cx="16" cy="6" r="3" fill="#00f0ff" />
+                <circle cx="16" cy="6" r="1.5" fill="#fff" />
               </svg>
             </div>
             <div>
@@ -1467,12 +1472,17 @@ class UIManager {
           <button type="button" class="base-market-btn">AL (250 💎)</button>
         </div>
 
-        <!-- 5. 100x S2 Termal Alev Lazeri (500 Kristal • Üs Sv. 2) -->
+        <!-- 5. 100x S2 Termal Alev Lazeri (500 Kristal • Üs Sv. 2) - Eşleşen Skill Bar İkonu -->
         <div class="base-market-card ${s2Locked ? 'locked' : ''}" data-action="buy_s2">
           <div class="base-market-card-top">
             <div class="base-market-card-icon" style="background: rgba(255, 85, 51, 0.15); border: 1px solid rgba(255, 85, 51, 0.4);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff5533" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+              <svg viewBox="0 0 32 32" width="24" height="24">
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#ff4500" stroke-width="3" stroke-linecap="round" />
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#ffdd44" stroke-width="1.4" stroke-linecap="round" />
+                <polygon points="16,2 12,12 20,12" fill="#ff6600" opacity="0.8" />
+                <line x1="11" y1="18" x2="13" y2="8" stroke="#ffaa00" stroke-width="1.2" />
+                <line x1="21" y1="18" x2="19" y2="8" stroke="#ffaa00" stroke-width="1.2" />
+                <circle cx="16" cy="5" r="2" fill="#ffffff" />
               </svg>
             </div>
             <div>
@@ -1483,13 +1493,17 @@ class UIManager {
           <button type="button" class="base-market-btn" ${s2Locked ? 'disabled' : ''}>${s2Locked ? 'KİLİTLİ' : 'AL (500 💎)'}</button>
         </div>
 
-        <!-- 6. 100x S3 Void Karanlık Lazeri (750 Kristal • Üs Sv. 3) -->
+        <!-- 6. 100x S3 Void Karanlık Lazeri (750 Kristal • Üs Sv. 3) - Eşleşen Skill Bar İkonu -->
         <div class="base-market-card ${s3Locked ? 'locked' : ''}" data-action="buy_s3">
           <div class="base-market-card-top">
             <div class="base-market-card-icon" style="background: rgba(192, 132, 252, 0.15); border: 1px solid rgba(192, 132, 252, 0.4);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="9"/>
-                <path d="M12 3a9 9 0 0 0 0 18 4.5 4.5 0 0 0 0-9 4.5 4.5 0 0 1 0-9z"/>
+              <svg viewBox="0 0 32 32" width="24" height="24">
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#c084fc" stroke-width="3.5" stroke-linecap="round" />
+                <line x1="16" y1="28" x2="16" y2="4" stroke="#0f0728" stroke-width="1.8" stroke-linecap="round" />
+                <circle cx="16" cy="8" r="4.5" stroke="#a855f7" stroke-width="1.5" fill="none" />
+                <circle cx="16" cy="8" r="2.5" fill="#090514" stroke="#e9d5ff" stroke-width="1" />
+                <line x1="9" y1="20" x2="16" y2="8" stroke="#c084fc" stroke-width="1" stroke-dasharray="1 3" />
+                <line x1="23" y1="20" x2="16" y2="8" stroke="#c084fc" stroke-width="1" stroke-dasharray="1 3" />
               </svg>
             </div>
             <div>
@@ -1991,7 +2005,7 @@ class UIManager {
   }
 
   updateLeaderboard(player, remotePlayers = []) {
-    const metric = this.activeLeaderboardMetric || 'kills';
+    const metric = this.activeLeaderboardMetric || 'donations';
     const all = [];
     if (player && !player.isDead) {
       all.push({
@@ -2006,6 +2020,21 @@ class UIManager {
     }
     const remotes = Array.isArray(remotePlayers) ? remotePlayers : (remotePlayers instanceof Map ? Array.from(remotePlayers.values()) : []);
     for (const b of remotes) {
+      if (!b.isDead) {
+        all.push({
+          name: b.name,
+          score: b.score || 0,
+          kills: b.kills || 0,
+          mined: b.mined || 0,
+          donations: b.donations || 0,
+          isPlayer: false,
+          nation: b.nation
+        });
+      }
+    }
+    // Include the 9 Active Bots in the Leaderboard
+    const bots = (this.game && this.game.bots) ? this.game.bots : [];
+    for (const b of bots) {
       if (!b.isDead) {
         all.push({
           name: b.name,
@@ -2050,6 +2079,44 @@ class UIManager {
           <span style="margin-right: 5px;">${nationCfg.icon}</span>
           <span class="leader-name" style="color: ${nationCfg.hex};">${entry.name}</span>
           <span class="leader-score">${metricVal}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  updateRefineryHologram(refineries) {
+    const listEl = document.getElementById('refinery-holo-list');
+    if (!listEl) return;
+    if (!refineries) return;
+
+    const refs = Array.isArray(refineries) ? refineries : Object.values(refineries);
+    if (refs.length === 0) return;
+
+    listEl.innerHTML = refs.map(r => {
+      const nation = r.controllingNation;
+      const nationCfg = nation ? (NATIONS[nation] || NATIONS['blue']) : null;
+      const ownerLabel = nationCfg ? nationCfg.name.substring(0, 6) : 'NÖTR';
+      const ownerColor = nationCfg ? nationCfg.hex : '#94a3b8';
+      const badgeLetter = r.letter || (r.id === 'alpha' ? 'α' : (r.id === 'beta' ? 'β' : 'γ'));
+      const badgeBg = nationCfg ? `${nationCfg.hex}33` : 'rgba(255, 255, 255, 0.1)';
+      const badgeBorder = nationCfg ? nationCfg.hex : 'rgba(255, 255, 255, 0.2)';
+      const shortName = r.name ? r.name.replace('Rafineri ', '') : (r.id ? r.id.toUpperCase() : '');
+
+      let progressHtml = '';
+      if (r.captureProgress > 0 && r.captureProgress < 100) {
+        progressHtml = `<div style="font-size:0.55rem; color:#facc15; margin-left:3px; font-weight:700;">%${Math.round(r.captureProgress)}</div>`;
+      } else if (r.contested) {
+        progressHtml = `<div style="font-size:0.55rem; color:#ef4444; margin-left:3px;">⚔️</div>`;
+      }
+
+      return `
+        <div class="refinery-holo-item" style="border-left: 2px solid ${ownerColor};">
+          <span class="ref-badge" style="background:${badgeBg}; border:1px solid ${badgeBorder}; color:${ownerColor};">${badgeLetter}</span>
+          <span style="font-size:0.62rem; color:#e2e8f0; font-weight:600;">${shortName}</span>
+          <div style="display:flex; align-items:center;">
+            <span class="ref-owner" style="color: ${ownerColor};">${ownerLabel}</span>
+            ${progressHtml}
+          </div>
         </div>
       `;
     }).join('');

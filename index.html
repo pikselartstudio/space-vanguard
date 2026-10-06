@@ -76,19 +76,6 @@
               </div>
               <div class="meter-val" id="cargo-text"><span class="val-cur">0</span><span class="val-sep">/</span><span class="val-max">60</span></div>
             </div>
-            <!-- EXP / Level Progress Meter (Icon + Bar + Value) -->
-            <div class="hud-meter-row hud-exp">
-              <div class="hud-meter-icon hud-icon-exp" title="Seviye & Gelişim">
-                <svg viewBox="0 0 24 24" class="hud-svg-icon" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="#c084fc" fill-opacity="0.25"/>
-                </svg>
-              </div>
-              <div class="meter-track">
-                <div class="meter-bar bar-fill exp-fill" id="exp-fill" style="width: 0%;"></div>
-                <div class="meter-grid-overlay"></div>
-              </div>
-              <div class="meter-val" id="exp-text"><span class="val-cur">0</span><span class="val-sep">/</span><span class="val-max">50</span></div>
-            </div>
           </div>
         </div>
         <!-- Action Buttons Row: Drift mode indicator and Shop toggle button -->
@@ -111,39 +98,28 @@
       </div>
 
       <!-- Top Right: Radar / Minimap & 3-Tab Leaderboard (PvP Kills, Mining Farm, Base Donations) -->
+      <!-- Top Right: Radar / Minimap & 3-Tab Leaderboard & Refinery Hologram HUD -->
       <div id="top-right-hud">
-        <div id="radar-container" class="interactive">
-          <canvas id="radar-canvas" width="240" height="240"></canvas>
-          <div class="radar-sweep"></div>
+        <div class="top-right-radar-row">
+          <!-- Hologramic Refinery Status Widget (Left of radar) -->
+          <div id="refinery-hologram-hud" class="interactive" title="Nötr Maden Rafinerileri (Bölge Hakimiyeti)">
+            <div class="refinery-holo-header">RAFİNERİLER</div>
+            <div class="refinery-holo-list" id="refinery-holo-list">
+              <!-- Dynamically populated: Alfa, Beta, Gama -->
+            </div>
+          </div>
+
+          <div id="radar-container" class="interactive">
+            <canvas id="radar-canvas" width="240" height="240"></canvas>
+            <div class="radar-sweep"></div>
+          </div>
         </div>
 
         <div id="leaderboard" class="interactive">
           <div class="leaderboard-tabs">
-            <button type="button" class="lb-tab" id="lb-tab-kills" data-metric="kills" title="PvP İtlafları">
-              <svg viewBox="0 0 24 24" class="lb-tab-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="9"/>
-                <line x1="12" y1="2" x2="12" y2="7"/>
-                <line x1="12" y1="17" x2="12" y2="22"/>
-                <line x1="2" y1="12" x2="7" y2="12"/>
-                <line x1="17" y1="12" x2="22" y2="12"/>
-                <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
-              </svg>
-            </button>
-            <button type="button" class="lb-tab active" id="lb-tab-mined" data-metric="mined" title="Maden Farmı">
-              <svg viewBox="0 0 24 24" class="lb-tab-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="6 3 18 3 22 9 12 22 2 9"/>
-                <line x1="2" y1="9" x2="22" y2="9"/>
-                <line x1="12" y1="22" x2="8" y2="9"/>
-                <line x1="12" y1="22" x2="16" y2="9"/>
-              </svg>
-            </button>
-            <button type="button" class="lb-tab" id="lb-tab-donations" data-metric="donations" title="Üs Bağışı">
-              <svg viewBox="0 0 24 24" class="lb-tab-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                <path d="M2 17l10 5 10-5"/>
-                <path d="M2 12l10 5 10-5"/>
-              </svg>
-            </button>
+            <button type="button" class="lb-tab active" id="lb-tab-donations" data-metric="donations">Üs Puanı</button>
+            <button type="button" class="lb-tab" id="lb-tab-mined" data-metric="mined">Maden Farmı</button>
+            <button type="button" class="lb-tab" id="lb-tab-kills" data-metric="kills">PvP Lideri</button>
           </div>
           <div id="leaderboard-list">
             <!-- Populated by JS -->

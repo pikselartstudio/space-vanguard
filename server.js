@@ -133,31 +133,56 @@ function generateAsteroid(tier = null, nearBase = null, nearNation = null, isOut
   }
   crystalCount = Math.max(1, Math.min(4, crystalCount));
 
-  let x, y;
-  if (nearBase) {
-    const angle = Math.random() * Math.PI * 2;
-    const r = 500 + Math.random() * 650;
-    x = nearBase.x + Math.cos(angle) * r;
-    y = nearBase.y + Math.sin(angle) * r;
-  } else if (isOuterRim) {
-    // Fill empty outer sectors and corners uniformly across the map
-    const dist = 2000 + Math.random() * (WORLD_SIZE / 2 - 2100);
-    const angle = Math.random() * Math.PI * 2;
-    x = Math.cos(angle) * dist;
-    y = Math.sin(angle) * dist;
-  } else {
-    const dist = 300 + Math.random() * (WORLD_SIZE / 2 - 350);
-    const angle = Math.random() * Math.PI * 2;
-    x = Math.cos(angle) * dist;
-    y = Math.sin(angle) * dist;
-  }
-
-  // Toroidal boundary normalization: guarantees every asteroid is strictly within [-half, half]
   const halfWorld = WORLD_SIZE / 2;
-  while (x < -halfWorld) x += WORLD_SIZE;
-  while (x > halfWorld) x -= WORLD_SIZE;
-  while (y < -halfWorld) y += WORLD_SIZE;
-  while (y > halfWorld) y -= WORLD_SIZE;
+  const isInsideExclusionZone = (px, py) => {
+    // Check all 3 bases: exclusion radius 780px
+    for (const bKey in BASE_LOCATIONS) {
+      const b = BASE_LOCATIONS[bKey];
+      let dx = Math.abs(px - b.x);
+      if (dx > halfWorld) dx = WORLD_SIZE - dx;
+      let dy = Math.abs(py - b.y);
+      if (dy > halfWorld) dy = WORLD_SIZE - dy;
+      if (Math.hypot(dx, dy) < 780) return true;
+    }
+    // Check all 3 refineries: exclusion radius 650px
+    for (const rKey in refineries) {
+      const r = refineries[rKey];
+      let dx = Math.abs(px - r.x);
+      if (dx > halfWorld) dx = WORLD_SIZE - dx;
+      let dy = Math.abs(py - r.y);
+      if (dy > halfWorld) dy = WORLD_SIZE - dy;
+      if (Math.hypot(dx, dy) < 650) return true;
+    }
+    return false;
+  };
+
+  let x, y;
+  let attempts = 0;
+  do {
+    attempts++;
+    if (nearBase) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = 800 + Math.random() * 550; // Outside 780px base perimeter
+      x = nearBase.x + Math.cos(angle) * r;
+      y = nearBase.y + Math.sin(angle) * r;
+    } else if (isOuterRim) {
+      const dist = 2200 + Math.random() * (halfWorld - 2300);
+      const angle = Math.random() * Math.PI * 2;
+      x = Math.cos(angle) * dist;
+      y = Math.sin(angle) * dist;
+    } else {
+      const dist = 400 + Math.random() * (halfWorld - 450);
+      const angle = Math.random() * Math.PI * 2;
+      x = Math.cos(angle) * dist;
+      y = Math.sin(angle) * dist;
+    }
+
+    // Toroidal boundary normalization
+    while (x < -halfWorld) x += WORLD_SIZE;
+    while (x > halfWorld) x -= WORLD_SIZE;
+    while (y < -halfWorld) y += WORLD_SIZE;
+    while (y > halfWorld) y -= WORLD_SIZE;
+  } while (attempts < 25 && isInsideExclusionZone(x, y));
 
   let element = 'ice';
   const distFromCenter = Math.hypot(x, y);
@@ -1103,17 +1128,59 @@ setInterval(() => {
             timestamp: Date.now()
           });
         }
-      } else {
-        // Unclaimed / neutral: capturing!
+        // Unclaimed / neutral: capturing over 10s (10% per second)
         ref.captureProgress = Math.min(100, ref.captureProgress + 10);
         statusChanged = true;
         if (ref.captureProgress >= 100) {
           ref.controllingNation = occupyingNation;
+
+          // User request: "gemi rafineri alanına girdiğinde 10 saniye sonra ulusun rengine boyansın. 10 üs puanı versin."
+          const base = stations[occupyingNation];
+          if (base) {
+            base.crystalsDonated += 10;
+            base.hp = Math.min(base.maxHp, base.hp + 300);
+            let leveledUp = false;
+            if (base.crystalsDonated >= base.crystalsRequired && base.level < 5) {
+              base.level++;
+              base.maxHp = base.level * 100000;
+              base.hp = base.maxHp;
+              base.crystalsDonated = 0;
+              base.crystalsRequired = Math.round(base.crystalsRequired * 2.2);
+              leveledUp = true;
+              io.emit('chat_message', {
+                id: `base-lvl-${Date.now()}`,
+                senderName: 'MERKEZ ÜS',
+                nation: occupyingNation,
+                text: `🌟 ${occupyingNation.toUpperCase()} Ana Üssü Seviye ${base.level}'e Yükseltildi!`,
+                isSystem: true,
+                timestamp: Date.now()
+              });
+            }
+            io.emit('base_updated', {
+              ...base,
+              leveledUp
+            });
+          }
+
+          // Credit +10 donations to players present at the refinery for leaderboard
+          for (const [pid, p] of players) {
+            if (p.nation === occupyingNation) {
+              let dx = Math.abs(p.x - ref.x);
+              if (dx > halfWorld) dx = worldSpan - dx;
+              let dy = Math.abs(p.y - ref.y);
+              if (dy > halfWorld) dy = worldSpan - dy;
+              if (Math.hypot(dx, dy) <= 480) {
+                p.donations = (p.donations || 0) + 10;
+                p.score = (p.score || 0) + 250;
+              }
+            }
+          }
+
           io.emit('chat_message', {
             id: `ref-cap-${Date.now()}-${ref.id}`,
             senderName: 'STRATEJİ',
             nation: occupyingNation,
-            text: `🚩 [${ref.name}] ${occupyingNation.toUpperCase()} ulusu tarafından ele geçirildi! (+2 Pasif Kristal / 3sn)`,
+            text: `🚩 [${ref.name}] ${occupyingNation.toUpperCase()} ulusu tarafından ele geçirildi! (+10 Üs Puanı)`,
             isSystem: true,
             timestamp: Date.now()
           });

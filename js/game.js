@@ -532,6 +532,9 @@ class StarblastGame {
     // Spawn 3 Neutral Mining Refineries (Plan A)
     this.initRefineries();
 
+    // Spawn 3 Bots per team (9 bots total: 3 red, 3 blue, 3 gold)
+    this.initBots();
+
     // Spawn player at own nation base
     const spawn = this.getNationSpawn(chosenNation);
     const myId = (this.network && this.network.myId) ? this.network.myId : 'player';
@@ -689,9 +692,10 @@ class StarblastGame {
         const b = this.baseLocations[n];
         for (const tier of baseTiers) {
           const angle = Math.random() * Math.PI * 2;
-          const r = 500 + Math.random() * 650;
+          const r = 800 + Math.random() * 550; // Outside 780px base perimeter
           const x = b.x + Math.cos(angle) * r;
           const y = b.y + Math.sin(angle) * r;
+          if (this.isInsideExclusionZone(x, y)) continue;
           const ast = new Asteroid(x, y, tier);
           // Beginner base perimeter: predominantly ice (88%), rare fire (12%)
           ast.element = Math.random() < 0.88 ? 'ice' : 'fire';
@@ -702,10 +706,11 @@ class StarblastGame {
       // User request: uzayın boş alanlarında da asteroit ekle (soteye farm alanları)
       for (let i = 0; i < 80; i++) {
         const tier = (i % 7) + 1;
-        const dist = 2000 + Math.random() * (this.worldSize / 2 - 2100);
+        const dist = 2200 + Math.random() * (this.worldSize / 2 - 2300);
         const angle = Math.random() * Math.PI * 2;
         const x = Math.cos(angle) * dist;
         const y = Math.sin(angle) * dist;
+        if (this.isInsideExclusionZone(x, y)) continue;
         const ast = new Asteroid(x, y, tier);
         const roll = Math.random();
         ast.element = roll < 0.35 ? 'ice' : (roll < 0.70 ? 'fire' : 'dark');
@@ -715,13 +720,44 @@ class StarblastGame {
     }
   }
 
+  isInsideExclusionZone(px, py) {
+    const worldSpan = this.worldSize || 10000;
+    const halfWorld = worldSpan * 0.5;
+    // Check all 3 bases: exclusion radius 780px
+    for (const bKey of ['red', 'blue', 'gold']) {
+      const b = this.baseLocations[bKey];
+      if (!b) continue;
+      let dx = Math.abs(px - b.x);
+      if (dx > halfWorld) dx = worldSpan - dx;
+      let dy = Math.abs(py - b.y);
+      if (dy > halfWorld) dy = worldSpan - dy;
+      if (Math.hypot(dx, dy) < 780) return true;
+    }
+    // Check all 3 refineries: exclusion radius 650px
+    for (const rKey in this.refineryLocations) {
+      const r = this.refineryLocations[rKey];
+      if (!r) continue;
+      let dx = Math.abs(px - r.x);
+      if (dx > halfWorld) dx = worldSpan - dx;
+      let dy = Math.abs(py - r.y);
+      if (dy > halfWorld) dy = worldSpan - dy;
+      if (Math.hypot(dx, dy) < 650) return true;
+    }
+    return false;
+  }
+
   spawnRandomAsteroid(tier = null) {
     if (this.isMenuBattle) return null;
     const sizeTier = tier || Math.floor(Math.random() * 7) + 1;
-    const dist = 300 + Math.random() * (this.worldSize / 2 - 350);
-    const angle = Math.random() * Math.PI * 2;
-    const x = Math.cos(angle) * dist;
-    const y = Math.sin(angle) * dist;
+    let x = 0, y = 0;
+    let attempts = 0;
+    do {
+      attempts++;
+      const dist = 400 + Math.random() * (this.worldSize / 2 - 450);
+      const angle = Math.random() * Math.PI * 2;
+      x = Math.cos(angle) * dist;
+      y = Math.sin(angle) * dist;
+    } while (attempts < 25 && this.isInsideExclusionZone(x, y));
 
     const asteroid = new Asteroid(x, y, sizeTier);
     // Element rarity based on value: Ice common (72%), Fire uncommon (21%), Dark rare (7%)
@@ -966,7 +1002,7 @@ class StarblastGame {
           if (this.ui) this.ui.showAnnouncement(`⭐ ${names[droneType]} zaten maksimum Seviye 3!`, 2200);
           return;
         }
-        const upgradeCost = existingDrone.level === 1 ? 600 : 720;
+        const upgradeCost = existingDrone.level === 1 ? 300 : 500;
         if (this.player.crystals < upgradeCost) {
           if (this.ui) this.ui.showAnnouncement(`⚠️ Yetersiz kristal! Seviye ${existingDrone.level + 1} yükseltmesi için ${upgradeCost} Kristal gereklidir.`, 2500);
           return;
@@ -981,8 +1017,8 @@ class StarblastGame {
         return;
       }
 
-      // Purchase new drone
-      const buyCost = 500;
+      // Purchase new drone (Sv.1 = 150 Kristal)
+      const buyCost = 150;
       if (this.player.crystals < buyCost) {
         if (this.ui) this.ui.showAnnouncement(`⚠️ Yetersiz kristal! Dron satın almak için ${buyCost} Kristal gereklidir.`, 2500);
         return;
@@ -1484,6 +1520,9 @@ class StarblastGame {
     for (const rp of this.remotePlayers.values()) {
       if (!rp.isDead) allShips.push(rp);
     }
+    for (const b of this.bots) {
+      if (!b.isDead) allShips.push(b);
+    }
 
     // Update Remote Players Smooth Interpolation
     for (const rp of this.remotePlayers.values()) {
@@ -1500,6 +1539,125 @@ class StarblastGame {
     for (const key in this.refineries) {
       const ref = this.refineries[key];
       if (ref) ref.update(dt);
+    }
+
+    // 2a. Neutral Mining Refineries Capture Loop (Plan A - 10s capture, turns to nation color, awards 10 base points)
+    if (!this.network || !this.network.isConnected) {
+      const worldSpan = this.worldSize || 10000;
+      const halfWorld = worldSpan * 0.5;
+      for (const rKey in this.refineries) {
+        const ref = this.refineries[rKey];
+        if (!ref) continue;
+
+        const presentNations = new Set();
+        const nationShips = { blue: [], red: [], gold: [] };
+
+        for (const s of allShips) {
+          if (s.isDead || !s.nation) continue;
+          let dx = Math.abs(s.x - ref.x);
+          if (dx > halfWorld) dx = worldSpan - dx;
+          let dy = Math.abs(s.y - ref.y);
+          if (dy > halfWorld) dy = worldSpan - dy;
+          if (Math.hypot(dx, dy) <= 480) {
+            presentNations.add(s.nation);
+            if (nationShips[s.nation]) nationShips[s.nation].push(s);
+          }
+        }
+
+        if (presentNations.size === 0) {
+          ref.contested = false;
+        } else if (presentNations.size > 1) {
+          ref.contested = true;
+        } else {
+          ref.contested = false;
+          const occNation = Array.from(presentNations)[0];
+          if (ref.controllingNation === occNation) {
+            ref.captureProgress = Math.min(100, (ref.captureProgress || 0) + 10 * dt);
+          } else if (ref.controllingNation !== null) {
+            ref.captureProgress = Math.max(0, (ref.captureProgress || 0) - 10 * dt);
+            if (ref.captureProgress <= 0) {
+              ref.setControllingNation(null);
+            }
+          } else {
+            // Capturing neutral territory: 10 seconds total (10% per second)
+            ref.captureProgress = Math.min(100, (ref.captureProgress || 0) + 10 * dt);
+            if (ref.captureProgress >= 100) {
+              ref.setControllingNation(occNation);
+              // +10 Base Points to nation station
+              const st = this.stations[occNation];
+              if (st) {
+                st.crystalsDonated = (st.crystalsDonated || 0) + 10;
+                st.hp = Math.min(st.maxHp, st.hp + 300);
+                if (st.crystalsDonated >= st.crystalsRequired && st.level < 5) {
+                  st.level++;
+                  st.maxHp = st.level * 100000;
+                  st.hp = st.maxHp;
+                  st.crystalsDonated = 0;
+                  st.crystalsRequired = Math.round(st.crystalsRequired * 2.2);
+                  if (st.mesh) this.scene.remove(st.mesh);
+                  st.mesh = ModelBuilder.createStationMesh(occNation, st.level);
+                  st.mesh.position.set(st.x, -st.y, -150);
+                  this.scene.add(st.mesh);
+                }
+              }
+              // Award +10 donations to ships inside
+              for (const s of (nationShips[occNation] || [])) {
+                s.donations = (s.donations || 0) + 10;
+                s.score = (s.score || 0) + 250;
+              }
+              if (this.ui) {
+                this.ui.addChatMessage('STRATEJİ', `🚩 [${ref.name}] ${occNation.toUpperCase()} ulusu tarafından ele geçirildi! (+10 Üs Puanı)`, occNation, true);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 2b. Update 9 Active Bots (AI stepping, respawn timers, laser shooting)
+    for (const b of this.bots) {
+      if (b.isDead) {
+        b.respawnTimer = (b.respawnTimer || 6.0) - dt;
+        if (b.respawnTimer <= 0) {
+          const sp = this.getNationSpawn(b.nation);
+          b.x = sp.x + (Math.random() - 0.5) * 120;
+          b.y = sp.y + (Math.random() - 0.5) * 120;
+          b.vx = 0;
+          b.vy = 0;
+          b.shield = b.stats.shieldCap;
+          b.energy = b.stats.energyCap;
+          b.isDead = false;
+          b.respawnTimer = 0;
+          b.spawnShieldTimer = 3.5;
+          if (b.mesh) {
+            b.mesh.visible = true;
+            b.mesh.position.set(b.x, -b.y, 0);
+          }
+          if (b.healthBarGroup) {
+            b.healthBarGroup.visible = true;
+            b.healthBarGroup.position.set(b.x, -b.y + b.radius + 18, 4);
+          }
+        }
+        continue;
+      }
+
+      // Step Bot AI with 3 roles (miner, fighter, explorer)
+      b.updateAI(dt, this.asteroids, allShips, this.gems, this.stations, this.refineries);
+
+      // Fire Bot Lasers
+      if (b.isShooting) {
+        const botLasers = b.tryFire();
+        if (botLasers && botLasers.length > 0) {
+          for (const l of botLasers) {
+            this.lasers.push(l);
+            this.scene.add(l.mesh);
+          }
+          const fireVol = this.getPositionalVolume(b.x, b.y, 800);
+          if (fireVol > 0.03 && window.soundSystem) {
+            window.soundSystem.playLaser(b.activeWeapon || 'standard');
+          }
+        }
+      }
     }
 
     // Territory speed boost (+10% speed within 1200px of refinery controlled by player's nation)
@@ -1613,7 +1771,7 @@ class StarblastGame {
     // 5. Update Lasers & Collisions
     for (let i = this.lasers.length - 1; i >= 0; i--) {
       const laser = this.lasers[i];
-      laser.update(dt, this.worldSize);
+      laser.update(dt, this.worldSize, camLogX, camLogY);
 
       if (laser.isDead) {
         laser.destroy(this.scene);
@@ -1887,9 +2045,20 @@ class StarblastGame {
       for (const ship of allShips) {
         if (ship.isDead) continue;
         if (gem.collectDelay > 0) continue;
-        // User request: "son seviye ve kargo full dolunca daha toplama yapılmasın"
-        if (ship.tier >= 4 && ship.crystals >= ship.stats.cargoCapacity) {
-          continue;
+        // User request: "asteroitlerden çıkan yeşil renk harici kristaller ilgili lazeri verecek sadece. lazer full miktar olursa yerde kalabilir aksi halde ambar full olsada lazeri ilgilendirdiği için yerden toplanılabilecek."
+        const isGreen = (!gem.element || gem.element === 'green');
+        if (isGreen) {
+          if (ship.crystals >= ship.stats.cargoCapacity) {
+            continue; // Yeşil kristal için ambar doluysa yerde kalır
+          }
+        } else {
+          const elem = gem.element;
+          const maxCap = (ship.maxElementalAmmo && ship.maxElementalAmmo[elem]) || 150;
+          const curAmmo = (ship.elementalAmmo && ship.elementalAmmo[elem]) || 0;
+          if (curAmmo >= maxCap) {
+            continue; // İlgili lazer zaten full ise yerde kalır
+          }
+          // Lazer dolu değilse ambar full olsa bile toplanır!
         }
 
         let gdx = gem.x - ship.x;
@@ -1905,39 +2074,33 @@ class StarblastGame {
           this.createGemPickupFlash(ship.x, ship.y, gem.value);
           gem.destroy(this.scene);
           this.gems.splice(i, 1);
+          ship.mined = (ship.mined || 0) + 1;
 
-          if (ship.isPlayer) {
+          if (isGreen) {
+            // Yeşil kristal ambara eklenir
             ship.crystals += gem.value;
             ship.score += gem.value * 15;
-            // User request: "asteroitlerden çıkan lazer malzemeleri hemen fullemesin maks 2 mermi çıksın"
-            if (ship.elementalAmmo) {
-              const elem = gem.element || 'ice';
-              if (ship.elementalAmmo[elem] !== undefined) {
-                const ammoGain = Math.min(2, Math.max(1, Math.round(gem.value || 1)));
-                const maxCap = (ship.maxElementalAmmo && ship.maxElementalAmmo[elem]) || 150;
-                ship.elementalAmmo[elem] = Math.min(maxCap, ship.elementalAmmo[elem] + ammoGain);
+            if (ship.isPlayer) {
+              const currentCfg = SHIP_TREE[ship.shipKey];
+              if (ship.crystals >= currentCfg.cargoCapacity && currentCfg.evolvesTo && currentCfg.evolvesTo.length > 0) {
+                this.ui.showTierUpDropBanner(ship);
               }
-            }
-            window.soundSystem.playGemPickup();
-            const currentCfg = SHIP_TREE[ship.shipKey];
-            if (ship.crystals >= currentCfg.cargoCapacity && currentCfg.evolvesTo && currentCfg.evolvesTo.length > 0) {
-              this.ui.showTierUpDropBanner(ship);
-            }
-            this.ui.updateHUD(ship, this.stations);
-
-            if (this.network && this.network.isConnected) {
-              this.network.emitCollectCrystal(gem.id, gem.x, gem.y);
             }
           } else {
-            ship.crystals += gem.value;
-            ship.score += gem.value * 10;
-            if (ship.elementalAmmo) {
-              const elem = gem.element || 'ice';
-              if (ship.elementalAmmo[elem] !== undefined) {
-                const ammoGain = Math.min(2, Math.max(1, Math.round(gem.value || 1)));
-                const maxCap = (ship.maxElementalAmmo && ship.maxElementalAmmo[elem]) || 150;
-                ship.elementalAmmo[elem] = Math.min(maxCap, ship.elementalAmmo[elem] + ammoGain);
-              }
+            // Renkli kristal sadece ilgili lazeri doldurur, ambara eklenmez!
+            const elem = gem.element;
+            if (!ship.elementalAmmo) ship.elementalAmmo = { ice: 0, fire: 0, dark: 0 };
+            const maxCap = (ship.maxElementalAmmo && ship.maxElementalAmmo[elem]) || 150;
+            const ammoGain = Math.min(2, Math.max(1, Math.round(gem.value || 1)));
+            ship.elementalAmmo[elem] = Math.min(maxCap, (ship.elementalAmmo[elem] || 0) + ammoGain);
+            ship.score += 20;
+          }
+
+          if (ship.isPlayer) {
+            window.soundSystem.playGemPickup();
+            this.ui.updateHUD(ship, this.stations);
+            if (this.network && this.network.isConnected) {
+              this.network.emitCollectCrystal(gem.id, gem.x, gem.y);
             }
           }
           break;
@@ -2257,8 +2420,23 @@ class StarblastGame {
     const totalToDrop = Math.floor(Math.max(0, ship.crystals || 0) * 0.5);
     this.dropShipCrystals(ship.x, ship.y, totalToDrop);
 
+    // Track PvP Kills for Leaderboard
     if (this.player && killerId === this.player.id) {
       this.player.score += 350;
+      this.player.kills = (this.player.kills || 0) + 1;
+    } else if (killerId) {
+      const killerBot = this.bots.find(b => b.id === killerId);
+      if (killerBot) {
+        killerBot.score += 350;
+        killerBot.kills = (killerBot.kills || 0) + 1;
+      }
+    }
+
+    if (ship !== this.player) {
+      ship.isDead = true;
+      ship.respawnTimer = 6.0;
+      if (ship.mesh) ship.mesh.visible = false;
+      if (ship.healthBarGroup) ship.healthBarGroup.visible = false;
     }
   }
 
@@ -2575,6 +2753,45 @@ class StarblastGame {
       if (loc && (!this.refineries[key] || !this.refineries[key].mesh || !this.refineries[key].mesh.parent)) {
         this.refineries[key] = new MiningRefinery(loc.id, loc.name, loc.letter, loc.x, loc.y, this.scene);
       }
+    }
+  }
+
+  initBots() {
+    // Clean up existing bots
+    for (const b of this.bots) {
+      if (b.healthBarGroup) {
+        this.scene.remove(b.healthBarGroup);
+        b.healthBarGroup = null;
+      }
+      if (b.mesh) this.scene.remove(b.mesh);
+    }
+    this.bots = [];
+
+    // User request: 3 teams x 3 bots = 9 bots total with varied autonomous roles
+    const botConfigs = [
+      // Red Team: Kryos (Mars)
+      { id: 'bot-red-1', name: 'Kryos-Avcı', nation: 'red', role: 'fighter', shipKey: 'fly' },
+      { id: 'bot-red-2', name: 'Kryos-Muhafız', nation: 'red', role: 'miner', shipKey: 'fly' },
+      { id: 'bot-red-3', name: 'Kryos-Öncü', nation: 'red', role: 'explorer', shipKey: 'fly' },
+
+      // Blue Team: Veylar (Earth)
+      { id: 'bot-blue-1', name: 'Veylar-Gözcü', nation: 'blue', role: 'explorer', shipKey: 'fly' },
+      { id: 'bot-blue-2', name: 'Veylar-Savaşçı', nation: 'blue', role: 'fighter', shipKey: 'fly' },
+      { id: 'bot-blue-3', name: 'Veylar-Mühendis', nation: 'blue', role: 'miner', shipKey: 'fly' },
+
+      // Gold Team: Aethel (Saturn)
+      { id: 'bot-gold-1', name: 'Aethel-Şahin', nation: 'gold', role: 'fighter', shipKey: 'fly' },
+      { id: 'bot-gold-2', name: 'Aethel-Titan', nation: 'gold', role: 'miner', shipKey: 'fly' },
+      { id: 'bot-gold-3', name: 'Aethel-Maden', nation: 'gold', role: 'explorer', shipKey: 'fly' }
+    ];
+
+    for (const cfg of botConfigs) {
+      const spawn = this.getNationSpawn(cfg.nation);
+      const offsetX = (Math.random() - 0.5) * 160;
+      const offsetY = (Math.random() - 0.5) * 160;
+      const bot = new BotShip(cfg.id, cfg.name, cfg.shipKey, spawn.x + offsetX, spawn.y + offsetY, cfg.nation, this.scene, cfg.role);
+      bot.createPlayerNameTag(this.scene);
+      this.bots.push(bot);
     }
   }
 
