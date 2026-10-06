@@ -680,6 +680,9 @@ class Ship extends Entity {
       this.mesh.position.set(this.x, -this.y, 0);
       this.mesh.rotation.z = -this.rotation + Math.PI / 2;
       this.mesh.renderOrder = 10; // Guaranteed to render in front of space station geometry
+      if (this.scene && !this.mesh.parent) {
+        this.scene.add(this.mesh);
+      }
     }
 
     if (this.scene && !this.isMenuBot && !this.isMenuSkirmish && !(window.game && window.game.isMenuBattle)) {

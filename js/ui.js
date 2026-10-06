@@ -1354,53 +1354,58 @@ class UIManager {
     const s3Ammo = (player.elementalAmmo && player.elementalAmmo.dark) || 0;
     const pct = Math.round((homeBase.crystalsDonated / homeBase.crystalsRequired) * 100);
 
-    const attackDrone = (player.drones || []).find(d => d.type === 'attack');
-    const defenseDrone = (player.drones || []).find(d => d.type === 'defense');
-    const miningDrone = (player.drones || []).find(d => d.type === 'mining');
-
-    const getDroneInfo = (drone, defaultName, type) => {
-      if (!drone) {
-        return {
-          level: 0,
-          label: 'YOK',
-          btnText: 'KUŞAN (150 💎)',
-          action: `drone_${type}`,
-          cost: 150,
-          isMax: false,
-          desc: type === 'attack' ? 'PvP Düşman Avcısı' : (type === 'defense' ? 'Hızlı Kalkan Onarımı' : 'Hedef Asteroiti Kazar')
-        };
-      }
-      if (drone.level >= 3) {
-        return {
-          level: 3,
-          label: 'MAX (Sv. 3)',
-          btnText: 'MAKSİMUM',
-          action: 'none',
-          cost: 0,
-          isMax: true,
-          desc: `Güç x${Math.pow(1.2, 2).toFixed(2)} (Maksimum)`
-        };
-      }
-      const nextLvl = drone.level + 1;
-      const nextCost = drone.level === 1 ? 300 : 500;
-      return {
-        level: drone.level,
-        label: `Sv. ${drone.level}/3`,
-        btnText: `YÜKSELT (${nextCost} 💎)`,
-        action: `upgrade_drone_${type}`,
-        cost: nextCost,
-        isMax: false,
-        desc: `Sonraki: Sv.${nextLvl} (+%20 Güç)`
-      };
-    };
-
-    const atkInfo = getDroneInfo(attackDrone, 'Saldırı Dronu', 'attack');
-    const defInfo = getDroneInfo(defenseDrone, 'Savunma Dronu', 'defense');
-    const minInfo = getDroneInfo(miningDrone, 'Maden Dronu', 'mining');
-
     const s1Locked = homeBase.level < 1;
     const s2Locked = homeBase.level < 2;
     const s3Locked = homeBase.level < 3;
+
+    // Generate Left Owned Drones Rack (Küp küp aşağı doğru)
+    const playerDrones = player.drones || [];
+    let ownedDronesHtml = '';
+    for (let i = 0; i < maxDrones; i++) {
+      const drone = playerDrones[i];
+      if (drone) {
+        const isAtk = drone.type === 'attack';
+        const isDef = drone.type === 'defense';
+        const droneColor = isAtk ? '#ff2a4b' : (isDef ? '#10b981' : '#f59e0b');
+        const droneName = isAtk ? 'Saldırı' : (isDef ? 'Savunma' : 'Maden');
+        const iconSvg = isAtk
+          ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${droneColor}" stroke-width="2"><polygon points="12 2 19 21 12 17 5 21 12 2"/><circle cx="12" cy="11" r="2" fill="${droneColor}"/></svg>`
+          : (isDef
+            ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${droneColor}" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="11" r="2.5" fill="${droneColor}"/></svg>`
+            : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${droneColor}" stroke-width="2"><path d="M14 2l4 4-9 9-4-4 9-9z"/><path d="M3 21l3-3"/><path d="M18 10l3 3"/></svg>`);
+
+        let upgradeSection = '';
+        if (drone.level >= 3) {
+          upgradeSection = `<div class="drone-cube-max">⭐ MAX</div>`;
+        } else {
+          const nextLvl = drone.level + 1;
+          const upCost = drone.level === 1 ? 300 : 500;
+          upgradeSection = `
+            <button type="button" class="drone-cube-upgrade-btn" data-action="upgrade_drone_${drone.type}" title="Sv.${nextLvl} seviyesine yükselt">
+              ⬆ Sv.${nextLvl} (${upCost} 💎)
+            </button>
+          `;
+        }
+
+        ownedDronesHtml += `
+          <div class="drone-cube-slot active" style="border-color: ${droneColor}88; box-shadow: 0 0 10px ${droneColor}33;">
+            <div class="drone-cube-header">
+              <span class="drone-cube-icon">${iconSvg}</span>
+              <span class="drone-cube-level-tag" style="background: ${droneColor}33; color: ${droneColor}; border: 1px solid ${droneColor}66;">Sv.${drone.level}</span>
+            </div>
+            <div class="drone-cube-name" style="color: ${droneColor};">${droneName}</div>
+            ${upgradeSection}
+          </div>
+        `;
+      } else {
+        ownedDronesHtml += `
+          <div class="drone-cube-slot empty">
+            <span class="drone-cube-empty-icon">🛸</span>
+            <span class="drone-cube-empty-text">BOŞ SLOT</span>
+          </div>
+        `;
+      }
+    }
 
     this.baseDockStatus.innerHTML = `
       <div class="base-market-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px; margin-bottom: 8px;">
@@ -1408,120 +1413,134 @@ class UIManager {
         <div class="base-market-title" style="letter-spacing: 5px; font-size: 1.05rem; font-weight: 900; margin-left: 18px;">UZAY PAZARI</div>
         <button type="button" id="base-market-close-btn" title="Kapat (ESC / M)">✕</button>
       </div>
-      <div class="base-market-grid">
-        <!-- 1. Saldırı Dronu -->
-        <div class="base-market-card ${atkInfo.isMax ? 'maxed' : ''}" data-action="${atkInfo.action}">
-          <div class="base-market-card-top">
-            <div class="base-market-card-icon" style="background: rgba(255, 42, 75, 0.15); border: 1px solid rgba(255, 42, 75, 0.4);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff2a4b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="12 2 19 21 12 17 5 21 12 2"/>
-                <circle cx="12" cy="11" r="2" fill="#ff2a4b"/>
-              </svg>
-            </div>
-            <div>
-              <div class="base-market-card-name">Saldırı Dronu <span class="market-level-tag ${atkInfo.level > 0 ? 'active' : ''}">${atkInfo.label}</span></div>
-              <div class="base-market-card-desc">${atkInfo.desc}</div>
-            </div>
+
+      <div class="base-market-layout">
+        <!-- Left Side: Owned Drones Rack (Küp küp aşağı doğru) -->
+        <div class="owned-drones-rack">
+          <div class="owned-drones-rack-title">DRONLAR (${playerDrones.length}/${maxDrones})</div>
+          <div class="owned-drones-list">
+            ${ownedDronesHtml}
           </div>
-          <button type="button" class="base-market-btn" ${atkInfo.isMax ? 'disabled' : ''}>${atkInfo.btnText}</button>
         </div>
 
-        <!-- 2. Savunma Dronu -->
-        <div class="base-market-card ${defInfo.isMax ? 'maxed' : ''}" data-action="${defInfo.action}">
-          <div class="base-market-card-top">
-            <div class="base-market-card-icon" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                <circle cx="12" cy="11" r="2.5" fill="#10b981"/>
-              </svg>
+        <!-- Right Side: Market Grid (Saldırı, Savunma, Maden Dronu - Clean Buy 150 💎, Lasers) -->
+        <div class="base-market-main-col">
+          <div class="base-market-grid">
+            <!-- 1. Saldırı Dronu (Clean Buy 150 💎) -->
+            <div class="base-market-card" data-action="drone_attack">
+              <div class="base-market-card-top">
+                <div class="base-market-card-icon" style="background: rgba(255, 42, 75, 0.15); border: 1px solid rgba(255, 42, 75, 0.4);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff2a4b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="12 2 19 21 12 17 5 21 12 2"/>
+                    <circle cx="12" cy="11" r="2" fill="#ff2a4b"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="base-market-card-name">Saldırı Dronu</div>
+                  <div class="base-market-card-desc">PvP Düşman Avcısı</div>
+                </div>
+              </div>
+              <button type="button" class="base-market-btn">AL (150 💎)</button>
             </div>
-            <div>
-              <div class="base-market-card-name">Savunma Dronu <span class="market-level-tag ${defInfo.level > 0 ? 'active' : ''}">${defInfo.label}</span></div>
-              <div class="base-market-card-desc">${defInfo.desc}</div>
-            </div>
-          </div>
-          <button type="button" class="base-market-btn" ${defInfo.isMax ? 'disabled' : ''}>${defInfo.btnText}</button>
-        </div>
 
-        <!-- 3. Maden Dronu -->
-        <div class="base-market-card ${minInfo.isMax ? 'maxed' : ''}" data-action="${minInfo.action}">
-          <div class="base-market-card-top">
-            <div class="base-market-card-icon" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4);">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2l4 4-9 9-4-4 9-9z"/>
-                <path d="M3 21l3-3"/>
-                <path d="M18 10l3 3"/>
-              </svg>
+            <!-- 2. Savunma Dronu (Clean Buy 150 💎) -->
+            <div class="base-market-card" data-action="drone_defense">
+              <div class="base-market-card-top">
+                <div class="base-market-card-icon" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <circle cx="12" cy="11" r="2.5" fill="#10b981"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="base-market-card-name">Savunma Dronu</div>
+                  <div class="base-market-card-desc">Hızlı Kalkan Onarımı</div>
+                </div>
+              </div>
+              <button type="button" class="base-market-btn">AL (150 💎)</button>
             </div>
-            <div>
-              <div class="base-market-card-name">Maden Dronu <span class="market-level-tag ${minInfo.level > 0 ? 'active' : ''}">${minInfo.label}</span></div>
-              <div class="base-market-card-desc">${minInfo.desc}</div>
-            </div>
-          </div>
-          <button type="button" class="base-market-btn" ${minInfo.isMax ? 'disabled' : ''}>${minInfo.btnText}</button>
-        </div>
 
-        <!-- 4. 100x S1 Cryo Buz Lazeri (250 Kristal) - Eşleşen Skill Bar İkonu -->
-        <div class="base-market-card ${s1Locked ? 'locked' : ''}" data-action="buy_s1">
-          <div class="base-market-card-top">
-            <div class="base-market-card-icon" style="background: rgba(0, 240, 255, 0.15); border: 1px solid rgba(0, 240, 255, 0.4);">
-              <svg viewBox="0 0 32 32" width="24" height="24">
-                <line x1="16" y1="28" x2="16" y2="4" stroke="#00f0ff" stroke-width="2.5" stroke-linecap="round" />
-                <line x1="16" y1="28" x2="16" y2="4" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" />
-                <line x1="10" y1="22" x2="16" y2="12" stroke="#7dd3fc" stroke-width="1.5" stroke-dasharray="2 2" />
-                <line x1="22" y1="22" x2="16" y2="12" stroke="#7dd3fc" stroke-width="1.5" stroke-dasharray="2 2" />
-                <circle cx="16" cy="6" r="3" fill="#00f0ff" />
-                <circle cx="16" cy="6" r="1.5" fill="#fff" />
-              </svg>
+            <!-- 3. Maden Dronu (Clean Buy 150 💎) -->
+            <div class="base-market-card" data-action="drone_mining">
+              <div class="base-market-card-top">
+                <div class="base-market-card-icon" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2l4 4-9 9-4-4 9-9z"/>
+                    <path d="M3 21l3-3"/>
+                    <path d="M18 10l3 3"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="base-market-card-name">Maden Dronu</div>
+                  <div class="base-market-card-desc">Hedef Asteroiti Kazar</div>
+                </div>
+              </div>
+              <button type="button" class="base-market-btn">AL (150 💎)</button>
             </div>
-            <div>
-              <div class="base-market-card-name">100x S1 Cryo Buz</div>
-              <div class="base-market-card-desc">Dondurucu Lazer • Mevcut: ${s1Ammo}</div>
-            </div>
-          </div>
-          <button type="button" class="base-market-btn">AL (250 💎)</button>
-        </div>
 
-        <!-- 5. 100x S2 Termal Alev Lazeri (500 Kristal • Üs Sv. 2) - Eşleşen Skill Bar İkonu -->
-        <div class="base-market-card ${s2Locked ? 'locked' : ''}" data-action="buy_s2">
-          <div class="base-market-card-top">
-            <div class="base-market-card-icon" style="background: rgba(255, 85, 51, 0.15); border: 1px solid rgba(255, 85, 51, 0.4);">
-              <svg viewBox="0 0 32 32" width="24" height="24">
-                <line x1="16" y1="28" x2="16" y2="4" stroke="#ff4500" stroke-width="3" stroke-linecap="round" />
-                <line x1="16" y1="28" x2="16" y2="4" stroke="#ffdd44" stroke-width="1.4" stroke-linecap="round" />
-                <polygon points="16,2 12,12 20,12" fill="#ff6600" opacity="0.8" />
-                <line x1="11" y1="18" x2="13" y2="8" stroke="#ffaa00" stroke-width="1.2" />
-                <line x1="21" y1="18" x2="19" y2="8" stroke="#ffaa00" stroke-width="1.2" />
-                <circle cx="16" cy="5" r="2" fill="#ffffff" />
-              </svg>
+            <!-- 4. 100x S1 Cryo Buz Lazeri (250 Kristal) -->
+            <div class="base-market-card ${s1Locked ? 'locked' : ''}" data-action="buy_s1">
+              <div class="base-market-card-top">
+                <div class="base-market-card-icon" style="background: rgba(0, 240, 255, 0.15); border: 1px solid rgba(0, 240, 255, 0.4);">
+                  <svg viewBox="0 0 32 32" width="24" height="24">
+                    <line x1="16" y1="28" x2="16" y2="4" stroke="#00f0ff" stroke-width="2.5" stroke-linecap="round" />
+                    <line x1="16" y1="28" x2="16" y2="4" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" />
+                    <line x1="10" y1="22" x2="16" y2="12" stroke="#7dd3fc" stroke-width="1.5" stroke-dasharray="2 2" />
+                    <line x1="22" y1="22" x2="16" y2="12" stroke="#7dd3fc" stroke-width="1.5" stroke-dasharray="2 2" />
+                    <circle cx="16" cy="6" r="3" fill="#00f0ff" />
+                    <circle cx="16" cy="6" r="1.5" fill="#fff" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="base-market-card-name">100x S1 Cryo Buz</div>
+                  <div class="base-market-card-desc">Dondurucu Lazer • Mevcut: ${s1Ammo}</div>
+                </div>
+              </div>
+              <button type="button" class="base-market-btn">AL (250 💎)</button>
             </div>
-            <div>
-              <div class="base-market-card-name">100x S2 Termal Alev ${s2Locked ? '<span class="market-lock-tag">🔒 Üs Sv.2</span>' : ''}</div>
-              <div class="base-market-card-desc">${s2Locked ? 'Ana Üs Seviye 2 gereklidir' : `Yakıcı Lazer • Mevcut: ${s2Ammo}`}</div>
-            </div>
-          </div>
-          <button type="button" class="base-market-btn" ${s2Locked ? 'disabled' : ''}>${s2Locked ? 'KİLİTLİ' : 'AL (500 💎)'}</button>
-        </div>
 
-        <!-- 6. 100x S3 Void Karanlık Lazeri (750 Kristal • Üs Sv. 3) - Eşleşen Skill Bar İkonu -->
-        <div class="base-market-card ${s3Locked ? 'locked' : ''}" data-action="buy_s3">
-          <div class="base-market-card-top">
-            <div class="base-market-card-icon" style="background: rgba(192, 132, 252, 0.15); border: 1px solid rgba(192, 132, 252, 0.4);">
-              <svg viewBox="0 0 32 32" width="24" height="24">
-                <line x1="16" y1="28" x2="16" y2="4" stroke="#c084fc" stroke-width="3.5" stroke-linecap="round" />
-                <line x1="16" y1="28" x2="16" y2="4" stroke="#0f0728" stroke-width="1.8" stroke-linecap="round" />
-                <circle cx="16" cy="8" r="4.5" stroke="#a855f7" stroke-width="1.5" fill="none" />
-                <circle cx="16" cy="8" r="2.5" fill="#090514" stroke="#e9d5ff" stroke-width="1" />
-                <line x1="9" y1="20" x2="16" y2="8" stroke="#c084fc" stroke-width="1" stroke-dasharray="1 3" />
-                <line x1="23" y1="20" x2="16" y2="8" stroke="#c084fc" stroke-width="1" stroke-dasharray="1 3" />
-              </svg>
+            <!-- 5. 100x S2 Termal Alev Lazeri (500 Kristal) -->
+            <div class="base-market-card ${s2Locked ? 'locked' : ''}" data-action="buy_s2">
+              <div class="base-market-card-top">
+                <div class="base-market-card-icon" style="background: rgba(255, 85, 51, 0.15); border: 1px solid rgba(255, 85, 51, 0.4);">
+                  <svg viewBox="0 0 32 32" width="24" height="24">
+                    <line x1="16" y1="28" x2="16" y2="4" stroke="#ff4500" stroke-width="3" stroke-linecap="round" />
+                    <line x1="16" y1="28" x2="16" y2="4" stroke="#ffdd44" stroke-width="1.4" stroke-linecap="round" />
+                    <polygon points="16,2 12,12 20,12" fill="#ff6600" opacity="0.8" />
+                    <line x1="11" y1="18" x2="13" y2="8" stroke="#ffaa00" stroke-width="1.2" />
+                    <line x1="21" y1="18" x2="19" y2="8" stroke="#ffaa00" stroke-width="1.2" />
+                    <circle cx="16" cy="5" r="2" fill="#ffffff" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="base-market-card-name">100x S2 Termal Alev ${s2Locked ? '<span class="market-lock-tag">🔒 Üs Sv.2</span>' : ''}</div>
+                  <div class="base-market-card-desc">${s2Locked ? 'Ana Üs Seviye 2 gereklidir' : `Yakıcı Lazer • Mevcut: ${s2Ammo}`}</div>
+                </div>
+              </div>
+              <button type="button" class="base-market-btn" ${s2Locked ? 'disabled' : ''}>${s2Locked ? 'KİLİTLİ' : 'AL (500 💎)'}</button>
             </div>
-            <div>
-              <div class="base-market-card-name">100x S3 Void Lazer ${s3Locked ? '<span class="market-lock-tag">🔒 Üs Sv.3</span>' : ''}</div>
-              <div class="base-market-card-desc">${s3Locked ? 'Ana Üs Seviye 3 gereklidir' : `Obsidyen Lazer • Mevcut: ${s3Ammo}`}</div>
+
+            <!-- 6. 100x S3 Void Karanlık Lazeri (750 Kristal) -->
+            <div class="base-market-card ${s3Locked ? 'locked' : ''}" data-action="buy_s3">
+              <div class="base-market-card-top">
+                <div class="base-market-card-icon" style="background: rgba(192, 132, 252, 0.15); border: 1px solid rgba(192, 132, 252, 0.4);">
+                  <svg viewBox="0 0 32 32" width="24" height="24">
+                    <line x1="16" y1="28" x2="16" y2="4" stroke="#c084fc" stroke-width="3.5" stroke-linecap="round" />
+                    <line x1="16" y1="28" x2="16" y2="4" stroke="#0f0728" stroke-width="1.8" stroke-linecap="round" />
+                    <circle cx="16" cy="8" r="4.5" stroke="#a855f7" stroke-width="1.5" fill="none" />
+                    <circle cx="16" cy="8" r="2.5" fill="#090514" stroke="#e9d5ff" stroke-width="1" />
+                    <line x1="9" y1="20" x2="16" y2="8" stroke="#c084fc" stroke-width="1" stroke-dasharray="1 3" />
+                    <line x1="23" y1="20" x2="16" y2="8" stroke="#c084fc" stroke-width="1" stroke-dasharray="1 3" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="base-market-card-name">100x S3 Void Lazer ${s3Locked ? '<span class="market-lock-tag">🔒 Üs Sv.3</span>' : ''}</div>
+                  <div class="base-market-card-desc">${s3Locked ? 'Ana Üs Seviye 3 gereklidir' : `Obsidyen Lazer • Mevcut: ${s3Ammo}`}</div>
+                </div>
+              </div>
+              <button type="button" class="base-market-btn" ${s3Locked ? 'disabled' : ''}>${s3Locked ? 'KİLİTLİ' : 'AL (750 💎)'}</button>
             </div>
           </div>
-          <button type="button" class="base-market-btn" ${s3Locked ? 'disabled' : ''}>${s3Locked ? 'KİLİTLİ' : 'AL (750 💎)'}</button>
         </div>
       </div>
 
@@ -1534,6 +1553,7 @@ class UIManager {
       </div>
     `;
 
+    // Buy card listeners
     const cards = this.baseDockStatus.querySelectorAll('.base-market-card');
     cards.forEach(card => {
       card.addEventListener('click', (e) => {
@@ -1541,6 +1561,26 @@ class UIManager {
         const action = card.dataset.action;
         if (this.game && action) {
           this.game.purchaseBaseItem(action);
+          if (this.game.player && this.game.stations) {
+            const hBase = this.game.stations[this.game.player.nation];
+            if (hBase) this.renderBaseMarket(hBase, this.game.player);
+          }
+        }
+      });
+    });
+
+    // Left Rack Drone Upgrade Button listeners
+    const upgradeBtns = this.baseDockStatus.querySelectorAll('.drone-cube-upgrade-btn');
+    upgradeBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = btn.dataset.action;
+        if (this.game && action) {
+          this.game.purchaseBaseItem(action);
+          if (this.game.player && this.game.stations) {
+            const hBase = this.game.stations[this.game.player.nation];
+            if (hBase) this.renderBaseMarket(hBase, this.game.player);
+          }
         }
       });
     });
@@ -1988,27 +2028,6 @@ class UIManager {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
-      } else {
-        // Distant bot / player directional chevron on radar rim
-        const angle = Math.atan2(dy, dx);
-        const rimR = radarRadius - 5;
-        const bx = cx + Math.cos(angle) * rimR;
-        const by = cy + Math.sin(angle) * rimR;
-
-        ctx.save();
-        ctx.translate(bx, by);
-        ctx.rotate(angle);
-        ctx.fillStyle = nationCfg.hex;
-        ctx.globalAlpha = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(4.5, 0);
-        ctx.lineTo(-3, -2.5);
-        ctx.lineTo(-1.5, 0);
-        ctx.lineTo(-3, 2.5);
-        ctx.closePath();
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
-        ctx.restore();
       }
     }
 
@@ -2051,6 +2070,52 @@ class UIManager {
 
   updateLeaderboard(player, remotePlayers = []) {
     const metric = this.activeLeaderboardMetric || 'donations';
+
+    // 1. "Üs Puanı" sekmesi: Sadece 3 Ulusun Yarışı (İlk 3)
+    // Format: Örnek "KRYOS - %85 - Sv2", %100 dolunca Sv3 ve yüzde sıfırlanır, önde olan 1. devam eder.
+    if (metric === 'donations') {
+      const stationEntries = [];
+      const nationsList = ['blue', 'red', 'gold'];
+      for (const nKey of nationsList) {
+        const st = (this.game && this.game.stations) ? this.game.stations[nKey] : null;
+        const nCfg = NATIONS[nKey] || NATIONS['blue'];
+        const lvl = st ? (st.level || 1) : 1;
+        const req = st ? (st.crystalsRequired || 400) : 400;
+        const don = st ? (st.crystalsDonated || 0) : 0;
+        const isDead = st ? !!st.isDead : false;
+        const pct = isDead ? 0 : Math.min(100, Math.floor((don / req) * 100));
+        const sortScore = isDead ? -1 : (lvl * 100000 + pct * 1000 + don);
+        stationEntries.push({
+          nation: nKey,
+          name: nCfg.name.toUpperCase(),
+          icon: nCfg.icon,
+          hex: nCfg.hex,
+          level: lvl,
+          pct: pct,
+          isDead: isDead,
+          sortScore: sortScore
+        });
+      }
+
+      stationEntries.sort((a, b) => b.sortScore - a.sortScore);
+
+      this.leaderboardList.innerHTML = stationEntries.map((st, idx) => {
+        const statusText = st.isDead ? 'YIKILDI' : `%${st.pct} - Sv${st.level}`;
+        const isMyNation = player && player.nation === st.nation;
+        return `
+          <div class="leader-item ${isMyNation ? 'player' : ''}" style="border-left: 2px solid ${st.hex};">
+            <span class="leader-rank">#${idx + 1}</span>
+            <span class="leader-nation" style="margin-right: 4px;">${st.icon}</span>
+            <span class="leader-name" style="color: ${st.hex}; font-weight: 800;">${st.name}</span>
+            <span class="leader-score" style="color: ${st.isDead ? '#ef4444' : '#facc15'}; font-family: 'Orbitron', monospace; font-size: 0.74rem;">${statusText}</span>
+          </div>
+        `;
+      }).join('');
+      return;
+    }
+
+    // 2. "Maden Farmı" ve "PvP Lideri" sekmeleri (İlk 10 Pilot)
+    // Format: 1. - [ulus sembolü] - [adı] - [bulunduğu gemi ikonu] - [puan]
     const all = [];
     if (player && !player.isDead) {
       all.push({
@@ -2059,6 +2124,7 @@ class UIManager {
         kills: player.kills || 0,
         mined: player.mined || 0,
         donations: player.donations || 0,
+        shipKey: player.shipKey || 'fly',
         isPlayer: true,
         nation: player.nation
       });
@@ -2072,12 +2138,13 @@ class UIManager {
           kills: b.kills || 0,
           mined: b.mined || 0,
           donations: b.donations || 0,
+          shipKey: b.shipKey || 'fly',
           isPlayer: false,
           nation: b.nation
         });
       }
     }
-    // Include the 9 Active Bots in the Leaderboard
+    // Include active bots
     const bots = (this.game && this.game.bots) ? this.game.bots : [];
     for (const b of bots) {
       if (!b.isDead) {
@@ -2087,6 +2154,7 @@ class UIManager {
           kills: b.kills || 0,
           mined: b.mined || 0,
           donations: b.donations || 0,
+          shipKey: b.shipKey || 'fly',
           isPlayer: false,
           nation: b.nation
         });
@@ -2094,35 +2162,31 @@ class UIManager {
     }
 
     if (metric === 'kills') {
+      // PvP Lideri: Kills sıralaması
       all.sort((a, b) => (b.kills - a.kills) || (b.score - a.score));
-    } else if (metric === 'mined') {
-      all.sort((a, b) => (b.mined - a.mined) || (b.score - a.score));
-    } else if (metric === 'donations') {
-      all.sort((a, b) => (b.donations - a.donations) || (b.score - a.score));
     } else {
-      all.sort((a, b) => b.score - a.score);
+      // Maden Farmı: User request: "maden farmında da üs üzerinden bağış yapanları sıralayalım"
+      all.sort((a, b) => (b.donations - a.donations) || (b.mined - a.mined) || (b.score - a.score));
     }
 
-    const top = all.slice(0, 7);
+    // İlk 10 sıralaması per user request: "diğer maden ve pvp ilk 10 olarak olmalı"
+    const top = all.slice(0, 10);
 
     this.leaderboardList.innerHTML = top.map((entry, idx) => {
       const nationCfg = NATIONS[entry.nation] || NATIONS['blue'];
-      let metricVal = '';
-      if (metric === 'kills') {
-        metricVal = `${entry.kills}`;
-      } else if (metric === 'mined') {
-        metricVal = `${entry.mined}`;
-      } else if (metric === 'donations') {
-        metricVal = `${entry.donations}`;
-      } else {
-        metricVal = `${entry.score}`;
-      }
+      const shipKey = entry.shipKey || 'fly';
+      const shipCfg = (typeof SHIP_TREE !== 'undefined' && SHIP_TREE[shipKey]) ? SHIP_TREE[shipKey] : null;
+      const shipName = shipCfg ? shipCfg.name : 'Keşif Avcısı';
+      const shipIcon = (shipCfg && shipCfg.classIcon) ? shipCfg.classIcon : (shipKey.includes('tank') ? '🛡️' : (shipKey.includes('speed') ? '⚡' : (shipKey.includes('healer') ? '💚' : (shipKey.includes('bruiser') ? '⚔️' : '🛸'))));
+
+      const metricVal = (metric === 'kills') ? `${entry.kills}` : `${entry.donations}`;
 
       return `
         <div class="leader-item ${entry.isPlayer ? 'player' : ''}">
           <span class="leader-rank">#${idx + 1}</span>
-          <span style="margin-right: 5px;">${nationCfg.icon}</span>
-          <span class="leader-name" style="color: ${nationCfg.hex};">${entry.name}</span>
+          <span class="leader-nation" style="margin-right: 4px;">${nationCfg.icon}</span>
+          <span class="leader-name" style="color: ${nationCfg.hex};" title="${entry.name}">${entry.name}</span>
+          <span class="leader-ship" title="${shipName}">${shipIcon}</span>
           <span class="leader-score">${metricVal}</span>
         </div>
       `;
@@ -2145,22 +2209,23 @@ class UIManager {
       const badgeLetter = r.letter || (r.id === 'alpha' ? 'A' : (r.id === 'beta' ? 'B' : 'C'));
       const badgeBg = nationCfg ? `${nationCfg.hex}33` : 'rgba(255, 255, 255, 0.1)';
       const badgeBorder = nationCfg ? nationCfg.hex : 'rgba(255, 255, 255, 0.2)';
-      const shortName = r.name ? r.name.replace('Rafineri ', '') : (r.id ? r.id.toUpperCase() : '');
 
       let progressHtml = '';
       if (r.captureProgress > 0 && r.captureProgress < 100) {
-        progressHtml = `<div style="font-size:0.55rem; color:#facc15; margin-left:3px; font-weight:700;">%${Math.round(r.captureProgress)}</div>`;
+        progressHtml = `<span style="font-size:0.60rem; color:#facc15; font-weight:700; font-family:'Orbitron',monospace;">%${Math.round(r.captureProgress)}</span>`;
       } else if (r.contested) {
-        progressHtml = `<div style="font-size:0.55rem; color:#ef4444; margin-left:3px;">⚔️</div>`;
+        progressHtml = `<span style="font-size:0.62rem; color:#ef4444;" title="Çatışma">⚔️</span>`;
       }
 
       return `
-        <div class="refinery-holo-item" style="border-left: 2px solid ${ownerColor};">
+        <div class="refinery-holo-item" style="border-left: 3px solid ${ownerColor};">
           <span class="ref-badge" style="background:${badgeBg}; border:1px solid ${badgeBorder}; color:${ownerColor};">${badgeLetter}</span>
-          <span style="font-size:0.62rem; color:#e2e8f0; font-weight:600;">${shortName}</span>
-          <div style="display:flex; align-items:center;">
-            <span class="ref-owner" style="color: ${ownerColor};">${ownerLabel}</span>
-            ${progressHtml}
+          <div class="ref-holo-content">
+            <div class="ref-holo-title">Rafineri ${badgeLetter}</div>
+            <div class="ref-holo-meta">
+              <span class="ref-owner" style="color: ${ownerColor};">${ownerLabel}</span>
+              ${progressHtml}
+            </div>
           </div>
         </div>
       `;

@@ -439,10 +439,138 @@ body, html {
   font-size: 0.85rem;
   line-height: 1.4;
   backdrop-filter: blur(10px);
-  width: 360px;
-  max-width: 90vw;
+  width: 490px;
+  max-width: 95vw;
   user-select: none;
   margin-left: 50px; /* User request: 50px sağa çekildi, sol yetenek barının sağında kalır */
+}
+
+.base-market-layout {
+  display: flex;
+  gap: 10px;
+}
+
+.owned-drones-rack {
+  width: 110px;
+  min-width: 110px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(8, 18, 36, 0.75);
+  border: 1px solid rgba(80, 200, 255, 0.25);
+  border-radius: 6px;
+  padding: 6px;
+}
+
+.owned-drones-rack-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.60rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #38bdf8;
+  text-align: center;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+  padding-bottom: 4px;
+}
+
+.owned-drones-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drone-cube-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  background: rgba(12, 28, 54, 0.85);
+  border: 1.5px solid rgba(80, 200, 255, 0.3);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  min-height: 64px;
+}
+
+.drone-cube-slot.empty {
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  background: rgba(6, 14, 28, 0.4);
+  opacity: 0.65;
+}
+
+.drone-cube-empty-icon {
+  font-size: 1.1rem;
+  opacity: 0.45;
+}
+
+.drone-cube-empty-text {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.52rem;
+  color: #94a3b8;
+  font-weight: 700;
+  margin-top: 3px;
+}
+
+.drone-cube-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 2px;
+}
+
+.drone-cube-icon svg {
+  display: block;
+}
+
+.drone-cube-level-tag {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.58rem;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.drone-cube-name {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  margin: 3px 0;
+  text-align: center;
+}
+
+.drone-cube-upgrade-btn {
+  width: 100%;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.56rem;
+  font-weight: 700;
+  padding: 3px 2px;
+  background: rgba(0, 240, 255, 0.2);
+  border: 1px solid #00f0ff;
+  color: #00f0ff;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.drone-cube-upgrade-btn:hover {
+  background: #00f0ff;
+  color: #031220;
+  box-shadow: 0 0 8px #00f0ff;
+}
+
+.drone-cube-max {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #fbbf24;
+  text-shadow: 0 0 6px #fbbf24;
+}
+
+.base-market-main-col {
+  flex: 1;
+  min-width: 0;
 }
 
 .base-market-header {
@@ -814,12 +942,12 @@ body, html {
 /* Top Right Radar & Refinery Hologram Row */
 .top-right-radar-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
 }
 
 #refinery-hologram-hud {
-  width: 130px;
+  width: 154px;
   background: rgba(6, 16, 32, 0.90);
   border: 1px solid rgba(0, 200, 255, 0.4);
   border-radius: 6px;
@@ -852,22 +980,48 @@ body, html {
 .refinery-holo-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 7px;
   background: rgba(12, 28, 52, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 4px;
-  padding: 3px 5px;
-  font-size: 0.65rem;
+  padding: 4px 6px;
   font-family: 'Play', sans-serif;
   transition: all 0.2s ease;
 }
 
 .refinery-holo-item .ref-badge {
   font-family: 'Orbitron', monospace;
-  font-weight: 800;
-  font-size: 0.72rem;
-  padding: 0 3px;
-  border-radius: 3px;
+  font-weight: 900;
+  font-size: 0.76rem;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.ref-holo-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.ref-holo-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  line-height: 1.2;
+}
+
+.ref-holo-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
 }
 
 .refinery-holo-item .ref-owner {
@@ -959,17 +1113,29 @@ body, html {
   margin-right: 6px;
 }
 
+.leader-nation {
+  margin-right: 4px;
+  font-size: 0.85rem;
+}
+
 .leader-name {
   flex-grow: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 110px;
+  max-width: 100px;
+}
+
+.leader-ship {
+  margin: 0 6px;
+  font-size: 0.85rem;
+  opacity: 0.95;
 }
 
 .leader-score {
   font-weight: bold;
   color: #ffd15c;
+  font-family: 'Orbitron', monospace;
 }
 
 /* Unified Tactical Cockpit Telemetry HUD Panel (Pure Icon + Bar + Value) */

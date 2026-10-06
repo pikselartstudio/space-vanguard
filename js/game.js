@@ -535,6 +535,32 @@ class StarblastGame {
     // Spawn 3 Bots per team (9 bots total: 3 red, 3 blue, 3 gold)
     this.initBots();
 
+    // Check if chosen nation is dead - redirect to surviving nation with fewest players per user request
+    if (this.stations[chosenNation] && this.stations[chosenNation].isDead) {
+      const surviving = ['red', 'blue', 'gold'].filter(k => this.stations[k] && !this.stations[k].isDead);
+      if (surviving.length > 0) {
+        const counts = {};
+        surviving.forEach(k => counts[k] = 0);
+        if (this.bots) {
+          this.bots.forEach(b => { if (!b.isDead && counts[b.nation] !== undefined) counts[b.nation]++; });
+        }
+        if (this.remotePlayers) {
+          for (const [id, rp] of this.remotePlayers) {
+            if (!rp.isDead && counts[rp.nation] !== undefined) counts[rp.nation]++;
+          }
+        }
+        surviving.sort((a, b) => counts[a] - counts[b]);
+        const redirected = surviving[0];
+        const oldName = NATIONS[chosenNation] ? NATIONS[chosenNation].name : chosenNation;
+        const newName = NATIONS[redirected] ? NATIONS[redirected].name : redirected;
+        chosenNation = redirected;
+        this.playerNation = chosenNation;
+        setTimeout(() => {
+          if (this.ui) this.ui.showAnnouncement(`⚠️ ${oldName} üssü yıkıldığı için ${newName} filosuna atandınız!`, 4500);
+        }, 500);
+      }
+    }
+
     // Spawn player at own nation base
     const spawn = this.getNationSpawn(chosenNation);
     const myId = (this.network && this.network.myId) ? this.network.myId : 'player';
@@ -586,6 +612,12 @@ class StarblastGame {
   respawnPlayer() {
     this.ui.hideGameOver();
     const nation = this.playerNation || 'blue';
+
+    if (this.stations[nation] && this.stations[nation].isDead) {
+      this.isPlaying = false;
+      this.ui.showNationEliminated();
+      return;
+    }
 
     this.playerDeadHandled = false;
     if (this.player && this.player.mesh) {
@@ -1630,6 +1662,7 @@ class StarblastGame {
           if (b.mesh) {
             b.mesh.visible = true;
             b.mesh.position.set(b.x, -b.y, 0);
+            if (!b.mesh.parent) this.scene.add(b.mesh);
           }
           if (b.healthBarGroup) {
             b.healthBarGroup.visible = true;
@@ -2471,6 +2504,19 @@ class StarblastGame {
       }
     }
 
+    // Eliminate bots belonging to the fallen nation per user request
+    if (this.bots) {
+      for (const b of this.bots) {
+        if (b.nation === station.nation) {
+          b.isDead = true;
+          b.respawnTimer = 9999999;
+          if (b.mesh) this.scene.remove(b.mesh);
+          if (b.nameSprite) this.scene.remove(b.nameSprite);
+          if (b.healthBarGroup) this.scene.remove(b.healthBarGroup);
+        }
+      }
+    }
+
     // If player's own home base is destroyed, player team is eliminated!
     // ("oyunda bir ulusun üssü patlarsa o takım oyundan düşecek ve ekran bulanıklaşıp doygunluğu %80 düşecek ulusunuz yok oldu... yazacak sadece.")
     if (station.nation === this.playerNation) {
@@ -2794,6 +2840,9 @@ class StarblastGame {
       const offsetX = (Math.random() - 0.5) * 160;
       const offsetY = (Math.random() - 0.5) * 160;
       const bot = new BotShip(cfg.id, cfg.name, cfg.shipKey, spawn.x + offsetX, spawn.y + offsetY, cfg.nation, this.scene, cfg.role);
+      if (bot.mesh && !bot.mesh.parent) {
+        this.scene.add(bot.mesh);
+      }
       bot.createPlayerNameTag(this.scene);
       this.bots.push(bot);
     }

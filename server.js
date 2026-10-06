@@ -456,22 +456,20 @@ io.on('connection', (socket) => {
     // Enforce dead station restriction and team balance
     const dist = getTeamDistribution();
     if (stations[chosenNation] && stations[chosenNation].isDead) {
-      const openNations = ['red', 'blue', 'gold'].filter(n => !stations[n].isDead && !dist.status[n].locked);
-      if (openNations.length > 0) {
-        chosenNation = openNations[Math.floor(Math.random() * openNations.length)];
+      // User request: Üssü yıkılmış bir ulusa girilmek istendiğinde sistem o ulusun üssünün yok olduğunu görüp en az oyunculu hayatta kalan ulusa yönlendirir
+      const surviving = ['red', 'blue', 'gold'].filter(n => !stations[n].isDead);
+      if (surviving.length > 0) {
+        surviving.sort((a, b) => (dist.counts[a] || 0) - (dist.counts[b] || 0));
+        chosenNation = surviving[0];
       } else {
-        const anyLiving = ['red', 'blue', 'gold'].filter(n => !stations[n].isDead);
-        if (anyLiving.length > 0) {
-          chosenNation = anyLiving[0];
-        } else {
-          socket.emit('game_over', { reason: 'Tüm uzay üsleri imha edildi!' });
-          return;
-        }
+        socket.emit('game_over', { reason: 'Tüm uzay üsleri imha edildi!' });
+        return;
       }
     } else if (dist.status[chosenNation] && dist.status[chosenNation].locked) {
       const openNations = ['red', 'blue', 'gold'].filter(n => !stations[n].isDead && !dist.status[n].locked);
       if (openNations.length > 0) {
-        chosenNation = openNations[Math.floor(Math.random() * openNations.length)];
+        openNations.sort((a, b) => (dist.counts[a] || 0) - (dist.counts[b] || 0));
+        chosenNation = openNations[0];
       }
     }
 
@@ -919,6 +917,11 @@ io.on('connection', (socket) => {
   socket.on('respawn_player', () => {
     const p = players.get(socket.id);
     if (!p) return;
+
+    if (stations[p.nation] && stations[p.nation].isDead) {
+      socket.emit('player_eliminated', { reason: 'Ulusunuzun ana üssü yok edildi!' });
+      return;
+    }
 
     const spawn = getNationSpawn(p.nation);
     p.x = spawn.x;
