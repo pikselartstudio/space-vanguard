@@ -939,10 +939,10 @@ body, html {
   to { transform: rotate(360deg); }
 }
 
-/* Top Right Radar & Refinery Hologram Row */
+/* Top Right Radar & Maden / Refinery Hologram Row */
 .top-right-radar-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
 }
 
@@ -958,6 +958,7 @@ body, html {
   flex-direction: column;
   gap: 5px;
   pointer-events: auto;
+  margin-top: 2px;
 }
 
 .refinery-holo-header {

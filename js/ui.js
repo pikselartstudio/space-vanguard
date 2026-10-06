@@ -1381,14 +1381,17 @@ class UIManager {
           const nextLvl = drone.level + 1;
           const upCost = drone.level === 1 ? 300 : 500;
           upgradeSection = `
-            <button type="button" class="drone-cube-upgrade-btn" data-action="upgrade_drone_${drone.type}" title="Sv.${nextLvl} seviyesine yükselt">
+            <button type="button" class="drone-cube-upgrade-btn" data-action="upgrade_drone_slot_${i}" data-slot-index="${i}" title="Sv.${nextLvl} seviyesine yükselt">
               ⬆ Sv.${nextLvl} (${upCost} 💎)
             </button>
           `;
         }
 
+        const slotAction = drone.level < 3 ? `upgrade_drone_slot_${i}` : '';
+        const slotTooltip = drone.level < 3 ? `Tıkla: Sv.${drone.level + 1} (${drone.level === 1 ? 300 : 500} 💎)` : 'Maksimum Seviye';
+
         ownedDronesHtml += `
-          <div class="drone-cube-slot active" style="border-color: ${droneColor}88; box-shadow: 0 0 10px ${droneColor}33;">
+          <div class="drone-cube-slot active" data-action="${slotAction}" data-slot-index="${i}" title="${slotTooltip}" style="border-color: ${droneColor}88; box-shadow: 0 0 10px ${droneColor}33; cursor: ${drone.level < 3 ? 'pointer' : 'default'};">
             <div class="drone-cube-header">
               <span class="drone-cube-icon">${iconSvg}</span>
               <span class="drone-cube-level-tag" style="background: ${droneColor}33; color: ${droneColor}; border: 1px solid ${droneColor}66;">Sv.${drone.level}</span>
@@ -1569,12 +1572,12 @@ class UIManager {
       });
     });
 
-    // Left Rack Drone Upgrade Button listeners
-    const upgradeBtns = this.baseDockStatus.querySelectorAll('.drone-cube-upgrade-btn');
-    upgradeBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
+    // Left Rack Drone Upgrade: support clicking either the upgrade button OR the slot cube card itself
+    const activeUpgradeElements = this.baseDockStatus.querySelectorAll('.drone-cube-upgrade-btn, .drone-cube-slot.active');
+    activeUpgradeElements.forEach(el => {
+      el.addEventListener('click', (e) => {
         e.stopPropagation();
-        const action = btn.dataset.action;
+        const action = el.dataset.action;
         if (this.game && action) {
           this.game.purchaseBaseItem(action);
           if (this.game.player && this.game.stations) {
@@ -2102,10 +2105,10 @@ class UIManager {
       this.leaderboardList.innerHTML = stationEntries.map((st, idx) => {
         const statusText = st.isDead ? 'YIKILDI' : `%${st.pct} - Sv${st.level}`;
         const isMyNation = player && player.nation === st.nation;
+        // User request: "üs puanı istatistik kısmında. ulusu ekleme sadece isim yeterli."
         return `
           <div class="leader-item ${isMyNation ? 'player' : ''}" style="border-left: 2px solid ${st.hex};">
             <span class="leader-rank">#${idx + 1}</span>
-            <span class="leader-nation" style="margin-right: 4px;">${st.icon}</span>
             <span class="leader-name" style="color: ${st.hex}; font-weight: 800;">${st.name}</span>
             <span class="leader-score" style="color: ${st.isDead ? '#ef4444' : '#facc15'}; font-family: 'Orbitron', monospace; font-size: 0.74rem;">${statusText}</span>
           </div>
@@ -2115,9 +2118,14 @@ class UIManager {
     }
 
     // 2. "Maden Farmı" ve "PvP Lideri" sekmeleri (İlk 10 Pilot)
-    // Format: 1. - [ulus sembolü] - [adı] - [bulunduğu gemi ikonu] - [puan]
+    // User request: "gemiler patladığında falan oyundan düşmediği sürece istatistikler kısmında isimleri gidip gelmesin oyunda komple düşen çıkan botlar ya da oyuncular istatistikten çıksın ya da ulusu patlamışsa o ulusa ait olanlar komple düşsün."
+    const isNationAlive = (nation) => {
+      const st = (this.game && this.game.stations) ? this.game.stations[nation] : null;
+      return st ? !st.isDead : true;
+    };
+
     const all = [];
-    if (player && !player.isDead) {
+    if (player && isNationAlive(player.nation)) {
       all.push({
         name: player.name,
         score: player.score || 0,
@@ -2131,7 +2139,7 @@ class UIManager {
     }
     const remotes = Array.isArray(remotePlayers) ? remotePlayers : (remotePlayers instanceof Map ? Array.from(remotePlayers.values()) : []);
     for (const b of remotes) {
-      if (!b.isDead) {
+      if (isNationAlive(b.nation)) {
         all.push({
           name: b.name,
           score: b.score || 0,
@@ -2144,10 +2152,10 @@ class UIManager {
         });
       }
     }
-    // Include active bots
+    // Include bots as long as their nation is alive
     const bots = (this.game && this.game.bots) ? this.game.bots : [];
     for (const b of bots) {
-      if (!b.isDead) {
+      if (isNationAlive(b.nation)) {
         all.push({
           name: b.name,
           score: b.score || 0,
@@ -2217,11 +2225,12 @@ class UIManager {
         progressHtml = `<span style="font-size:0.62rem; color:#ef4444;" title="Çatışma">⚔️</span>`;
       }
 
+      // User request: "rafineri değilde MADEN olarak yazalım şuan"
       return `
         <div class="refinery-holo-item" style="border-left: 3px solid ${ownerColor};">
           <span class="ref-badge" style="background:${badgeBg}; border:1px solid ${badgeBorder}; color:${ownerColor};">${badgeLetter}</span>
           <div class="ref-holo-content">
-            <div class="ref-holo-title">Rafineri ${badgeLetter}</div>
+            <div class="ref-holo-title">Maden ${badgeLetter}</div>
             <div class="ref-holo-meta">
               <span class="ref-owner" style="color: ${ownerColor};">${ownerLabel}</span>
               ${progressHtml}

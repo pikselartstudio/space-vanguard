@@ -79,11 +79,11 @@ class StarblastGame {
       gold: { x: 2290, y: 1520 }     // North-East
     };
 
-    // Plan A: 3 Neutral Mining Refineries (Territory Control / King of the Hill)
+    // Plan A: 3 Neutral Mining Refineries / Madenler (Territory Control / King of the Hill)
     this.refineryLocations = {
-      alpha: { id: 'alpha', name: 'Rafineri A', letter: 'A', x: 0, y: 2800 },
-      beta:  { id: 'beta',  name: 'Rafineri B', letter: 'B', x: -2500, y: -1500 },
-      gamma: { id: 'gamma', name: 'Rafineri C', letter: 'C', x: 2500, y: -1500 }
+      alpha: { id: 'alpha', name: 'Maden A', letter: 'A', x: 0, y: 2800 },
+      beta:  { id: 'beta',  name: 'Maden B', letter: 'B', x: -2500, y: -1500 },
+      gamma: { id: 'gamma', name: 'Maden C', letter: 'C', x: 2500, y: -1500 }
     };
 
     // Inputs
@@ -1022,34 +1022,50 @@ class StarblastGame {
 
     const names = { attack: 'Saldırı Dronu', defense: 'Savunma Dronu', mining: 'Maden Dronu' };
 
-    // Drone purchase and leveling (Max Lv. 3, 500 / 600 / 720 crystals)
-    if (action.startsWith('drone_') || action.startsWith('upgrade_drone_')) {
-      const droneType = action.replace('upgrade_drone_', '').replace('drone_', ''); // 'attack', 'defense', 'mining'
+    // Drone Upgrades from Left Slot Rack (Sv.1 -> Sv.2 = 300 💎, Sv.2 -> Sv.3 = 500 💎)
+    if (action.startsWith('upgrade_drone_')) {
       if (!this.player.drones) this.player.drones = [];
+      let existingDrone = null;
+      if (action.startsWith('upgrade_drone_slot_')) {
+        const slotIdx = parseInt(action.replace('upgrade_drone_slot_', ''), 10);
+        existingDrone = this.player.drones[slotIdx];
+      } else {
+        const droneType = action.replace('upgrade_drone_', '');
+        existingDrone = this.player.drones.find(d => d.type === droneType);
+      }
 
-      const existingDrone = this.player.drones.find(d => d.type === droneType);
-
-      if (existingDrone && (action.startsWith('upgrade_drone_') || existingDrone.level < 3)) {
-        if (existingDrone.level >= 3) {
-          if (this.ui) this.ui.showAnnouncement(`⭐ ${names[droneType]} zaten maksimum Seviye 3!`, 2200);
-          return;
-        }
-        const upgradeCost = existingDrone.level === 1 ? 300 : 500;
-        if (this.player.crystals < upgradeCost) {
-          if (this.ui) this.ui.showAnnouncement(`⚠️ Yetersiz kristal! Seviye ${existingDrone.level + 1} yükseltmesi için ${upgradeCost} Kristal gereklidir.`, 2500);
-          return;
-        }
-        this.player.crystals -= upgradeCost;
-        existingDrone.setLevel(existingDrone.level + 1);
-        window.soundSystem.playUpgrade();
-        if (this.ui) {
-          this.ui.showAnnouncement(`⬆️ ${names[droneType]} Seviye ${existingDrone.level}'e yükseltildi! (Güç x${(Math.pow(1.2, existingDrone.level - 1)).toFixed(2)})`, 2500);
-          this.ui.updateHUD(this.player, this.stations);
-        }
+      if (!existingDrone) {
+        if (this.ui) this.ui.showAnnouncement('⚠️ Yükseltilecek dron bulunamadı!', 2000);
         return;
       }
 
-      // Purchase new drone (Sv.1 = 150 Kristal)
+      const droneType = existingDrone.type;
+      if (existingDrone.level >= 3) {
+        if (this.ui) this.ui.showAnnouncement(`⭐ ${names[droneType]} zaten maksimum Seviye 3!`, 2200);
+        return;
+      }
+
+      const upgradeCost = existingDrone.level === 1 ? 300 : 500;
+      if (this.player.crystals < upgradeCost) {
+        if (this.ui) this.ui.showAnnouncement(`⚠️ Yetersiz kristal! Seviye ${existingDrone.level + 1} yükseltmesi için ${upgradeCost} Kristal gereklidir.`, 2500);
+        return;
+      }
+
+      this.player.crystals -= upgradeCost;
+      existingDrone.setLevel(existingDrone.level + 1);
+      window.soundSystem.playUpgrade();
+      if (this.ui) {
+        this.ui.showAnnouncement(`⬆️ ${names[droneType]} Seviye ${existingDrone.level}'e yükseltildi! (Güç x${(Math.pow(1.2, existingDrone.level - 1)).toFixed(2)})`, 2500);
+        this.ui.updateHUD(this.player, this.stations);
+      }
+      return;
+    }
+
+    // Purchase New Drone from Shop (ALWAYS 150 💎 per user request: "saldırı dornu shopta sürekli 150 olacak diğer dronalrda slot kısmında seviye artıracağız")
+    if (action.startsWith('drone_')) {
+      const droneType = action.replace('drone_', ''); // 'attack', 'defense', 'mining'
+      if (!this.player.drones) this.player.drones = [];
+
       const buyCost = 150;
       if (this.player.crystals < buyCost) {
         if (this.ui) this.ui.showAnnouncement(`⚠️ Yetersiz kristal! Dron satın almak için ${buyCost} Kristal gereklidir.`, 2500);
@@ -1639,6 +1655,49 @@ class StarblastGame {
               if (this.ui) {
                 this.ui.addChatMessage('STRATEJİ', `🚩 [${ref.name}] ${occNation.toUpperCase()} ulusu tarafından ele geçirildi! (+10 Üs Puanı)`, occNation, true);
               }
+            }
+          }
+        }
+      }
+
+      // 2a-2. 5-Second Refinery / Maden Income to Home Base Level per user request:
+      // "rafineri ulusta kaldıkça 5 saniyede bir 10 kristal üs seviyesine eklensin seviyeye yardımcı olsun eğer 3 ünüde aynı ulus alırsa 50 kristal 5 saniyede bir ulusa yüklensin üs seviyesini artırmaya yardımcı olsun."
+      this.refineryIncomeTimer = (this.refineryIncomeTimer || 0) + dt;
+      if (this.refineryIncomeTimer >= 5.0) {
+        this.refineryIncomeTimer = 0;
+        const nationMadenCounts = { blue: 0, red: 0, gold: 0 };
+        for (const rk in this.refineries) {
+          const r = this.refineries[rk];
+          if (r && r.controllingNation && nationMadenCounts[r.controllingNation] !== undefined) {
+            nationMadenCounts[r.controllingNation]++;
+          }
+        }
+
+        for (const nKey of ['blue', 'red', 'gold']) {
+          const count = nationMadenCounts[nKey];
+          if (count <= 0) continue;
+          const st = this.stations[nKey];
+          if (!st || st.isDead) continue;
+
+          // 3'ünü de aynı ulus alırsa 50 kristal, aksi halde maden başına 10 kristal (count * 10)
+          const bonusCrystals = (count === 3) ? 50 : (count * 10);
+          st.crystalsDonated = (st.crystalsDonated || 0) + bonusCrystals;
+          st.hp = Math.min(st.maxHp, st.hp + bonusCrystals * 25);
+
+          while (st.crystalsDonated >= st.crystalsRequired && st.level < 5) {
+            st.level++;
+            st.maxHp = st.level * 100000;
+            st.hp = st.maxHp;
+            st.crystalsDonated -= st.crystalsRequired;
+            st.crystalsRequired = Math.round(st.crystalsRequired * 2.2);
+            if (st.mesh) this.scene.remove(st.mesh);
+            st.mesh = ModelBuilder.createStationMesh(nKey, st.level);
+            st.mesh.position.set(st.x, -st.y, -150);
+            this.scene.add(st.mesh);
+
+            if (this.ui) {
+              const nCfg = NATIONS[nKey] || NATIONS['blue'];
+              this.ui.addChatMessage('MERKEZ ÜS', `🌟 ${nCfg.name.toUpperCase()} Ana Üssü Seviye ${st.level}'e Yükseldi!`, nKey, true);
             }
           }
         }

@@ -110,11 +110,11 @@ const TIER_YIELDS = [
   { min: 1, max: 3, totalPoints: 75, allowSingleMega: true }
 ];
 
-// Neutral Mining Refineries (Plan A - Territory Control / King of the Hill)
+// Neutral Mining Refineries / Madenler (Plan A - Territory Control / King of the Hill)
 const refineries = {
-  alpha: { id: 'alpha', name: 'Rafineri A', letter: 'A', x: 0, y: 2800, controllingNation: null, captureProgress: 0, contested: false },
-  beta:  { id: 'beta',  name: 'Rafineri B', letter: 'B', x: -2500, y: -1500, controllingNation: null, captureProgress: 0, contested: false },
-  gamma: { id: 'gamma', name: 'Rafineri C', letter: 'C', x: 2500, y: -1500, controllingNation: null, captureProgress: 0, contested: false }
+  alpha: { id: 'alpha', name: 'Maden A', letter: 'A', x: 0, y: 2800, controllingNation: null, captureProgress: 0, contested: false },
+  beta:  { id: 'beta',  name: 'Maden B', letter: 'B', x: -2500, y: -1500, controllingNation: null, captureProgress: 0, contested: false },
+  gamma: { id: 'gamma', name: 'Maden C', letter: 'C', x: 2500, y: -1500, controllingNation: null, captureProgress: 0, contested: false }
 };
 
 const asteroids = new Map();
@@ -1193,30 +1193,47 @@ setInterval(() => {
     }
   }
 
-  // Passive income tick every 3 seconds
+  // Passive refinery income to base level every 5 seconds per user request:
+  // "rafineri ulusta kaldıkça 5 saniyede bir 10 kristal üs seviyesine eklensin seviyeye yardımcı olsun eğer 3 ünüde aynı ulus alırsa 50 kristal 5 saniyede bir ulusa yüklensin üs seviyesini artırmaya yardımcı olsun."
   refineryIncomeTimer += 1;
-  if (refineryIncomeTimer >= 3) {
+  if (refineryIncomeTimer >= 5) {
     refineryIncomeTimer = 0;
-    const rewards = { blue: 0, red: 0, gold: 0 };
+    const nationMadenCounts = { blue: 0, red: 0, gold: 0 };
     for (const refKey in refineries) {
       const ref = refineries[refKey];
-      if (ref.controllingNation) {
-        rewards[ref.controllingNation] += 2;
+      if (ref && ref.controllingNation && nationMadenCounts[ref.controllingNation] !== undefined) {
+        nationMadenCounts[ref.controllingNation]++;
       }
     }
 
-    let rewardedAny = false;
-    for (const [pid, p] of players) {
-      if (p.isDead || !p.nation) continue;
-      const amt = rewards[p.nation] || 0;
-      if (amt > 0) {
-        p.crystals = (p.crystals || 0) + amt;
-        p.mined = (p.mined || 0) + amt;
-        rewardedAny = true;
+    for (const nat of ['blue', 'red', 'gold']) {
+      const count = nationMadenCounts[nat];
+      if (count <= 0) continue;
+      const base = stations[nat];
+      if (!base || base.isDead) continue;
+
+      const bonusCrystals = (count === 3) ? 50 : (count * 10);
+      base.crystalsDonated = (base.crystalsDonated || 0) + bonusCrystals;
+      base.hp = Math.min(base.maxHp, base.hp + bonusCrystals * 25);
+
+      let leveledUp = false;
+      while (base.crystalsDonated >= base.crystalsRequired && base.level < 5) {
+        base.level++;
+        base.maxHp = base.level * 100000;
+        base.hp = base.maxHp;
+        base.crystalsDonated -= base.crystalsRequired;
+        base.crystalsRequired = Math.round(base.crystalsRequired * 2.2);
+        leveledUp = true;
+        io.emit('chat_message', {
+          id: `base-lvl-${Date.now()}`,
+          senderName: 'MERKEZ ÜS',
+          nation: nat,
+          text: `🌟 ${nat.toUpperCase()} Ana Üssü Seviye ${base.level}'e Yükseltildi!`,
+          isSystem: true,
+          timestamp: Date.now()
+        });
       }
-    }
-    if (rewardedAny) {
-      io.emit('refineries_income', { rewards });
+      io.emit('base_updated', { ...base, leveledUp });
     }
   }
 
