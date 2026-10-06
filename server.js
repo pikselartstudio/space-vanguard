@@ -112,9 +112,9 @@ const TIER_YIELDS = [
 
 // Neutral Mining Refineries (Plan A - Territory Control / King of the Hill)
 const refineries = {
-  alpha: { id: 'alpha', name: 'Rafineri Alfa', letter: 'α', x: 0, y: 2800, controllingNation: null, captureProgress: 0, contested: false },
-  beta:  { id: 'beta',  name: 'Rafineri Beta',  letter: 'β', x: -2500, y: -1500, controllingNation: null, captureProgress: 0, contested: false },
-  gamma: { id: 'gamma', name: 'Rafineri Gama',  letter: 'γ', x: 2500, y: -1500, controllingNation: null, captureProgress: 0, contested: false }
+  alpha: { id: 'alpha', name: 'Rafineri A', letter: 'A', x: 0, y: 2800, controllingNation: null, captureProgress: 0, contested: false },
+  beta:  { id: 'beta',  name: 'Rafineri B', letter: 'B', x: -2500, y: -1500, controllingNation: null, captureProgress: 0, contested: false },
+  gamma: { id: 'gamma', name: 'Rafineri C', letter: 'C', x: 2500, y: -1500, controllingNation: null, captureProgress: 0, contested: false }
 };
 
 const asteroids = new Map();
@@ -1128,6 +1128,7 @@ setInterval(() => {
             timestamp: Date.now()
           });
         }
+      } else {
         // Unclaimed / neutral: capturing over 10s (10% per second)
         ref.captureProgress = Math.min(100, ref.captureProgress + 10);
         statusChanged = true;

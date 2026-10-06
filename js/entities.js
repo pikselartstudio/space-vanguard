@@ -984,9 +984,11 @@ class Ship extends Entity {
       }
     }
 
+    if (this.spawnShieldTimer > 0) {
+      this.spawnShieldTimer = Math.max(0, this.spawnShieldTimer - dt);
+    }
     if (this.shieldBubble) {
       if (this.spawnShieldTimer > 0) {
-        this.spawnShieldTimer -= dt;
         this.shieldBubble.material.opacity = 0.55 + Math.sin(Date.now() * 0.015) * 0.25;
       } else if (this.shieldDamageFlash > 0) {
         this.shieldDamageFlash -= dt;
@@ -2218,7 +2220,7 @@ class MiningRefinery extends Entity {
     super(x, y, 220, 99999);
     this.id = id;
     this.name = name;
-    this.letter = letter || 'α';
+    this.letter = letter || 'A';
     this.radius = 480; // Capture perimeter
     this.controllingNation = null;
     this.captureProgress = 0;

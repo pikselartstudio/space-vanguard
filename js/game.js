@@ -81,9 +81,9 @@ class StarblastGame {
 
     // Plan A: 3 Neutral Mining Refineries (Territory Control / King of the Hill)
     this.refineryLocations = {
-      alpha: { id: 'alpha', name: 'Rafineri Alfa', letter: 'α', x: 0, y: 2800 },
-      beta:  { id: 'beta',  name: 'Rafineri Beta',  letter: 'β', x: -2500, y: -1500 },
-      gamma: { id: 'gamma', name: 'Rafineri Gama',  letter: 'γ', x: 2500, y: -1500 }
+      alpha: { id: 'alpha', name: 'Rafineri A', letter: 'A', x: 0, y: 2800 },
+      beta:  { id: 'beta',  name: 'Rafineri B', letter: 'B', x: -2500, y: -1500 },
+      gamma: { id: 'gamma', name: 'Rafineri C', letter: 'C', x: 2500, y: -1500 }
     };
 
     // Inputs
@@ -1542,12 +1542,11 @@ class StarblastGame {
     }
 
     // 2a. Neutral Mining Refineries Capture Loop (Plan A - 10s capture, turns to nation color, awards 10 base points)
-    if (!this.network || !this.network.isConnected) {
-      const worldSpan = this.worldSize || 10000;
-      const halfWorld = worldSpan * 0.5;
-      for (const rKey in this.refineries) {
-        const ref = this.refineries[rKey];
-        if (!ref) continue;
+    const worldSpan = this.worldSize || 10000;
+    const halfWorld = worldSpan * 0.5;
+    for (const rKey in this.refineries) {
+      const ref = this.refineries[rKey];
+      if (!ref) continue;
 
         const presentNations = new Set();
         const nationShips = { blue: [], red: [], gold: [] };
@@ -1612,7 +1611,6 @@ class StarblastGame {
           }
         }
       }
-    }
 
     // 2b. Update 9 Active Bots (AI stepping, respawn timers, laser shooting)
     for (const b of this.bots) {
@@ -1930,13 +1928,19 @@ class StarblastGame {
               ship.vy += (laser.vy / ship.mass) * 0.35;
             }
 
-            if (this.network && this.network.isConnected) {
-              this.network.emitHitPlayer(ship.id, laser.damage * 0.70, false);
-            } else {
-              const shipKilled = ship.takeDamage(laser.damage * 0.70);
+            const isVictimBot = this.bots.some(b => b.id === ship.id);
+            const isAttackerBot = laser.ownerId && String(laser.ownerId).startsWith('bot-');
+
+            if (isVictimBot || isAttackerBot || !this.network || !this.network.isConnected) {
+              const shipKilled = ship.takeDamage(laser.damage * 0.85);
               if (shipKilled) {
                 this.handleShipDestroyed(ship, laser.ownerId);
               }
+              if (ship === this.player && this.ui) {
+                this.ui.updateHUD(this.player, this.stations);
+              }
+            } else {
+              this.network.emitHitPlayer(ship.id, laser.damage * 0.85, false);
             }
 
             // Healer hitting enemy also regenerates health: "şifacı vurduğu zaman can yeniler"

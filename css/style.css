@@ -353,6 +353,26 @@ body, html {
   line-height: 1;
 }
 
+#shiptree-toggle-btn {
+  position: relative;
+}
+
+#shiptree-toggle-btn.active {
+  border-color: #00f0ff;
+  background: rgba(0, 240, 255, 0.22);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.7);
+}
+
+#shiptree-toggle-btn svg {
+  display: block;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+#shiptree-toggle-btn:hover svg {
+  transform: scale(1.12);
+  filter: drop-shadow(0 0 6px #00f0ff);
+}
+
 .crystal-counter {
   display: flex;
   align-items: center;

@@ -21,6 +21,7 @@ class UIManager {
     this.shopHudBtn = document.getElementById('shop-hud-btn');
     this.isShopOpen = false;
     this.shiptreeHudBtn = document.getElementById('shiptree-hud-btn');
+    this.shiptreeToggleBtn = document.getElementById('shiptree-toggle-btn');
     this.mainShiptreeBtn = document.getElementById('main-shiptree-btn');
     this.shiptreeModal = document.getElementById('shiptree-modal');
     this.shiptreeGrid = document.getElementById('shiptree-grid');
@@ -556,7 +557,13 @@ class UIManager {
       });
     }
 
-    // Ship Tree [Y] HUD & Main Menu Button click handlers
+    // Ship Tree [Y] HUD & Audio Controls Button click handlers
+    if (this.shiptreeToggleBtn) {
+      this.shiptreeToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleShipTreeModal();
+      });
+    }
     if (this.shiptreeHudBtn) {
       this.shiptreeHudBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1197,6 +1204,9 @@ class UIManager {
     if (this.shiptreeHudBtn) {
       this.shiptreeHudBtn.classList.toggle('active', nextState);
     }
+    if (this.shiptreeToggleBtn) {
+      this.shiptreeToggleBtn.classList.toggle('active', nextState);
+    }
     if (nextState) {
       this.renderShipTreeGrid();
     }
@@ -1823,7 +1833,7 @@ class UIManager {
         const dist = Math.hypot(dx, dy);
         const controllingNation = ref.controllingNation;
         const refColor = controllingNation && NATIONS[controllingNation] ? NATIONS[controllingNation].hex : '#00f0ff';
-        const letter = ref.letter || (refKey === 'alpha' ? 'α' : (refKey === 'beta' ? 'β' : 'γ'));
+        const letter = ref.letter || (refKey === 'alpha' ? 'A' : (refKey === 'beta' ? 'B' : 'C'));
 
         if (dist <= tacticalRange) {
           const rx = cx + dx * scale;
@@ -1937,18 +1947,32 @@ class UIManager {
 
     // Gems are hidden from radar per user request: "radarda düşen ganimetin görülmesini engelleyelim"
 
-    // 4. Draw Remote Ships / Bots on Radar within tactical range
-    const otherShips = Array.isArray(bots) ? bots : (bots instanceof Map ? Array.from(bots.values()) : []);
+    // 4. Draw Remote Ships & Autonomous Bots on Radar
+    const otherShips = [];
+    if (this.game && Array.isArray(this.game.bots)) {
+      for (const b of this.game.bots) otherShips.push(b);
+    }
+    if (bots) {
+      if (Array.isArray(bots)) {
+        for (const b of bots) if (!otherShips.includes(b)) otherShips.push(b);
+      } else if (bots instanceof Map) {
+        for (const b of bots.values()) if (!otherShips.includes(b)) otherShips.push(b);
+      }
+    }
+    if (this.game && this.game.remotePlayers instanceof Map) {
+      for (const b of this.game.remotePlayers.values()) if (!otherShips.includes(b)) otherShips.push(b);
+    }
+
     for (const b of otherShips) {
       if (b.isDead) continue;
       const dx = this.wrapDelta(b.x - player.x, worldSize);
       const dy = this.wrapDelta(b.y - player.y, worldSize);
       const dist = Math.hypot(dx, dy);
+      const nationCfg = NATIONS[b.nation] || NATIONS['red'];
 
       if (dist <= tacticalRange) {
         const rx = cx + dx * scale;
         const ry = cy + dy * scale;
-        const nationCfg = NATIONS[b.nation] || NATIONS['red'];
 
         ctx.save();
         ctx.translate(rx, ry);
@@ -1963,6 +1987,27 @@ class UIManager {
         ctx.lineTo(-4.5, 3.5);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
+      } else {
+        // Distant bot / player directional chevron on radar rim
+        const angle = Math.atan2(dy, dx);
+        const rimR = radarRadius - 5;
+        const bx = cx + Math.cos(angle) * rimR;
+        const by = cy + Math.sin(angle) * rimR;
+
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.rotate(angle);
+        ctx.fillStyle = nationCfg.hex;
+        ctx.globalAlpha = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(4.5, 0);
+        ctx.lineTo(-3, -2.5);
+        ctx.lineTo(-1.5, 0);
+        ctx.lineTo(-3, 2.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
         ctx.restore();
       }
     }
@@ -2097,7 +2142,7 @@ class UIManager {
       const nationCfg = nation ? (NATIONS[nation] || NATIONS['blue']) : null;
       const ownerLabel = nationCfg ? nationCfg.name.substring(0, 6) : 'NÖTR';
       const ownerColor = nationCfg ? nationCfg.hex : '#94a3b8';
-      const badgeLetter = r.letter || (r.id === 'alpha' ? 'α' : (r.id === 'beta' ? 'β' : 'γ'));
+      const badgeLetter = r.letter || (r.id === 'alpha' ? 'A' : (r.id === 'beta' ? 'B' : 'C'));
       const badgeBg = nationCfg ? `${nationCfg.hex}33` : 'rgba(255, 255, 255, 0.1)';
       const badgeBorder = nationCfg ? nationCfg.hex : 'rgba(255, 255, 255, 0.2)';
       const shortName = r.name ? r.name.replace('Rafineri ', '') : (r.id ? r.id.toUpperCase() : '');

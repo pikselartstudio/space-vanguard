@@ -88,10 +88,6 @@
             <span class="shop-key-tag">[M]</span>
             <span class="shop-title-tag">SHOP</span>
           </div>
-          <div id="shiptree-hud-btn" class="interactive" title="Gemi Gelişim Ağacı & 12 Uzman Gemi (Açmak/Kapatmak için [Y] tuşuna basın veya tıklayın)">
-            <span class="shiptree-key-tag">[Y]</span>
-            <span class="shiptree-title-tag">AĞAÇ</span>
-          </div>
         </div>
         <!-- Base Dock / Shop Market Status (Opens below DFRT + CTRL and [M] SHOP buttons) -->
         <div id="base-dock-status" style="display: none;" class="interactive"></div>
@@ -264,8 +260,14 @@
         </div>
       </div>
 
-      <!-- Bottom Right: Audio Controls (Music & Sound Icons Only) -->
+      <!-- Bottom Right: Ship Tree & Audio Controls -->
       <div id="audio-controls" class="interactive">
+        <button id="shiptree-toggle-btn" class="audio-btn" title="Gemi Gelişim Ağacı [Y]" aria-label="Gemi Gelişim Ağacı">
+          <svg class="audio-icon ship-icon-svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 19 21 12 17 5 21 12 2" fill="rgba(0, 240, 255, 0.25)" stroke="#00f0ff" stroke-width="1.8" />
+            <line x1="12" y1="2" x2="12" y2="17" stroke="#00f0ff" stroke-width="1.5" />
+          </svg>
+        </button>
         <button id="music-toggle-btn" class="audio-btn" title="Müziği Aç / Kapat" aria-label="Müziği Aç / Kapat">
           <span id="music-icon" class="audio-icon">🎵</span>
         </button>
@@ -499,7 +501,6 @@
 
 
         <button id="play-btn" class="play-btn">START</button>
-        <button type="button" id="main-shiptree-btn" class="play-btn-ghost" style="margin-top: 9px; width: 100%; border: 1px solid rgba(0, 240, 255, 0.45); color: #38bdf8; font-family: 'Orbitron', monospace; font-size: 0.78rem; font-weight: 700; padding: 8px 12px; letter-spacing: 1.5px; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; background: rgba(8, 24, 48, 0.65);">🚀 GEMİ GELİŞİM AĞACI (12 GEMİ)</button>
       </div>
 
       <!-- Bottom Social Icons Bar (Visual only, non-clickable) -->
