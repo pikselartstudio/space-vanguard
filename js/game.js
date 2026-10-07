@@ -24,11 +24,6 @@ class StarblastGame {
     this.playerNation = 'blue';
     this.playerDeadHandled = false;
 
-    // Pre-load 3D Model Assets
-    if (typeof ModelBuilder !== 'undefined') {
-      ModelBuilder.initGLTFLoading();
-    }
-
     // Three.js Core
     this.container = document.getElementById('canvas-container');
     this.scene = new THREE.Scene();
@@ -64,11 +59,6 @@ class StarblastGame {
     const blueBackLight = new THREE.DirectionalLight(0x0077ff, 0.9);
     blueBackLight.position.set(-1500, -1500, 800);
     this.scene.add(blueBackLight);
-
-    // Direct overhead fill light to guarantee high contrast visibility for all ships against deep space
-    const overheadFillLight = new THREE.DirectionalLight(0xffffff, 1.35);
-    overheadFillLight.position.set(0, 0, 2000);
-    this.scene.add(overheadFillLight);
 
     // Entity Collections
     this.player = null;
