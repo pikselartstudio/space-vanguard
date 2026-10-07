@@ -33,6 +33,139 @@ const ModelBuilder = {
   loadedGLTFModels: {},
   gltfLoadingPromises: {},
   flyInstances: new Set(),
+  starterShipMaterials: {},
+
+  resolveNationColors(inputColor) {
+    let colorHex = 0x0099ff;
+    if (typeof inputColor === 'string') {
+      const lower = inputColor.toLowerCase();
+      if (lower.includes('red') || lower.includes('kryos')) {
+        colorHex = 0xff2a4b;
+      } else if (lower.includes('gold') || lower.includes('aethel') || lower.includes('yellow')) {
+        colorHex = 0xffbb00;
+      } else if (lower.startsWith('#') || lower.startsWith('0x')) {
+        colorHex = parseInt(lower.replace('#', '').replace('0x', ''), 16);
+      } else {
+        colorHex = 0x0099ff;
+      }
+    } else if (typeof inputColor === 'number') {
+      colorHex = inputColor;
+    } else if (inputColor && typeof inputColor === 'object' && inputColor.color) {
+      colorHex = inputColor.color;
+    }
+
+    const isRed = (colorHex === 0xff2a4b || colorHex === 0xff2244 || colorHex === 0xff3355);
+    const isGold = (colorHex === 0xffbb00 || colorHex === 0xffaa00 || colorHex === 0xffd700);
+    const isBlue = !isRed && !isGold;
+
+    const nationKey = isRed ? 'red' : (isGold ? 'gold' : 'blue');
+    const accentHex = isRed ? 0xff2a4b : (isGold ? 0xffbb00 : 0x00a8ff);
+    const neonHex = isRed ? 0xff1e46 : (isGold ? 0xffb800 : 0x00f0ff);
+    const highlightHex = isRed ? 0xff6688 : (isGold ? 0xffe066 : 0x66f0ff);
+    const flameHex = isRed ? 0xff3355 : (isGold ? 0xffaa00 : 0x00d4ff);
+
+    return {
+      nationKey,
+      colorHex: accentHex,
+      isRed,
+      isGold,
+      isBlue,
+      accentHex,
+      neonHex,
+      highlightHex,
+      flameHex
+    };
+  },
+
+  getStarterShipMaterial(nationColor, baseMaterial) {
+    const info = this.resolveNationColors(nationColor);
+    const cacheKey = info.nationKey;
+
+    if (this.starterShipMaterials[cacheKey]) {
+      return this.starterShipMaterials[cacheKey];
+    }
+
+    const mat = baseMaterial ? baseMaterial.clone() : new THREE.MeshStandardMaterial();
+    mat.name = 'StarterShipPBR_' + cacheKey;
+    mat.metalness = 0.22; // Low metalness prevents black reflections against dark space!
+    mat.roughness = 0.42; // Satin finish that reflects directional and ambient light crisply
+    mat.color = new THREE.Color(1.15, 1.15, 1.18);
+    mat.castShadow = true;
+    mat.receiveShadow = true;
+
+    const uNationColor = new THREE.Color(info.accentHex);
+    const uNeonColor = new THREE.Color(info.neonHex);
+    const uHighlightColor = new THREE.Color(info.highlightHex);
+
+    mat.customProgramCacheKey = () => 'void_piercer_shader_' + cacheKey;
+
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uNationColor = { value: uNationColor };
+      shader.uniforms.uNeonColor = { value: uNeonColor };
+      shader.uniforms.uHighlightColor = { value: uHighlightColor };
+
+      shader.fragmentShader = `
+        uniform vec3 uNationColor;
+        uniform vec3 uNeonColor;
+        uniform vec3 uHighlightColor;
+      ` + shader.fragmentShader;
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <map_fragment>',
+        `
+        #ifdef USE_MAP
+          vec4 texColor = texture2D( map, vUv );
+          vec3 base = texColor.rgb;
+
+          // 1. Detect purple / magenta accent areas in the model's baked texture:
+          float purpleMetric = min(base.r, base.b) - base.g;
+          float isPurple = smoothstep(0.06, 0.18, purpleMetric);
+
+          // 2. Luminance calculation:
+          float lum = dot(base, vec3(0.299, 0.587, 0.114));
+
+          // 3. LIFT DARK AREAS: Eliminate "görünmez gibi duruyor" (invisible in space)
+          // Boost dark metallic plates from black to visible sleek graphite/slate:
+          base = max(base, vec3(0.24, 0.28, 0.35));
+
+          // 4. Adapt purple areas to vibrant nation color!
+          // Scales with luminance so surface curvature and texture shading are preserved:
+          vec3 nationTinted = uNationColor * (0.45 + lum * 1.15);
+          vec3 finalBase = mix(base, nationTinted, isPurple * 0.98);
+
+          diffuseColor = vec4( finalBase, texColor.a );
+        #endif
+        `
+      );
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <dithering_fragment>',
+        `
+        #include <dithering_fragment>
+
+        // A. SCI-FI FRESNEL RIM LIGHTING (Silhouette Edge Glow):
+        // Outlines the ship contours against the deep black void of space!
+        vec3 viewDir = normalize( - vViewPosition );
+        vec3 norm = normalize( vNormal );
+        float NdotV = max( 0.0, dot( norm, viewDir ) );
+        float fresnel = pow( 1.0 - NdotV, 2.3 );
+        gl_FragColor.rgb += uHighlightColor * (fresnel * 0.72);
+
+        // B. ACTIVE NATION ENERGY CIRCUITS (Emissive Glow):
+        // Replaced purple stripes now pulse with active nation energy!
+        #ifdef USE_MAP
+          vec4 rawTex = texture2D( map, vUv );
+          float pMet = min(rawTex.r, rawTex.b) - rawTex.g;
+          float pMask = smoothstep(0.07, 0.20, pMet);
+          gl_FragColor.rgb += uNeonColor * (pMask * 0.55);
+        #endif
+        `
+      );
+    };
+
+    this.starterShipMaterials[cacheKey] = mat;
+    return mat;
+  },
 
   initGLTFLoading() {
     if (this.gltfLoadingPromises['starter-ship']) return this.gltfLoadingPromises['starter-ship'];
@@ -65,7 +198,7 @@ const ModelBuilder = {
     const baseModel = this.loadedGLTFModels['starter-ship'];
     if (!baseModel) return;
     this.flyInstances.forEach((entry) => {
-      const { container, nationColor } = entry;
+      const { container, nationColor, flameGroup, wingTrails } = entry;
       if (!container || !container.parent) {
         this.flyInstances.delete(entry);
         return;
@@ -73,21 +206,27 @@ const ModelBuilder = {
       while (container.children.length > 0) {
         container.remove(container.children[0]);
       }
-      const glbMesh = this.buildStarterShipGLBMesh(nationColor);
+      if (flameGroup) {
+        while (flameGroup.children.length > 0) flameGroup.remove(flameGroup.children[0]);
+      }
+      if (wingTrails) {
+        while (wingTrails.children.length > 0) wingTrails.remove(wingTrails.children[0]);
+      }
+      const glbMesh = this.buildStarterShipGLBMesh(nationColor, flameGroup, wingTrails);
       if (glbMesh) container.add(glbMesh);
     });
   },
 
-  buildStarterShipGLBMesh(nationColor) {
+  buildStarterShipGLBMesh(nationColor, flameGroup = null, wingTrails = null) {
     const baseModel = this.loadedGLTFModels['starter-ship'];
     if (!baseModel) return null;
     const cloned = baseModel.clone(true);
+    const info = this.resolveNationColors(nationColor);
 
+    // Apply nation-adapted shader material to the GLB mesh
     cloned.traverse((child) => {
       if (child.isMesh && child.material) {
-        child.material = child.material.clone();
-        child.material.metalness = Math.min(0.9, (child.material.metalness || 0.5) * 1.05);
-        child.material.roughness = Math.max(0.2, (child.material.roughness || 0.4) * 0.95);
+        child.material = this.getStarterShipMaterial(nationColor, child.material);
         child.castShadow = true;
         child.receiveShadow = true;
       }
@@ -102,43 +241,226 @@ const ModelBuilder = {
     cloned.rotation.y = Math.PI / 2;
     cloned.scale.set(22, 22, 22);
     glbWrapper.add(cloned);
+
+    // --- INTEGRATED SCI-FI LIGHTING & ACCENT DETAILS ON THE 3D MODEL ---
+    const neonMat = new THREE.MeshBasicMaterial({ color: info.neonHex });
+    const canopyMat = new THREE.MeshStandardMaterial({
+      color: info.isRed ? 0x2e0814 : (info.isGold ? 0x2e1e08 : 0x092238),
+      emissive: info.isRed ? 0x77102a : (info.isGold ? 0x774810 : 0x0a5585),
+      emissiveIntensity: 0.95,
+      roughness: 0.08,
+      metalness: 0.92,
+      flatShading: true
+    });
+    const gunMat = new THREE.MeshStandardMaterial({
+      color: 0x303d4e,
+      roughness: 0.25,
+      metalness: 0.85,
+      flatShading: true
+    });
+
+    // 1. Faceted Glowing Cockpit Visor / Canopy (placed directly over GLB cockpit at [0, 2.0, 3.0])
+    const canopyGeo = new THREE.CylinderGeometry(1.4, 3.2, 8.5, 6);
+    canopyGeo.rotateX(Math.PI / 2);
+    const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+    canopy.scale.set(0.92, 0.65, 1.0);
+    canopy.position.set(0, 2.1, 3.0);
+    glbWrapper.add(canopy);
+
+    const canopyRidgeGeo = new THREE.BoxGeometry(0.35, 0.35, 7.8);
+    const canopyRidge = new THREE.Mesh(canopyRidgeGeo, neonMat);
+    canopyRidge.position.set(0, 2.7, 3.0);
+    glbWrapper.add(canopyRidge);
+
+    // 2. Swept Wing Leading-Edge Glowing Energy Lines (matches GLB delta wings from [0, 10] to [±11.2, -6])
+    [-1, 1].forEach(side => {
+      const leGeo = new THREE.BoxGeometry(0.42, 0.42, 17.5);
+      const leMesh = new THREE.Mesh(leGeo, neonMat);
+      leMesh.position.set(side * 6.5, 0.4, 1.8);
+      leMesh.rotation.y = side * -0.62;
+      glbWrapper.add(leMesh);
+
+      // Wingtip Navigation / Energy Beacon Gem
+      const beaconGeo = new THREE.ConeGeometry(0.85, 2.4, 4);
+      beaconGeo.rotateX(Math.PI / 2);
+      const beacon = new THREE.Mesh(beaconGeo, neonMat);
+      beacon.position.set(side * 11.2, 0.6, -7.5);
+      glbWrapper.add(beacon);
+
+      // Wing pod intake rings
+      const podRingGeo = new THREE.TorusGeometry(1.4, 0.22, 6, 14);
+      const podRing = new THREE.Mesh(podRingGeo, neonMat);
+      podRing.position.set(side * 7.2, 0.7, -13.5);
+      glbWrapper.add(podRing);
+    });
+
+    // 3. Forward Laser Muzzle Aperture (tip Z = +20.8)
+    const muzzleApertureGeo = new THREE.TorusGeometry(0.95, 0.22, 6, 16);
+    const muzzleAperture = new THREE.Mesh(muzzleApertureGeo, neonMat);
+    muzzleAperture.position.set(0, 0.2, 20.8);
+    glbWrapper.add(muzzleAperture);
+
+    // 4. Rear Engine Nozzles (placed at the GLB rear exhaust ports at Z = -20.6)
+    const cNozGeo = new THREE.CylinderGeometry(2.4, 3.2, 3.2, 10);
+    cNozGeo.rotateX(Math.PI / 2);
+    const cNoz = new THREE.Mesh(cNozGeo, gunMat);
+    cNoz.position.set(0, 0.3, -20.6);
+    glbWrapper.add(cNoz);
+
+    const cNozRimGeo = new THREE.TorusGeometry(2.3, 0.28, 6, 16);
+    const cNozRim = new THREE.Mesh(cNozRimGeo, neonMat);
+    cNozRim.position.set(0, 0.3, -22.1);
+    glbWrapper.add(cNozRim);
+
+    // Twin flank auxiliary nozzles
+    [-1, 1].forEach(side => {
+      const auxNozGeo = new THREE.CylinderGeometry(1.6, 2.1, 2.6, 8);
+      auxNozGeo.rotateX(Math.PI / 2);
+      const auxNoz = new THREE.Mesh(auxNozGeo, gunMat);
+      auxNoz.position.set(side * 6.8, 0.6, -18.8);
+      glbWrapper.add(auxNoz);
+
+      const auxRimGeo = new THREE.TorusGeometry(1.5, 0.20, 6, 14);
+      const auxRim = new THREE.Mesh(auxRimGeo, neonMat);
+      auxRim.position.set(side * 6.8, 0.6, -20.0);
+      glbWrapper.add(auxRim);
+    });
+
+    // 5. Thruster Plasma Flame Beams in flameGroup
+    if (flameGroup) {
+      // Center Main Ion Plasma Flame Beam
+      const cBeamGeo = new THREE.CylinderGeometry(2.2, 0.45, 24, 12);
+      cBeamGeo.rotateX(Math.PI / 2);
+      const cBeamMat = new THREE.MeshBasicMaterial({
+        color: info.flameHex,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending
+      });
+      const cBeam = new THREE.Mesh(cBeamGeo, cBeamMat);
+      cBeam.position.set(0, 0.3, -33.5);
+      flameGroup.add(cBeam);
+
+      // Center High-Energy White Core
+      const cCoreGeo = new THREE.CylinderGeometry(0.95, 0.18, 19, 10);
+      cCoreGeo.rotateX(Math.PI / 2);
+      const cCore = new THREE.Mesh(cCoreGeo, new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.95,
+        blending: THREE.AdditiveBlending
+      }));
+      cCore.position.set(0, 0.3, -31.0);
+      flameGroup.add(cCore);
+
+      // Shock containment diamonds
+      [-26, -32].forEach((zPos, idx) => {
+        const sRingGeo = new THREE.TorusGeometry(idx === 0 ? 1.6 : 1.1, 0.20, 6, 16);
+        const sRingMat = new THREE.MeshBasicMaterial({
+          color: info.neonHex,
+          transparent: true,
+          opacity: 0.85,
+          blending: THREE.AdditiveBlending
+        });
+        const sRing = new THREE.Mesh(sRingGeo, sRingMat);
+        sRing.position.set(0, 0.3, zPos);
+        flameGroup.add(sRing);
+      });
+
+      // Twin Flank Ion Plasma Jets
+      [-1, 1].forEach(side => {
+        const auxJetGeo = new THREE.CylinderGeometry(1.2, 0.25, 14, 8);
+        auxJetGeo.rotateX(Math.PI / 2);
+        const auxJetMat = new THREE.MeshBasicMaterial({
+          color: info.flameHex,
+          transparent: true,
+          opacity: 0.80,
+          blending: THREE.AdditiveBlending
+        });
+        const auxJet = new THREE.Mesh(auxJetGeo, auxJetMat);
+        auxJet.position.set(side * 6.8, 0.6, -26.5);
+        flameGroup.add(auxJet);
+
+        const auxCoreGeo = new THREE.CylinderGeometry(0.5, 0.1, 11, 6);
+        auxCoreGeo.rotateX(Math.PI / 2);
+        const auxCore = new THREE.Mesh(auxCoreGeo, new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.92,
+          blending: THREE.AdditiveBlending
+        }));
+        auxCore.position.set(side * 6.8, 0.6, -25.0);
+        flameGroup.add(auxCore);
+      });
+    }
+
+    // 6. Wing Contrails in wingTrails
+    if (wingTrails) {
+      [-1, 1].forEach(side => {
+        const wx = side * 11.2;
+        const trailGeo = new THREE.CylinderGeometry(0.20, 0.38, 16, 6);
+        trailGeo.rotateX(Math.PI / 2);
+        const trailMat = new THREE.MeshBasicMaterial({
+          color: info.neonHex,
+          transparent: true,
+          opacity: 0.60,
+          blending: THREE.AdditiveBlending
+        });
+        const trailMesh = new THREE.Mesh(trailGeo, trailMat);
+        trailMesh.position.set(wx, 0.4, -15.5);
+        wingTrails.add(trailMesh);
+
+        const threadGeo = new THREE.CylinderGeometry(0.08, 0.18, 12, 6);
+        threadGeo.rotateX(Math.PI / 2);
+        const threadMat = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.75,
+          blending: THREE.AdditiveBlending
+        });
+        const threadMesh = new THREE.Mesh(threadGeo, threadMat);
+        threadMesh.position.set(wx, 0.4, -13.5);
+        wingTrails.add(threadMesh);
+      });
+    }
+
     return glbWrapper;
   },
 
-  buildProceduralFlyHull(nationColor, neonColorHex, flameColorHex) {
+  buildProceduralFlyHull(nationColor, neonColorHex, flameColorHex, flameGroup = null, wingTrails = null) {
     const hullGroup = new THREE.Group();
     hullGroup.name = 'proceduralFlyHull';
 
-    const isRedNation = (nationColor === 0xff2a4b);
-    const isGoldNation = (nationColor === 0xffbb00);
+    const info = this.resolveNationColors(nationColor);
 
+    // Lifted dark hull material (sleek metallic graphite slate, not black)
     const flyDarkHullMat = new THREE.MeshStandardMaterial({
-      color: 0x182230,
-      roughness: 0.35,
-      metalness: 0.65,
+      color: 0x2c3b4f,
+      roughness: 0.38,
+      metalness: 0.55,
       flatShading: true
     });
     const flyWhiteArmorMat = new THREE.MeshStandardMaterial({
-      color: 0xf2f6fa,
-      roughness: 0.22,
-      metalness: 0.30,
+      color: 0xf8faff,
+      roughness: 0.20,
+      metalness: 0.25,
       flatShading: true
     });
-    const canopyTint = isRedNation ? 0x2e0814 : (isGoldNation ? 0x2e1e08 : 0x092238);
-    const canopyEmissive = isRedNation ? 0x550c1e : (isGoldNation ? 0x55380c : 0x063e66);
+    const canopyTint = info.isRed ? 0x2e0814 : (info.isGold ? 0x2e1e08 : 0x092238);
+    const canopyEmissive = info.isRed ? 0x550c1e : (info.isGold ? 0x55380c : 0x063e66);
     const flyCanopyMat = new THREE.MeshStandardMaterial({
       color: canopyTint,
       emissive: canopyEmissive,
-      emissiveIntensity: 0.80,
+      emissiveIntensity: 0.85,
       roughness: 0.08,
       metalness: 0.92,
       flatShading: true
     });
     const flyNeonMat = new THREE.MeshBasicMaterial({ color: neonColorHex });
     const flyGunMat = new THREE.MeshStandardMaterial({
-      color: 0x1f2732,
+      color: 0x283444,
       roughness: 0.28,
-      metalness: 0.88,
+      metalness: 0.85,
       flatShading: true
     });
 
@@ -195,6 +517,55 @@ const ModelBuilder = {
       hullGroup.add(wingTip);
     });
 
+    // Fallback thruster nozzle and flame
+    const mainNozzleGeo = new THREE.CylinderGeometry(3.4, 4.3, 4.5, 10);
+    mainNozzleGeo.rotateX(Math.PI / 2);
+    const mainNozzle = new THREE.Mesh(mainNozzleGeo, flyDarkHullMat);
+    mainNozzle.position.set(0, 0.2, -12);
+    hullGroup.add(mainNozzle);
+
+    if (flameGroup) {
+      const ionBeamGeo = new THREE.CylinderGeometry(2.4, 0.5, 24, 12);
+      ionBeamGeo.rotateX(Math.PI / 2);
+      const ionBeamMat = new THREE.MeshBasicMaterial({
+        color: flameColorHex,
+        transparent: true,
+        opacity: 0.82,
+        blending: THREE.AdditiveBlending
+      });
+      const ionBeam = new THREE.Mesh(ionBeamGeo, ionBeamMat);
+      ionBeam.position.set(0, 0.2, -24.5);
+      flameGroup.add(ionBeam);
+
+      const ionCoreGeo = new THREE.CylinderGeometry(1.1, 0.2, 19, 10);
+      ionCoreGeo.rotateX(Math.PI / 2);
+      const ionCore = new THREE.Mesh(ionCoreGeo, new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.95,
+        blending: THREE.AdditiveBlending
+      }));
+      ionCore.position.set(0, 0.2, -22);
+      flameGroup.add(ionCore);
+    }
+
+    if (wingTrails) {
+      [-1, 1].forEach(side => {
+        const wx = side * 14.6;
+        const trailGeo = new THREE.CylinderGeometry(0.20, 0.38, 18, 6);
+        trailGeo.rotateX(Math.PI / 2);
+        const trailMat = new THREE.MeshBasicMaterial({
+          color: neonColorHex,
+          transparent: true,
+          opacity: 0.55,
+          blending: THREE.AdditiveBlending
+        });
+        const trailMesh = new THREE.Mesh(trailGeo, trailMat);
+        trailMesh.position.set(wx, 0.4, -14 - 9);
+        wingTrails.add(trailMesh);
+      });
+    }
+
     return hullGroup;
   },
 
@@ -209,7 +580,8 @@ const ModelBuilder = {
     shipGroup.rotation.x = Math.PI / 2;
     shipRoot.add(shipGroup);
 
-    const nationColor = customColor !== null ? customColor : (config.color || 0x0099ff);
+    const nationInfo = this.resolveNationColors(customColor !== null ? customColor : (config.color || 0x0099ff));
+    const nationColor = nationInfo.accentHex;
 
     // 1. Primary Off-White / Titanium Hull Alloy (Matches reference image body)
     const baseHullMat = new THREE.MeshStandardMaterial({
@@ -510,11 +882,15 @@ const ModelBuilder = {
       case 'tier-1': {
         tierScale = 1.00;
 
-        // Dedicated materials matching media_1790886036925.jpg reference
-        const isRedNation = (nationColor === 0xff2a4b);
-        const isGoldNation = (nationColor === 0xffbb00);
-        const neonColorHex = isRedNation ? 0xff2244 : (isGoldNation ? 0xffaa00 : 0x00f0ff);
-        const flameColorHex = isRedNation ? 0xff3355 : (isGoldNation ? 0xffaa00 : 0x00d4ff);
+        const info = this.resolveNationColors(nationColor);
+        const neonColorHex = info.neonHex;
+        const flameColorHex = info.flameHex;
+
+        // Wing trails container
+        const wingTrails = new THREE.Group();
+        wingTrails.name = 'wingTrails';
+        wingTrails.visible = false;
+        shipGroup.add(wingTrails);
 
         // 3D GLB Model Container for Starter Ship (Void Piercer)
         const flyGLBContainer = new THREE.Group();
@@ -522,384 +898,14 @@ const ModelBuilder = {
         shipGroup.add(flyGLBContainer);
 
         if (this.loadedGLTFModels['starter-ship']) {
-          const glbMesh = this.buildStarterShipGLBMesh(nationColor);
+          const glbMesh = this.buildStarterShipGLBMesh(nationColor, flameGroup, wingTrails);
           if (glbMesh) flyGLBContainer.add(glbMesh);
         } else {
-          this.flyInstances.add({ container: flyGLBContainer, nationColor });
+          this.flyInstances.add({ container: flyGLBContainer, nationColor, flameGroup, wingTrails });
           this.initGLTFLoading();
+          const fallbackMesh = this.buildProceduralFlyHull(nationColor, neonColorHex, flameColorHex, flameGroup, wingTrails);
+          if (fallbackMesh) flyGLBContainer.add(fallbackMesh);
         }
-
-        // 1. Dark Midnight Navy / Charcoal Primary Hull
-        const flyDarkHullMat = new THREE.MeshStandardMaterial({
-          color: 0x182230,
-          roughness: 0.35,
-          metalness: 0.65,
-          flatShading: true
-        });
-
-        // 2. Pure White / Ceramic Armor Plates
-        const flyWhiteArmorMat = new THREE.MeshStandardMaterial({
-          color: 0xf2f6fa,
-          roughness: 0.22,
-          metalness: 0.30,
-          flatShading: true
-        });
-
-        // 3. Faceted Gem Cockpit Glass (Nation tinted)
-        const canopyTint = isRedNation ? 0x2e0814 : (isGoldNation ? 0x2e1e08 : 0x092238);
-        const canopyEmissive = isRedNation ? 0x550c1e : (isGoldNation ? 0x55380c : 0x063e66);
-        const flyCanopyMat = new THREE.MeshStandardMaterial({
-          color: canopyTint,
-          emissive: canopyEmissive,
-          emissiveIntensity: 0.80,
-          roughness: 0.08,
-          metalness: 0.92,
-          flatShading: true
-        });
-
-        // 4. Vibrant Neon Emissive Trim (Wing strips, nacelle intake rings, muzzle ring)
-        const flyNeonMat = new THREE.MeshBasicMaterial({
-          color: neonColorHex
-        });
-
-        // 5. Polished Gunmetal Barrel
-        const flyGunMat = new THREE.MeshStandardMaterial({
-          color: 0x1f2732,
-          roughness: 0.28,
-          metalness: 0.88,
-          flatShading: true
-        });
-
-                if (!this.loadedGLTFModels['starter-ship']) {
-          const proceduralHull = new THREE.Group();
-          proceduralHull.name = 'proceduralFlyHull';
-          flyGLBContainer.add(proceduralHull);
-
-// --- A. CENTRAL FUSELAGE & NOSE ---
-        // 1. Lower hull wedge base
-        const lowerHullGeo = new THREE.BoxGeometry(10.5, 3.2, 23);
-        const lowerHull = new THREE.Mesh(lowerHullGeo, flyDarkHullMat);
-        lowerHull.position.set(0, -0.4, 0);
-        proceduralHull.add(lowerHull);
-
-        // 2. Upper spine ridge
-        const spineGeo = new THREE.BoxGeometry(6.6, 2.6, 20);
-        const spineMesh = new THREE.Mesh(spineGeo, flyDarkHullMat);
-        spineMesh.position.set(0, 1.4, 1.0);
-        proceduralHull.add(spineMesh);
-
-        // 3. Forward prow wedge
-        const prowGeo = new THREE.ConeGeometry(5.8, 12, 4);
-        prowGeo.rotateX(Math.PI / 2);
-        prowGeo.rotateY(Math.PI / 4);
-        const prowMesh = new THREE.Mesh(prowGeo, flyDarkHullMat);
-        prowMesh.scale.set(1.15, 0.55, 1.0);
-        prowMesh.position.set(0, 0.4, 11);
-        proceduralHull.add(prowMesh);
-
-        // 4. Stepped nose mount block
-        const noseMountGeo = new THREE.BoxGeometry(3.6, 2.6, 4.5);
-        const noseMount = new THREE.Mesh(noseMountGeo, flyDarkHullMat);
-        noseMount.position.set(0, 0.2, 14.5);
-        proceduralHull.add(noseMount);
-
-        // --- B. FORWARD CANNON BARREL & GLOWING RINGS ---
-        // Cannon barrel collar base
-        const bCollarGeo = new THREE.CylinderGeometry(1.6, 1.8, 2.8, 8);
-        bCollarGeo.rotateX(Math.PI / 2);
-        const bCollar = new THREE.Mesh(bCollarGeo, flyDarkHullMat);
-        bCollar.position.set(0, 0.1, 16.2);
-        proceduralHull.add(bCollar);
-
-        // Main cylindrical cannon barrel
-        const barrelGeo = new THREE.CylinderGeometry(1.05, 1.25, 9.5, 8);
-        barrelGeo.rotateX(Math.PI / 2);
-        const barrel = new THREE.Mesh(barrelGeo, flyGunMat);
-        barrel.position.set(0, 0.1, 20);
-        proceduralHull.add(barrel);
-
-        // Glowing neon ring near barrel tip
-        const tipRingGeo = new THREE.TorusGeometry(1.18, 0.22, 6, 16);
-        const tipRing = new THREE.Mesh(tipRingGeo, flyNeonMat);
-        tipRing.position.set(0, 0.1, 23.2);
-        proceduralHull.add(tipRing);
-
-        // Glowing muzzle aperture ring at front tip
-        const muzzleApertureGeo = new THREE.TorusGeometry(1.05, 0.24, 6, 16);
-        const muzzleAperture = new THREE.Mesh(muzzleApertureGeo, flyNeonMat);
-        muzzleAperture.position.set(0, 0.1, 24.6);
-        proceduralHull.add(muzzleAperture);
-
-        // --- C. FACETED GEM COCKPIT CANOPY ---
-        // Faceted gem canopy
-        const canopyGeo = new THREE.CylinderGeometry(1.6, 3.8, 9.2, 6);
-        canopyGeo.rotateX(Math.PI / 2);
-        const canopy = new THREE.Mesh(canopyGeo, flyCanopyMat);
-        canopy.scale.set(0.92, 0.70, 1.0);
-        canopy.position.set(0, 2.6, 3.5);
-        proceduralHull.add(canopy);
-
-        // Cockpit framing rim
-        const frameGeo = new THREE.CylinderGeometry(1.8, 4.2, 9.4, 6);
-        frameGeo.rotateX(Math.PI / 2);
-        const frame = new THREE.Mesh(frameGeo, flyDarkHullMat);
-        frame.scale.set(0.98, 0.40, 1.0);
-        frame.position.set(0, 1.9, 3.5);
-        proceduralHull.add(frame);
-
-        // --- D. WHITE CERAMIC AFT COWL BEHIND CANOPY ---
-        // Raised white armor plate behind cockpit canopy
-        const aftCowlGeo = new THREE.BoxGeometry(4.8, 2.0, 7.5);
-        const aftCowl = new THREE.Mesh(aftCowlGeo, flyWhiteArmorMat);
-        aftCowl.position.set(0, 2.4, -3.2);
-        proceduralHull.add(aftCowl);
-
-        // Faceted transition wedge between canopy and aft cowl
-        const cowlSlopeGeo = new THREE.ConeGeometry(3.6, 4.0, 4);
-        cowlSlopeGeo.rotateX(Math.PI / 2);
-        cowlSlopeGeo.rotateY(Math.PI / 4);
-        const cowlSlope = new THREE.Mesh(cowlSlopeGeo, flyWhiteArmorMat);
-        cowlSlope.scale.set(1.1, 0.5, 0.9);
-        cowlSlope.position.set(0, 2.5, 0.2);
-        proceduralHull.add(cowlSlope);
-
-        // --- E. SWEPT DELTA WINGS & WHITE CERAMIC PLATES ---
-        // Main dark wing platform
-        const wingBedGeo = new THREE.BoxGeometry(28, 1.6, 14);
-        const wingBed = new THREE.Mesh(wingBedGeo, flyDarkHullMat);
-        wingBed.position.set(0, -0.2, -1.0);
-        proceduralHull.add(wingBed);
-
-        // White ceramic armor wing panels (Left & Right)
-        const createWingPlateGeometry = (isRight) => {
-          const s = isRight ? 1 : -1;
-          const geom = new THREE.BufferGeometry();
-          const verts = new Float32Array([
-            // Top face (0-3)
-            s * 3.4, 0.9, 7.2,
-            s * 12.0, 0.7, 0.5,
-            s * 12.4, 0.7, -6.8,
-            s * 4.8, 0.9, -6.5,
-            // Bottom face (4-7)
-            s * 3.4, -0.1, 7.2,
-            s * 12.0, -0.1, 0.5,
-            s * 12.4, -0.1, -6.8,
-            s * 4.8, -0.1, -6.5
-          ]);
-          geom.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-
-          let indices;
-          if (isRight) {
-            indices = [
-              0, 1, 2,  0, 2, 3,
-              4, 6, 5,  4, 7, 6,
-              0, 5, 1,  0, 4, 5,
-              1, 6, 2,  1, 5, 6,
-              2, 7, 3,  2, 6, 7,
-              3, 4, 0,  3, 7, 4
-            ];
-          } else {
-            indices = [
-              0, 2, 1,  0, 3, 2,
-              4, 5, 6,  4, 6, 7,
-              0, 1, 5,  0, 5, 4,
-              1, 2, 6,  1, 6, 5,
-              2, 3, 7,  2, 7, 6,
-              3, 0, 4,  3, 4, 7
-            ];
-          }
-          geom.setIndex(indices);
-          geom.computeVertexNormals();
-          return geom;
-        };
-
-        const rightWingPlate = new THREE.Mesh(createWingPlateGeometry(true), flyWhiteArmorMat);
-        proceduralHull.add(rightWingPlate);
-
-        const leftWingPlate = new THREE.Mesh(createWingPlateGeometry(false), flyWhiteArmorMat);
-        proceduralHull.add(leftWingPlate);
-
-        // --- F. GLOWING NEON TRIM LINES (Leading edges & seams) ---
-        [-1, 1].forEach(side => {
-          // 1. Leading edge glowing stripe
-          const leLen = 17.0;
-          const leGeo = new THREE.BoxGeometry(0.55, 0.55, leLen);
-          const leMesh = new THREE.Mesh(leGeo, flyNeonMat);
-          leMesh.position.set(side * 8.4, 0.6, 4.4);
-          leMesh.rotation.y = side * -0.60;
-          proceduralHull.add(leMesh);
-
-          // 2. Inner fuselage seam glowing stripe
-          const inLen = 14.5;
-          const inGeo = new THREE.BoxGeometry(0.50, 0.50, inLen);
-          const inMesh = new THREE.Mesh(inGeo, flyNeonMat);
-          inMesh.position.set(side * 4.4, 0.95, 0.6);
-          inMesh.rotation.y = side * -0.18;
-          proceduralHull.add(inMesh);
-        });
-
-        // --- G. DUAL WINGTIP ENGINE NACELLES / PODS ---
-        [-1, 1].forEach(side => {
-          const px = side * 14.6;
-          const py = 0.4;
-          const pz = -2.5;
-
-          // 1. Main cylindrical nacelle body (Dark navy/charcoal)
-          const podGeo = new THREE.CylinderGeometry(2.6, 3.0, 13.5, 8);
-          podGeo.rotateX(Math.PI / 2);
-          const podMesh = new THREE.Mesh(podGeo, flyDarkHullMat);
-          podMesh.position.set(px, py, pz);
-          proceduralHull.add(podMesh);
-
-          // 2. White armor cap on top of pod (Exact reference match!)
-          const topCowlGeo = new THREE.BoxGeometry(2.8, 1.3, 8.5);
-          const topCowl = new THREE.Mesh(topCowlGeo, flyWhiteArmorMat);
-          topCowl.position.set(px, py + 2.1, pz + 0.5);
-          proceduralHull.add(topCowl);
-
-          // 3. Glowing neon intake ring on front rim
-          const intakeRingGeo = new THREE.TorusGeometry(2.5, 0.32, 6, 16);
-          const intakeRing = new THREE.Mesh(intakeRingGeo, flyNeonMat);
-          intakeRing.position.set(px, py, pz + 6.8);
-          proceduralHull.add(intakeRing);
-
-          // 4. Recessed dark intake interior
-          const intakeInnerGeo = new THREE.CylinderGeometry(1.8, 2.3, 2.2, 8);
-          intakeInnerGeo.rotateX(Math.PI / 2);
-          const intakeInner = new THREE.Mesh(intakeInnerGeo, flyDarkHullMat);
-          intakeInner.position.set(px, py, pz + 6.0);
-          proceduralHull.add(intakeInner);
-
-          // 5. Outer flank glowing neon accent slit
-          const slitGeo = new THREE.BoxGeometry(0.45, 0.45, 5.5);
-          const slit = new THREE.Mesh(slitGeo, flyNeonMat);
-          slit.position.set(px + side * 2.8, py + 0.6, pz);
-          proceduralHull.add(slit);
-
-          // 6. Rear exhaust nozzle
-          const nozGeo = new THREE.CylinderGeometry(2.4, 2.1, 2.5, 8);
-          nozGeo.rotateX(Math.PI / 2);
-          const noz = new THREE.Mesh(nozGeo, flyGunMat);
-          noz.position.set(px, py, pz - 7.5);
-          proceduralHull.add(noz);
-
-          // Side nacelle sleek ion light jets
-          const podFlameGeo = new THREE.CylinderGeometry(0.8, 0.25, 12, 8);
-          podFlameGeo.rotateX(Math.PI / 2);
-          const podFlameMat = new THREE.MeshBasicMaterial({
-            color: flameColorHex,
-            transparent: true,
-            opacity: 0.85,
-            blending: THREE.AdditiveBlending
-          });
-          const podFlame = new THREE.Mesh(podFlameGeo, podFlameMat);
-          podFlame.position.set(px, py, pz - 13.5);
-          flameGroup.add(podFlame);
-
-          // Side nacelle inner white core
-          const podCoreGeo = new THREE.CylinderGeometry(0.35, 0.1, 9.5, 6);
-          podCoreGeo.rotateX(Math.PI / 2);
-          const podCore = new THREE.Mesh(podCoreGeo, new THREE.MeshBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.92,
-            blending: THREE.AdditiveBlending
-          }));
-          podCore.position.set(px, py, pz - 12.0);
-          flameGroup.add(podCore);
-        });
-
-                }
-
-// --- H. CENTER MAIN ENGINE & FUTURISTIC SCI-FI ION LIGHT BEAM ---
-        // Center rear nozzle bell
-        const mainNozzleGeo = new THREE.CylinderGeometry(3.4, 4.3, 4.5, 10);
-        mainNozzleGeo.rotateX(Math.PI / 2);
-        const mainNozzle = new THREE.Mesh(mainNozzleGeo, flyDarkHullMat);
-        mainNozzle.position.set(0, 0.2, -12);
-        shipGroup.add(mainNozzle);
-
-        // Glowing neon interior rim
-        const nozzleRingGeo = new THREE.TorusGeometry(3.1, 0.35, 6, 16);
-        const nozzleRing = new THREE.Mesh(nozzleRingGeo, flyNeonMat);
-        nozzleRing.position.set(0, 0.2, -14.2);
-        shipGroup.add(nozzleRing);
-
-        // 1. Sci-Fi Outer Ion Plasma Glow Beam (Clean, steady celestial light)
-        const ionBeamGeo = new THREE.CylinderGeometry(2.4, 0.5, 24, 12);
-        ionBeamGeo.rotateX(Math.PI / 2);
-        const ionBeamMat = new THREE.MeshBasicMaterial({
-          color: flameColorHex,
-          transparent: true,
-          opacity: 0.82,
-          blending: THREE.AdditiveBlending
-        });
-        const ionBeam = new THREE.Mesh(ionBeamGeo, ionBeamMat);
-        ionBeam.position.set(0, 0.2, -24.5);
-        flameGroup.add(ionBeam);
-
-        // 2. High-Energy White Core Ion Beam
-        const ionCoreGeo = new THREE.CylinderGeometry(1.1, 0.2, 19, 10);
-        ionCoreGeo.rotateX(Math.PI / 2);
-        const ionCoreMat = new THREE.MeshBasicMaterial({
-          color: 0xffffff,
-          transparent: true,
-          opacity: 0.95,
-          blending: THREE.AdditiveBlending
-        });
-        const ionCore = new THREE.Mesh(ionCoreGeo, ionCoreMat);
-        ionCore.position.set(0, 0.2, -22);
-        flameGroup.add(ionCore);
-
-        // 3. Ion Containment Shock Rings (Pulse Diamonds)
-        [-19, -25].forEach((zPos, idx) => {
-          const sRingGeo = new THREE.TorusGeometry(idx === 0 ? 1.7 : 1.15, 0.20, 6, 16);
-          const sRingMat = new THREE.MeshBasicMaterial({
-            color: flameColorHex,
-            transparent: true,
-            opacity: 0.85,
-            blending: THREE.AdditiveBlending
-          });
-          const sRing = new THREE.Mesh(sRingGeo, sRingMat);
-          sRing.position.set(0, 0.2, zPos);
-          flameGroup.add(sRing);
-        });
-
-        // --- I. WINGTIP AERODYNAMIC SLIPSTREAM GLIDE TRAILS ("kanatlarda hafif çizgisel bir süzülme efekti, aşırı uzamasın") ---
-        const wingTrails = new THREE.Group();
-        wingTrails.name = 'wingTrails';
-        wingTrails.visible = false;
-        shipGroup.add(wingTrails);
-
-        [-1, 1].forEach(side => {
-          const wx = side * 14.6;
-          // Outer subtle glowing slipstream ribbon (length 18 units, neatly restrained)
-          const trailGeo = new THREE.CylinderGeometry(0.20, 0.38, 18, 6);
-          trailGeo.rotateX(Math.PI / 2);
-          const trailMat = new THREE.MeshBasicMaterial({
-            color: neonColorHex,
-            transparent: true,
-            opacity: 0.55,
-            blending: THREE.AdditiveBlending
-          });
-          const trailMesh = new THREE.Mesh(trailGeo, trailMat);
-          trailMesh.position.set(wx, 0.4, -17.5);
-          wingTrails.add(trailMesh);
-
-          // Inner white slipstream thread
-          const threadGeo = new THREE.CylinderGeometry(0.08, 0.16, 13, 6);
-          threadGeo.rotateX(Math.PI / 2);
-          const threadMat = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.70,
-            blending: THREE.AdditiveBlending
-          });
-          const threadMesh = new THREE.Mesh(threadGeo, threadMat);
-          threadMesh.position.set(wx, 0.4, -15.0);
-          wingTrails.add(threadMesh);
-        });
-
         break;
       }
 

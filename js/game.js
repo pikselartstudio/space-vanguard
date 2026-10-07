@@ -65,6 +65,11 @@ class StarblastGame {
     blueBackLight.position.set(-1500, -1500, 800);
     this.scene.add(blueBackLight);
 
+    // Direct overhead fill light to guarantee high contrast visibility for all ships against deep space
+    const overheadFillLight = new THREE.DirectionalLight(0xffffff, 1.35);
+    overheadFillLight.position.set(0, 0, 2000);
+    this.scene.add(overheadFillLight);
+
     // Entity Collections
     this.player = null;
     this.asteroids = [];
