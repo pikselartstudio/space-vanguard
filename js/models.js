@@ -29,6 +29,175 @@ const ModelBuilder = {
     })
   },
 
+  // 3D GLB Models Cache & Dynamic Registry
+  loadedGLTFModels: {},
+  gltfLoadingPromises: {},
+  flyInstances: new Set(),
+
+  initGLTFLoading() {
+    if (this.gltfLoadingPromises['starter-ship']) return this.gltfLoadingPromises['starter-ship'];
+    if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined') {
+      setTimeout(() => this.initGLTFLoading(), 60);
+      return null;
+    }
+    const loader = new THREE.GLTFLoader();
+    this.gltfLoadingPromises['starter-ship'] = new Promise((resolve) => {
+      loader.load(
+        'assets/models/starter-ship.glb',
+        (gltf) => {
+          const model = gltf.scene || gltf.scenes[0];
+          this.loadedGLTFModels['starter-ship'] = model;
+          console.log('✅ [ModelBuilder] Starter Ship 3D GLB model (Void Piercer) loaded successfully!');
+          this.upgradeAllFlyInstancesWithGLB();
+          resolve(model);
+        },
+        undefined,
+        (err) => {
+          console.error('❌ [ModelBuilder] Failed to load starter-ship.glb:', err);
+          resolve(null);
+        }
+      );
+    });
+    return this.gltfLoadingPromises['starter-ship'];
+  },
+
+  upgradeAllFlyInstancesWithGLB() {
+    const baseModel = this.loadedGLTFModels['starter-ship'];
+    if (!baseModel) return;
+    this.flyInstances.forEach((entry) => {
+      const { container, nationColor } = entry;
+      if (!container || !container.parent) {
+        this.flyInstances.delete(entry);
+        return;
+      }
+      while (container.children.length > 0) {
+        container.remove(container.children[0]);
+      }
+      const glbMesh = this.buildStarterShipGLBMesh(nationColor);
+      if (glbMesh) container.add(glbMesh);
+    });
+  },
+
+  buildStarterShipGLBMesh(nationColor) {
+    const baseModel = this.loadedGLTFModels['starter-ship'];
+    if (!baseModel) return null;
+    const cloned = baseModel.clone(true);
+
+    cloned.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.material = child.material.clone();
+        child.material.metalness = Math.min(0.9, (child.material.metalness || 0.5) * 1.05);
+        child.material.roughness = Math.max(0.2, (child.material.roughness || 0.4) * 0.95);
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    const glbWrapper = new THREE.Group();
+    glbWrapper.name = 'starterShipGLBWrapper';
+    // Orient: Model needle nose is at -X -> +PI/2 rotation around Y maps -X to +Z (forward flight direction)
+    // Model engines are at +X -> maps to -Z (rear exhaust)
+    // Model canopy is at +Y -> stays +Y (top surface facing camera)
+    // Model wings are along Z -> maps to X (left/right wings)
+    cloned.rotation.y = Math.PI / 2;
+    cloned.scale.set(22, 22, 22);
+    glbWrapper.add(cloned);
+    return glbWrapper;
+  },
+
+  buildProceduralFlyHull(nationColor, neonColorHex, flameColorHex) {
+    const hullGroup = new THREE.Group();
+    hullGroup.name = 'proceduralFlyHull';
+
+    const isRedNation = (nationColor === 0xff2a4b);
+    const isGoldNation = (nationColor === 0xffbb00);
+
+    const flyDarkHullMat = new THREE.MeshStandardMaterial({
+      color: 0x182230,
+      roughness: 0.35,
+      metalness: 0.65,
+      flatShading: true
+    });
+    const flyWhiteArmorMat = new THREE.MeshStandardMaterial({
+      color: 0xf2f6fa,
+      roughness: 0.22,
+      metalness: 0.30,
+      flatShading: true
+    });
+    const canopyTint = isRedNation ? 0x2e0814 : (isGoldNation ? 0x2e1e08 : 0x092238);
+    const canopyEmissive = isRedNation ? 0x550c1e : (isGoldNation ? 0x55380c : 0x063e66);
+    const flyCanopyMat = new THREE.MeshStandardMaterial({
+      color: canopyTint,
+      emissive: canopyEmissive,
+      emissiveIntensity: 0.80,
+      roughness: 0.08,
+      metalness: 0.92,
+      flatShading: true
+    });
+    const flyNeonMat = new THREE.MeshBasicMaterial({ color: neonColorHex });
+    const flyGunMat = new THREE.MeshStandardMaterial({
+      color: 0x1f2732,
+      roughness: 0.28,
+      metalness: 0.88,
+      flatShading: true
+    });
+
+    // Fuselage & Nose
+    const lowerHullGeo = new THREE.BoxGeometry(10.5, 3.2, 23);
+    const lowerHull = new THREE.Mesh(lowerHullGeo, flyDarkHullMat);
+    lowerHull.position.set(0, -0.4, 0);
+    hullGroup.add(lowerHull);
+
+    const spineGeo = new THREE.BoxGeometry(6.6, 2.6, 20);
+    const spineMesh = new THREE.Mesh(spineGeo, flyDarkHullMat);
+    spineMesh.position.set(0, 1.4, 1.0);
+    hullGroup.add(spineMesh);
+
+    const prowGeo = new THREE.ConeGeometry(5.8, 12, 4);
+    prowGeo.rotateX(Math.PI / 2);
+    prowGeo.rotateY(Math.PI / 4);
+    const prowMesh = new THREE.Mesh(prowGeo, flyDarkHullMat);
+    prowMesh.scale.set(1.15, 0.55, 1.0);
+    prowMesh.position.set(0, 0.4, 11);
+    hullGroup.add(prowMesh);
+
+    // Barrel & Muzzle
+    const barrelGeo = new THREE.CylinderGeometry(1.05, 1.25, 9.5, 8);
+    barrelGeo.rotateX(Math.PI / 2);
+    const barrel = new THREE.Mesh(barrelGeo, flyGunMat);
+    barrel.position.set(0, 0.1, 20);
+    hullGroup.add(barrel);
+
+    const muzzleApertureGeo = new THREE.TorusGeometry(1.05, 0.24, 6, 16);
+    const muzzleAperture = new THREE.Mesh(muzzleApertureGeo, flyNeonMat);
+    muzzleAperture.position.set(0, 0.1, 24.6);
+    hullGroup.add(muzzleAperture);
+
+    // Canopy
+    const canopyGeo = new THREE.CylinderGeometry(1.6, 3.8, 9.2, 6);
+    canopyGeo.rotateX(Math.PI / 2);
+    const canopy = new THREE.Mesh(canopyGeo, flyCanopyMat);
+    canopy.scale.set(1.0, 0.58, 1.0);
+    canopy.position.set(0, 2.3, 1.8);
+    hullGroup.add(canopy);
+
+    // Wings
+    [-1, 1].forEach(side => {
+      const wingGeo = new THREE.BoxGeometry(10, 1.4, 14);
+      const wingMesh = new THREE.Mesh(wingGeo, flyWhiteArmorMat);
+      wingMesh.position.set(side * 8, 0, -2);
+      wingMesh.rotation.y = side * -0.25;
+      hullGroup.add(wingMesh);
+
+      const wingTipGeo = new THREE.BoxGeometry(3.5, 1.2, 10);
+      const wingTip = new THREE.Mesh(wingTipGeo, flyDarkHullMat);
+      wingTip.position.set(side * 13.5, 0.2, -6);
+      hullGroup.add(wingTip);
+    });
+
+    return hullGroup;
+  },
+
   createShipMesh(shipKey, customColor = null) {
     const config = SHIP_TREE[shipKey] || SHIP_TREE['fly'];
     const shipRoot = new THREE.Group();
@@ -347,6 +516,19 @@ const ModelBuilder = {
         const neonColorHex = isRedNation ? 0xff2244 : (isGoldNation ? 0xffaa00 : 0x00f0ff);
         const flameColorHex = isRedNation ? 0xff3355 : (isGoldNation ? 0xffaa00 : 0x00d4ff);
 
+        // 3D GLB Model Container for Starter Ship (Void Piercer)
+        const flyGLBContainer = new THREE.Group();
+        flyGLBContainer.name = 'flyGLBContainer';
+        shipGroup.add(flyGLBContainer);
+
+        if (this.loadedGLTFModels['starter-ship']) {
+          const glbMesh = this.buildStarterShipGLBMesh(nationColor);
+          if (glbMesh) flyGLBContainer.add(glbMesh);
+        } else {
+          this.flyInstances.add({ container: flyGLBContainer, nationColor });
+          this.initGLTFLoading();
+        }
+
         // 1. Dark Midnight Navy / Charcoal Primary Hull
         const flyDarkHullMat = new THREE.MeshStandardMaterial({
           color: 0x182230,
@@ -388,18 +570,23 @@ const ModelBuilder = {
           flatShading: true
         });
 
-        // --- A. CENTRAL FUSELAGE & NOSE ---
+                if (!this.loadedGLTFModels['starter-ship']) {
+          const proceduralHull = new THREE.Group();
+          proceduralHull.name = 'proceduralFlyHull';
+          flyGLBContainer.add(proceduralHull);
+
+// --- A. CENTRAL FUSELAGE & NOSE ---
         // 1. Lower hull wedge base
         const lowerHullGeo = new THREE.BoxGeometry(10.5, 3.2, 23);
         const lowerHull = new THREE.Mesh(lowerHullGeo, flyDarkHullMat);
         lowerHull.position.set(0, -0.4, 0);
-        shipGroup.add(lowerHull);
+        proceduralHull.add(lowerHull);
 
         // 2. Upper spine ridge
         const spineGeo = new THREE.BoxGeometry(6.6, 2.6, 20);
         const spineMesh = new THREE.Mesh(spineGeo, flyDarkHullMat);
         spineMesh.position.set(0, 1.4, 1.0);
-        shipGroup.add(spineMesh);
+        proceduralHull.add(spineMesh);
 
         // 3. Forward prow wedge
         const prowGeo = new THREE.ConeGeometry(5.8, 12, 4);
@@ -408,13 +595,13 @@ const ModelBuilder = {
         const prowMesh = new THREE.Mesh(prowGeo, flyDarkHullMat);
         prowMesh.scale.set(1.15, 0.55, 1.0);
         prowMesh.position.set(0, 0.4, 11);
-        shipGroup.add(prowMesh);
+        proceduralHull.add(prowMesh);
 
         // 4. Stepped nose mount block
         const noseMountGeo = new THREE.BoxGeometry(3.6, 2.6, 4.5);
         const noseMount = new THREE.Mesh(noseMountGeo, flyDarkHullMat);
         noseMount.position.set(0, 0.2, 14.5);
-        shipGroup.add(noseMount);
+        proceduralHull.add(noseMount);
 
         // --- B. FORWARD CANNON BARREL & GLOWING RINGS ---
         // Cannon barrel collar base
@@ -422,26 +609,26 @@ const ModelBuilder = {
         bCollarGeo.rotateX(Math.PI / 2);
         const bCollar = new THREE.Mesh(bCollarGeo, flyDarkHullMat);
         bCollar.position.set(0, 0.1, 16.2);
-        shipGroup.add(bCollar);
+        proceduralHull.add(bCollar);
 
         // Main cylindrical cannon barrel
         const barrelGeo = new THREE.CylinderGeometry(1.05, 1.25, 9.5, 8);
         barrelGeo.rotateX(Math.PI / 2);
         const barrel = new THREE.Mesh(barrelGeo, flyGunMat);
         barrel.position.set(0, 0.1, 20);
-        shipGroup.add(barrel);
+        proceduralHull.add(barrel);
 
         // Glowing neon ring near barrel tip
         const tipRingGeo = new THREE.TorusGeometry(1.18, 0.22, 6, 16);
         const tipRing = new THREE.Mesh(tipRingGeo, flyNeonMat);
         tipRing.position.set(0, 0.1, 23.2);
-        shipGroup.add(tipRing);
+        proceduralHull.add(tipRing);
 
         // Glowing muzzle aperture ring at front tip
         const muzzleApertureGeo = new THREE.TorusGeometry(1.05, 0.24, 6, 16);
         const muzzleAperture = new THREE.Mesh(muzzleApertureGeo, flyNeonMat);
         muzzleAperture.position.set(0, 0.1, 24.6);
-        shipGroup.add(muzzleAperture);
+        proceduralHull.add(muzzleAperture);
 
         // --- C. FACETED GEM COCKPIT CANOPY ---
         // Faceted gem canopy
@@ -450,7 +637,7 @@ const ModelBuilder = {
         const canopy = new THREE.Mesh(canopyGeo, flyCanopyMat);
         canopy.scale.set(0.92, 0.70, 1.0);
         canopy.position.set(0, 2.6, 3.5);
-        shipGroup.add(canopy);
+        proceduralHull.add(canopy);
 
         // Cockpit framing rim
         const frameGeo = new THREE.CylinderGeometry(1.8, 4.2, 9.4, 6);
@@ -458,14 +645,14 @@ const ModelBuilder = {
         const frame = new THREE.Mesh(frameGeo, flyDarkHullMat);
         frame.scale.set(0.98, 0.40, 1.0);
         frame.position.set(0, 1.9, 3.5);
-        shipGroup.add(frame);
+        proceduralHull.add(frame);
 
         // --- D. WHITE CERAMIC AFT COWL BEHIND CANOPY ---
         // Raised white armor plate behind cockpit canopy
         const aftCowlGeo = new THREE.BoxGeometry(4.8, 2.0, 7.5);
         const aftCowl = new THREE.Mesh(aftCowlGeo, flyWhiteArmorMat);
         aftCowl.position.set(0, 2.4, -3.2);
-        shipGroup.add(aftCowl);
+        proceduralHull.add(aftCowl);
 
         // Faceted transition wedge between canopy and aft cowl
         const cowlSlopeGeo = new THREE.ConeGeometry(3.6, 4.0, 4);
@@ -474,14 +661,14 @@ const ModelBuilder = {
         const cowlSlope = new THREE.Mesh(cowlSlopeGeo, flyWhiteArmorMat);
         cowlSlope.scale.set(1.1, 0.5, 0.9);
         cowlSlope.position.set(0, 2.5, 0.2);
-        shipGroup.add(cowlSlope);
+        proceduralHull.add(cowlSlope);
 
         // --- E. SWEPT DELTA WINGS & WHITE CERAMIC PLATES ---
         // Main dark wing platform
         const wingBedGeo = new THREE.BoxGeometry(28, 1.6, 14);
         const wingBed = new THREE.Mesh(wingBedGeo, flyDarkHullMat);
         wingBed.position.set(0, -0.2, -1.0);
-        shipGroup.add(wingBed);
+        proceduralHull.add(wingBed);
 
         // White ceramic armor wing panels (Left & Right)
         const createWingPlateGeometry = (isRight) => {
@@ -527,10 +714,10 @@ const ModelBuilder = {
         };
 
         const rightWingPlate = new THREE.Mesh(createWingPlateGeometry(true), flyWhiteArmorMat);
-        shipGroup.add(rightWingPlate);
+        proceduralHull.add(rightWingPlate);
 
         const leftWingPlate = new THREE.Mesh(createWingPlateGeometry(false), flyWhiteArmorMat);
-        shipGroup.add(leftWingPlate);
+        proceduralHull.add(leftWingPlate);
 
         // --- F. GLOWING NEON TRIM LINES (Leading edges & seams) ---
         [-1, 1].forEach(side => {
@@ -540,7 +727,7 @@ const ModelBuilder = {
           const leMesh = new THREE.Mesh(leGeo, flyNeonMat);
           leMesh.position.set(side * 8.4, 0.6, 4.4);
           leMesh.rotation.y = side * -0.60;
-          shipGroup.add(leMesh);
+          proceduralHull.add(leMesh);
 
           // 2. Inner fuselage seam glowing stripe
           const inLen = 14.5;
@@ -548,7 +735,7 @@ const ModelBuilder = {
           const inMesh = new THREE.Mesh(inGeo, flyNeonMat);
           inMesh.position.set(side * 4.4, 0.95, 0.6);
           inMesh.rotation.y = side * -0.18;
-          shipGroup.add(inMesh);
+          proceduralHull.add(inMesh);
         });
 
         // --- G. DUAL WINGTIP ENGINE NACELLES / PODS ---
@@ -562,39 +749,39 @@ const ModelBuilder = {
           podGeo.rotateX(Math.PI / 2);
           const podMesh = new THREE.Mesh(podGeo, flyDarkHullMat);
           podMesh.position.set(px, py, pz);
-          shipGroup.add(podMesh);
+          proceduralHull.add(podMesh);
 
           // 2. White armor cap on top of pod (Exact reference match!)
           const topCowlGeo = new THREE.BoxGeometry(2.8, 1.3, 8.5);
           const topCowl = new THREE.Mesh(topCowlGeo, flyWhiteArmorMat);
           topCowl.position.set(px, py + 2.1, pz + 0.5);
-          shipGroup.add(topCowl);
+          proceduralHull.add(topCowl);
 
           // 3. Glowing neon intake ring on front rim
           const intakeRingGeo = new THREE.TorusGeometry(2.5, 0.32, 6, 16);
           const intakeRing = new THREE.Mesh(intakeRingGeo, flyNeonMat);
           intakeRing.position.set(px, py, pz + 6.8);
-          shipGroup.add(intakeRing);
+          proceduralHull.add(intakeRing);
 
           // 4. Recessed dark intake interior
           const intakeInnerGeo = new THREE.CylinderGeometry(1.8, 2.3, 2.2, 8);
           intakeInnerGeo.rotateX(Math.PI / 2);
           const intakeInner = new THREE.Mesh(intakeInnerGeo, flyDarkHullMat);
           intakeInner.position.set(px, py, pz + 6.0);
-          shipGroup.add(intakeInner);
+          proceduralHull.add(intakeInner);
 
           // 5. Outer flank glowing neon accent slit
           const slitGeo = new THREE.BoxGeometry(0.45, 0.45, 5.5);
           const slit = new THREE.Mesh(slitGeo, flyNeonMat);
           slit.position.set(px + side * 2.8, py + 0.6, pz);
-          shipGroup.add(slit);
+          proceduralHull.add(slit);
 
           // 6. Rear exhaust nozzle
           const nozGeo = new THREE.CylinderGeometry(2.4, 2.1, 2.5, 8);
           nozGeo.rotateX(Math.PI / 2);
           const noz = new THREE.Mesh(nozGeo, flyGunMat);
           noz.position.set(px, py, pz - 7.5);
-          shipGroup.add(noz);
+          proceduralHull.add(noz);
 
           // Side nacelle sleek ion light jets
           const podFlameGeo = new THREE.CylinderGeometry(0.8, 0.25, 12, 8);
@@ -622,7 +809,9 @@ const ModelBuilder = {
           flameGroup.add(podCore);
         });
 
-        // --- H. CENTER MAIN ENGINE & FUTURISTIC SCI-FI ION LIGHT BEAM ---
+                }
+
+// --- H. CENTER MAIN ENGINE & FUTURISTIC SCI-FI ION LIGHT BEAM ---
         // Center rear nozzle bell
         const mainNozzleGeo = new THREE.CylinderGeometry(3.4, 4.3, 4.5, 10);
         mainNozzleGeo.rotateX(Math.PI / 2);
@@ -3234,4 +3423,11 @@ const ModelBuilder = {
 
 if (typeof window !== 'undefined') {
   window.ModelBuilder = ModelBuilder;
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', () => {
+      ModelBuilder.initGLTFLoading();
+    });
+  } else {
+    ModelBuilder.initGLTFLoading();
+  }
 }

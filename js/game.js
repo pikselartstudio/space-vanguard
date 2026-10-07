@@ -24,6 +24,11 @@ class StarblastGame {
     this.playerNation = 'blue';
     this.playerDeadHandled = false;
 
+    // Pre-load 3D Model Assets
+    if (typeof ModelBuilder !== 'undefined') {
+      ModelBuilder.initGLTFLoading();
+    }
+
     // Three.js Core
     this.container = document.getElementById('canvas-container');
     this.scene = new THREE.Scene();

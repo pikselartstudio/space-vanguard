@@ -54,14 +54,14 @@ const SHIP_TREE = {
   // === 7 ANA SEVİYE GEMİLERİ (GÖRSELLER İLE BİREBİR ÖZEL MODELLEME) ===
   // =========================================================================
 
-  // SEVİYE 1: Keşif Avcısı (1.png)
+  // SEVİYE 1: Void Piercer 3D Başlangıç Gemisi
   'tier-1': {
-    name: 'Keşif Avcısı (Lv.1)',
+    name: 'Void Piercer (Lv.1)',
     tier: 1,
     classType: 'scout',
-    className: 'Keşif Avcısı',
+    className: 'Void Piercer',
     classIcon: '🛸',
-    description: 'Çevik delta kanatlı başlangıç keşif gemisi. Yüksek verimli tek namlulu plazma madenci lazeri.',
+    description: '3D aerodinamik iğne gövdeli başlangıç avcısı. Yüksek verimli tek namlulu plazma madenci lazeri.',
     cargoCapacity: 60,
     radius: 18,
     baseStats: {
@@ -212,12 +212,12 @@ const SHIP_TREE = {
 
   // fly alias to tier-1
   'fly': {
-    name: 'Keşif Avcısı (Lv.1)',
+    name: 'Void Piercer (Lv.1)',
     tier: 1,
     classType: 'scout',
-    className: 'Keşif Avcısı',
+    className: 'Void Piercer',
     classIcon: '🛸',
-    description: 'Çevik delta kanatlı başlangıç keşif gemisi. Yüksek verimli tek namlulu plazma madenci lazeri.',
+    description: '3D aerodinamik iğne gövdeli başlangıç avcısı. Yüksek verimli tek namlulu plazma madenci lazeri.',
     cargoCapacity: 60,
     radius: 18,
     baseStats: {
